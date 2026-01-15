@@ -8,7 +8,7 @@ export default function Layout() {
 
       <Sidebar />
 
-      <main className="flex-1 bg-[#121212] overflow-y-auto p-10">
+      <main className="flex-1 bg-[#292929]-bg overflow-y-auto p-10">
         <div className="max-w-6xl mx-auto">
           <Outlet />
         </div>
