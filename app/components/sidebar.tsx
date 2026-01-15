@@ -1,71 +1,91 @@
-import { Link, useLocation } from "react-router";
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router';
 
-export default function Sidebar() {
+const Sidebar = () => {
+  const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
 
+  // Update
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const menuItems = [
-    { name: "Home", path: "/", icon: "/icons/home.svg" },
-    { name: "Artisan", path: "/artisan", icon: "/icons/artisan.svg" },
-    { name: "Suppliers", path: "/suppliers", icon: "/icons/suppliers.svg" },
-    { name: "Audit logs", path: "/audit-logs", icon: "/icons/auditLogs.svg" },
-    { name: "Users", path: "/users", icon: "/icons/accounts.svg" },
+    { name: 'Home', path: '/' },
+    { name: 'Artisan', path: '/artisan' },
+    { name: 'Suppliers', path: '/suppliers' },
+    { name: 'Audit Logs', path: '/audit-logs' },
+    { name: 'Users', path: '/users' },
   ];
 
-  return (
-    <aside className="w-[300px] bg-[#222222] h-screen flex flex-col pt-16 pb-8 px-0 text-white shrink-0">
+  const sidebarStyle: React.CSSProperties = {
+    backgroundColor: '#292929',
+    color: 'white',
+    width: '250px',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '20px',
+    position: 'fixed',
+    left: 0,
+    top: 0
+  };
 
-      <div className="mb-14 px-8">
-        <h1 className="text-[28px] font-bold leading-tight">
-          Welcome back,<br />John!
-        </h1>
-        <p className="text-[#888888] text-[15px] mt-4 font-light">
-          Last update: Today, 10:02am
+  return (
+    <div style={sidebarStyle}>
+      {/* Header Section */}
+      <div style={{ marginBottom: '30px', borderBottom: '1px solid #444', paddingBottom: '20px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Welcome back, Name</h3>
+        <p style={{ fontSize: '0.8rem', color: '#aaa', marginTop: '5px' }}>
+          Last Update: {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
 
-      {/* Navigation Links */}
-      <nav className="flex-1 flex flex-col gap-2">
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <div key={item.name} className="pr-4"> 
+      {/* NavLinks */}
+      <nav style={{ flexGrow: 1 }}>
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {menuItems.map((item) => (
+            <li key={item.name} style={{ marginBottom: '10px' }}>
               <Link
                 to={item.path}
-                className={`flex items-center justify-between px-8 py-4 transition-all duration-300 ${
-                  isActive 
-                    ? "bg-white text-black rounded-r-full" 
-                    : "text-[#E0E0E0] hover:bg-white/5 rounded-r-full"
-                }`}
+                style={{
+                  color: location.pathname === item.path ? '#fff' : '#bbb',
+                  textDecoration: 'none',
+                  fontSize: '1.1rem',
+                  display: 'block',
+                  padding: '10px',
+                  borderRadius: '4px',
+                  backgroundColor: location.pathname === item.path ? '#3d3d3d' : 'transparent'
+                }}
               >
-                <div className="flex items-center gap-5">
-                  <img 
-                    src={item.icon} 
-                    alt="" 
-                    className={`w-7 h-7 ${isActive ? "brightness-0" : "brightness-200"}`} 
-                  />
-                  <span className="text-[20px] font-medium tracking-wide">{item.name}</span>
-                </div>
-                
-                {isActive && (
-                  <div className="w-3.5 h-3.5 bg-black rounded-full mr-1"></div>
-                )}
+                {item.name}
               </Link>
-            </div>
-          );
-        })}
+            </li>
+          ))}
+        </ul>
       </nav>
 
-      {/* Log Out Section */}
-      <div className="px-4">
-        <button className="flex items-center gap-5 px-8 py-4 w-full text-[#E0E0E0] hover:bg-white/5 rounded-r-full transition-all">
-          <img 
-            src="/icons/home.svg" 
-            alt="Logout" 
-            className="w-7 h-7 brightness-200 rotate-180 opacity-80" 
-          />
-          <span className="text-[20px] font-medium">Log Out</span>
+      {/* Logout Button */}
+      <div style={{ borderTop: '1px solid #444', paddingTop: '20px' }}>
+        <button 
+          onClick={() => console.log('Logging out...')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#ff4d4d',
+            cursor: 'pointer',
+            fontSize: '1.1rem',
+            padding: '10px'
+          }}
+        >
+          Log Out
         </button>
       </div>
-    </aside>
+    </div>
   );
-}
+};
+
+export default Sidebar;
