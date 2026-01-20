@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { 
   HiOutlineHome, 
   HiOutlinePresentationChartBar, 
@@ -26,8 +27,20 @@ const FinanceSidebar = () => {
     { name: 'Logs', path: '/finance/logs', icon: <HiOutlineShieldCheck size={22} /> },
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem("userName");
+  const handleLogout = async () => {
+    const userId = localStorage.getItem("userId");
+    const role = localStorage.getItem("userRole");
+
+    try {
+      await axios.post("http://localhost:5000/api/logout", {
+        userId: userId,
+        role: role
+      });
+    } catch (err) {
+      console.error("Logout log failed:", err);
+    }
+
+    localStorage.clear();
     navigate('/', { replace: true });
   };
 

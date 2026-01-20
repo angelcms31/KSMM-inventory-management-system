@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import axios from "axios";
-import { RecoveryContext } from "../../App";
+import { RecoveryContext } from "../../context/RecoveryContext";
 import { useNavigate } from "react-router-dom";
 
 export default function OTPInput() {

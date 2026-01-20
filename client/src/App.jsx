@@ -1,5 +1,6 @@
-import { useState, createContext } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { RecoveryContext } from "./context/RecoveryContext";
 
 import Login from "./pages/auth/Login";
 import OTPInput from "./pages/auth/OTPInput";
@@ -12,23 +13,33 @@ import ProductionLayout from "./components/layouts/ProductionLayout";
 import FinanceLayout from "./components/layouts/FinanceLayout";
 
 import ManageUsers from "./pages/admin/ManageUsers";
+import ManageArtisan from "./pages/admin/ManageArtisan";
+import Suppliers from "./pages/admin/suppliers"; 
+import AuditLogs from "./pages/admin/AuditLogs";
+import FinanceTransactions from "./pages/finance/FinanceTransaction";
+import Inventory from "./pages/production/Inventory";
+import Order from "./pages/production/Order";
 
-const AdminDashboard = () => <div className="p-4">Admin Dashboard Content</div>;
-const ArtisanPage = () => <div className="p-4">Artisan Management Page</div>;
-const SuppliersPage = () => <div className="p-4">Suppliers List Page</div>;
-const AuditLogs = () => <div className="p-4">Audit Logs History</div>;
-
-const SalesInventory = () => <div className="p-4">Sales Inventory Content</div>;
-const StatisticsPage = () => <div className="p-4">Sales Statistics Content</div>;
-
-const ProductionOrders = () => <div className="p-4">Production Orders Content</div>;
-const FinanceReports = () => <div className="p-4">Finance Reports Content</div>;
-
-export const RecoveryContext = createContext();
+const AdminDashboard = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Admin Dashboard</div>;
+const SalesInventory = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Sales Inventory</div>;
+const StatisticsPage = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Sales Statistics</div>;
+const ProductionOrders = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Production Orders</div>;
+const FinanceReports = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Finance Reports</div>;
 
 function App() {
   const [email, setEmail] = useState("");
   const [otp, setOTP] = useState();
+
+  useEffect(() => {
+    const syncLogout = (event) => {
+      if (event.key === "userId" && !event.newValue) {
+        window.location.href = "/";
+      }
+    };
+
+    window.addEventListener("storage", syncLogout);
+    return () => window.removeEventListener("storage", syncLogout);
+  }, []);
 
   return (
     <RecoveryContext.Provider value={{ otp, setOTP, setEmail, email }}>
@@ -40,8 +51,8 @@ function App() {
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
-          <Route path="artisan" element={<ArtisanPage />} />
-          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="artisan" element={<ManageArtisan />} />
+          <Route path="suppliers" element={<Suppliers />} />          
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="users" element={<ManageUsers />} />
         </Route>
@@ -54,10 +65,15 @@ function App() {
 
         <Route path="/production" element={<ProductionLayout />}>
           <Route index element={<ProductionOrders />} />
+          <Route path="artisan" element={<div className="p-4 font-black text-2xl uppercase tracking-tighter">Artisan</div>} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="order" element={<Order />} />
         </Route>
 
         <Route path="/finance" element={<FinanceLayout />}>
           <Route index element={<FinanceReports />} />
+          <Route path="transactions" element={<FinanceTransactions />} /> 
+          <Route path="logs" element={<AuditLogs />} /> 
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />

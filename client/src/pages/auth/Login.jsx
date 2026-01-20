@@ -1,6 +1,6 @@
 import axios from "axios";
 import React, { useState, useContext, useEffect } from "react";
-import { RecoveryContext } from "../../App";
+import { RecoveryContext } from "../../context/RecoveryContext";
 import { useNavigate } from "react-router-dom";
 import { HiOutlineEye, HiOutlineEyeOff } from "react-icons/hi";
 
@@ -44,11 +44,13 @@ export default function Login() {
         password: localPassword,
       })
       .then((res) => {
-        const { role, firstName, firstname } = res.data;
+        const { role, firstName, firstname, user_id } = res.data;
         const nameToSave = firstName || firstname;
         setError(false);
 
         localStorage.setItem("userName", nameToSave || "User");
+        localStorage.setItem("userRole", role);
+        localStorage.setItem("userId", user_id);
 
         const userRole = role.toLowerCase();
         if (userRole === "admin") navigate("/admin");
@@ -62,33 +64,36 @@ export default function Login() {
       })
       .catch((err) => {
         setError(true);
-        setErrorMessage(err.response?.data || "Incorrect email or password.");
+        const backendMessage = err.response?.data?.message || err.response?.data;
+        setErrorMessage(typeof backendMessage === 'string' ? backendMessage : "Incorrect email or password.");
       });
   };
 
-  function navigateToOtp(e) {
+  const navigateToOtp = (e) => {
     if (e) e.preventDefault(); 
-    if (localEmail) {
-      const OTP = Math.floor(Math.random() * 9000 + 1000);
-      axios.post("http://localhost:5000/send_recovery_email", {
-          OTP,
-          recipient_email: localEmail,
-        })
-        .then(() => {
-          setOTP(OTP);
-          setEmail(localEmail);
-          setError(false);
-          navigate("/otp");
-        })
-        .catch((err) => {
-          setError(true);
-          setErrorMessage(err.response?.data || "Email not found in our records.");
-        });
+    if (!localEmail) {
+      setError(true);
+      setErrorMessage("Please enter your email first for recovery.");
       return;
     }
-    setError(true);
-    setErrorMessage("Please enter your email first for recovery.");
-  }
+
+    const OTP = Math.floor(Math.random() * 9000 + 1000);
+    axios.post("http://localhost:5000/send_recovery_email", {
+        OTP,
+        recipient_email: localEmail,
+      })
+      .then(() => {
+        setOTP(OTP);
+        setEmail(localEmail);
+        setError(false);
+        navigate("/otp");
+      })
+      .catch((err) => {
+        setError(true);
+        const backendMessage = err.response?.data?.message || err.response?.data;
+        setErrorMessage(typeof backendMessage === 'string' ? backendMessage : "Failed to send recovery email. Please try again.");
+      });
+  };
 
   return (
     <div className="flex h-screen w-screen bg-white font-serif overflow-hidden">
@@ -103,9 +108,9 @@ export default function Login() {
           <p className="mt-8 text-gray-500 text-sm italic">Inventory Management System</p>
         </div>
 
-        <div className="w-full max-w-sm">
+        <div className="w-full max-sm:">
           <form onSubmit={handleLogin}>
-            <h2 className="text-2xl font-bold mb-1">Welcome!</h2>
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">Welcome!</h2>
             <p className="text-gray-400 text-sm mb-10 font-sans">Please login here</p>
             
             <div className="space-y-7">
@@ -127,7 +132,7 @@ export default function Login() {
               
               <div className="relative">
                  <label className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] text-gray-400">
-                   Password
+                    Password
                  </label>
                  <input 
                    type={showPassword ? "text" : "password"} 
@@ -149,9 +154,9 @@ export default function Login() {
               </div>
 
               {error && (
-                <p className="text-red-500 text-[11px] italic mt-[-15px]">
+                <div className="text-red-500 text-[11px] italic mt-[-15px] animate-pulse">
                   {errorMessage}
-                </p>
+                </div>
               )}
 
               <div className="flex justify-between items-center text-[11px] text-gray-500 pt-1">
@@ -185,7 +190,7 @@ export default function Login() {
       </div>
 
       <div 
-        className="hidden md:block w-1/2 bg-cover bg-center" 
+        className="hidden md:block w-1/2 bg-cover bg-center transition-all duration-700" 
         style={{ 
           backgroundImage: "url('https://ken-samudio.com/wp-content/uploads/2018/05/ken-pictorial__MG_5993-1-683x1024.jpg')" 
         }}

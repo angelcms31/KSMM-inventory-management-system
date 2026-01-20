@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { 
   HiOutlineHome, 
   HiOutlineCube, 
@@ -30,14 +31,25 @@ const AdminSidebar = () => {
     { name: 'Users', path: '/admin/users', icon: <HiOutlineUserGroup size={18} /> },
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem("userName");
+  const handleLogout = async () => {
+    const userId = localStorage.getItem("userId");
+    const role = localStorage.getItem("userRole");
+
+    try {
+      await axios.post("http://localhost:5000/api/logout", {
+        userId: userId,
+        role: role
+      });
+    } catch (err) {
+      console.error("Logout log failed:", err);
+    }
+
+    localStorage.clear();
     navigate('/', { replace: true });
   };
 
   return (
     <div className="w-[240px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 left-0 font-sans overflow-hidden border-r border-white/5">
-      
       <div className="pt-10 pb-8 px-6">
         <h3 className="text-[18px] font-bold leading-tight tracking-tight capitalize">
           Welcome back,<br />{userName}!
