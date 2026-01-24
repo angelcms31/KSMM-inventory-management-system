@@ -17,6 +17,7 @@ import ManageArtisan from "./pages/admin/ManageArtisan";
 import Suppliers from "./pages/admin/suppliers"; 
 import AuditLogs from "./pages/admin/AuditLogs";
 import FinanceTransactions from "./pages/finance/FinanceTransaction";
+import Artisan from "./pages/production/Artisan";
 import Inventory from "./pages/production/Inventory";
 import Order from "./pages/production/Order";
 
@@ -65,7 +66,7 @@ function App() {
 
         <Route path="/production" element={<ProductionLayout />}>
           <Route index element={<ProductionOrders />} />
-          <Route path="artisan" element={<div className="p-4 font-black text-2xl uppercase tracking-tighter">Artisan</div>} />
+          <Route path="artisan" element={<Artisan />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="order" element={<Order />} />
         </Route>
