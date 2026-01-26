@@ -1,6 +1,7 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import ProductionSidebar from "../sidebars/ProductionSidebar";
+import ProdSalesRightSidebar from "../sidebars/ProdSalesRightSideBar";
 
 export default function ProductionLayout() {
   return (
@@ -11,6 +12,7 @@ export default function ProductionLayout() {
           <Outlet />
         </main>
       </div>
+            <ProdSalesRightSidebar />
     </div>
   );
 }
