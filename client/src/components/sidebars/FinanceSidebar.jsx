@@ -24,7 +24,7 @@ const FinanceSidebar = () => {
   const menuItems = [
     { name: 'Home', path: '/finance', icon: <HiOutlineHome size={22} /> },
     { name: 'Transactions', path: '/finance/transactions', icon: <HiOutlinePresentationChartBar size={22} /> },
-    { name: 'Audit Logs', path: '/finance/audit-logs', icon: <HiOutlineShieldCheck size={22} /> },
+    { name: 'Audit Logs', path: '/finance/logs', icon: <HiOutlineShieldCheck size={22} /> },
   ];
 
   const handleLogout = async () => {
