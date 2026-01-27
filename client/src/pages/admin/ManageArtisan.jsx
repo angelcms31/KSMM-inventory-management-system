@@ -59,7 +59,6 @@ const ManageArtisan = () => {
   };
 
   const handleEditClick = (artisan) => {
-    const displayId = `AR00${artisan.artisan_id || '0'}`;
     setSelectedArtisan({
       ...artisan,
       firstName: artisan.first_name || '',
@@ -67,9 +66,8 @@ const ManageArtisan = () => {
       lastName: artisan.last_name || '',
       email: artisan.email || '',
       contactNo: artisan.contact_no || '',
-      department: artisan.department || 'Necklace',
-      profileImage: artisan.profile_image || '',
-      displayId: displayId
+      department: artisan.department || '',
+      profileImage: artisan.profile_image || ''
     });
     setShowEditModal(true);
     setActiveMenu(null);
@@ -78,11 +76,22 @@ const ManageArtisan = () => {
   const handleUpdateArtisan = async (e) => {
     e.preventDefault();
     try {
-      await axios.put("http://localhost:5000/api/artisan/update", selectedArtisan);
+      await axios.put(`http://localhost:5000/api/artisans/${selectedArtisan.artisan_id}`, {
+        first_name: selectedArtisan.firstName,
+        middle_name: selectedArtisan.middleName,
+        last_name: selectedArtisan.lastName,
+        email: selectedArtisan.email,
+        contact_no: selectedArtisan.contactNo,
+        department: selectedArtisan.department,
+        profile_image: selectedArtisan.profileImage,
+        status: selectedArtisan.status
+      });
       setShowEditModal(false);
       fetchArtisans();
       alert("Artisan updated successfully!");
-    } catch (err) { alert("Update failed"); }
+    } catch (err) { 
+      alert("Update failed: " + (err.response?.data || "Check console")); 
+    }
   };
 
   const toggleStatus = async (artisan) => {
@@ -96,7 +105,7 @@ const ManageArtisan = () => {
   };
 
   const totalPages = Math.ceil(totalArtisans / artisansPerPage);
-  const inputStyle = "w-full bg-[#EEEEEE] rounded-md p-2 outline-none border-none text-[13px] text-gray-700 placeholder:text-gray-400";
+  const inputStyle = "w-full bg-[#EEEEEE] rounded-md p-2 outline-none border-none text-[13px] text-gray-700 placeholder:text-gray-400 font-bold";
   const labelStyle = "block text-[13px] font-semibold text-gray-800 mb-1 ml-1";
 
   if (loading && currentPage === 1 && searchTerm === "") {
@@ -105,7 +114,6 @@ const ManageArtisan = () => {
 
   return (
     <div className="pt-6 px-10 bg-[#F8F9FA] h-screen flex flex-col font-sans overflow-hidden" onClick={() => setActiveMenu(null)}>
-      
       <div className="flex justify-between items-start mb-4">
         <div className="text-left">
           <h1 className="text-3xl font-bold text-gray-900 leading-tight">Manage Artisan</h1>
@@ -121,17 +129,16 @@ const ManageArtisan = () => {
         <input 
           type="text" 
           placeholder="Search Artisan" 
-          className="w-full bg-[#E9ECEF] rounded-lg py-2 pl-10 pr-4 outline-none text-sm"
+          className="w-full bg-[#E9ECEF] rounded-lg py-2 pl-10 pr-4 outline-none text-sm font-bold"
           value={searchTerm}
           onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
         />
       </div>
 
-      <div className="flex-1 min-h-0 mb-2 overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="flex-1 min-h-0 mb-2 overflow-y-auto custom-scrollbar">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-10">
           {artisans.map((artisan, index) => {
             const artisanStatus = artisan.status || 'Active';
-
             return (
               <div key={index} className="border border-gray-300 rounded-[1.5rem] p-5 relative bg-white shadow-sm hover:shadow-md transition-all flex flex-col h-fit">
                 <button onClick={(e) => { e.stopPropagation(); setActiveMenu(index); }} className="absolute top-5 right-5 text-gray-600 hover:text-black">
@@ -139,7 +146,7 @@ const ManageArtisan = () => {
                 </button>
 
                 {activeMenu === index && (
-                  <div className="absolute top-12 right-5 bg-white border rounded-lg shadow-xl z-10 w-44 py-1 text-[11px] font-bold animate-in fade-in zoom-in duration-200">
+                  <div className="absolute top-12 right-5 bg-white border rounded-lg shadow-xl z-10 w-44 py-1 text-[11px] font-bold">
                     <button onClick={() => handleEditClick(artisan)} className="w-full text-left px-4 py-2 hover:bg-gray-50">Update Information</button>
                     <div className="border-t"></div>
                     <button onClick={() => toggleStatus(artisan)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">
@@ -152,7 +159,7 @@ const ManageArtisan = () => {
                   <div className="relative flex-shrink-0">
                     <img 
                       src={artisan.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${artisan.first_name}`} 
-                      className="w-16 h-16 rounded-full object-cover" 
+                      className="w-16 h-16 rounded-full object-cover border border-gray-100" 
                       alt="Profile"
                     />
                     <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[2.5px] border-white 
@@ -161,7 +168,6 @@ const ManageArtisan = () => {
                   
                   <div className="flex-1 pt-0.5 min-w-0">
                     <h3 className="font-bold text-base text-black leading-tight mb-1.5">{artisan.first_name} {artisan.last_name}</h3>
-                    
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-[#9CA3AF] text-sm font-normal">Artisan</p>
                       {artisanStatus === 'Deactivated' && (
@@ -172,12 +178,12 @@ const ManageArtisan = () => {
                 </div>
 
                 <div className="border border-gray-300 rounded-2xl p-4 bg-white">
-                  <div className="flex justify-between text-[#9CA3AF] text-[11px] font-normal mb-2">
+                  <div className="flex justify-between text-[#9CA3AF] text-[11px] font-normal mb-2 uppercase tracking-widest">
                     <span>ID No.</span>
                     <span>Department</span>
                   </div>
-                  <div className="flex justify-between font-bold text-black text-sm mb-4 pb-3 border-b border-gray-200">
-                    <span>AR00{artisan.artisan_id}</span>
+                  <div className="flex justify-between font-black text-black text-sm mb-4 pb-3 border-b border-gray-200 uppercase tracking-tight">
+                    <span>AR-{artisan.artisan_id}</span>
                     <span>{artisan.department || 'General'}</span>
                   </div>
                   <div className="space-y-2.5">
@@ -205,11 +211,11 @@ const ManageArtisan = () => {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-3xl p-10 relative shadow-2xl overflow-hidden">
-            <button onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="absolute top-8 right-8 text-gray-400 hover:text-black flex items-center gap-1 font-semibold">
+          <div className="bg-white rounded-[2rem] w-full max-w-3xl p-10 relative shadow-2xl">
+            <button onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="absolute top-8 right-8 text-gray-400 hover:text-black">
               <HiX size={24}/>
             </button>
-            <h2 className="text-3xl font-bold mb-8 text-gray-900">{showAddModal ? "Add Artisan" : "Update Artisan"}</h2>
+            <h2 className="text-3xl font-black mb-8 text-gray-900 uppercase tracking-tighter">{showAddModal ? "Add Artisan" : "Update Artisan"}</h2>
 
             <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan} className="grid grid-cols-5 gap-x-10 gap-y-4">
               <div className="col-span-3 space-y-4">
@@ -228,7 +234,7 @@ const ManageArtisan = () => {
                   <div>
                     <label className={labelStyle}>Department</label>
                     <div className="relative">
-                      <select className={`${inputStyle} appearance-none font-medium`} value={showAddModal ? formData.department : selectedArtisan?.department} onChange={e => showAddModal ? setFormData({...formData, department: e.target.value}) : setSelectedArtisan({...selectedArtisan, department: e.target.value})}>
+                      <select className={`${inputStyle} appearance-none font-bold`} value={showAddModal ? formData.department : selectedArtisan?.department} onChange={e => showAddModal ? setFormData({...formData, department: e.target.value}) : setSelectedArtisan({...selectedArtisan, department: e.target.value})}>
                         <option value="Necklace">Necklace</option><option value="Bag">Bag</option><option value="Earring">Earring</option><option value="Headpiece">Headpiece</option>
                       </select>
                       <HiChevronDown className="absolute right-3 top-2.5 text-gray-500" size={18} />
@@ -246,16 +252,16 @@ const ManageArtisan = () => {
                 </div>
               </div>
 
-              <div className="col-span-2 flex flex-col items-center space-y-6">
+              <div className="col-span-2 flex flex-col items-center space-y-6 pt-4">
                 <div className="flex flex-col items-center">
-                  <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden relative">
+                  <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden relative bg-gray-50">
                     {(showAddModal ? formData.profileImage : selectedArtisan?.profileImage) ? (
                       <img src={showAddModal ? formData.profileImage : selectedArtisan.profileImage} className="w-full h-full object-cover" alt="Preview" />
                     ) : (
                       <HiCamera size={48} className="text-gray-200" />
                     )}
                   </div>
-                  <label className="mt-4 cursor-pointer bg-[#333333] text-white text-xs px-6 py-2 rounded-md font-medium hover:bg-black transition-colors">
+                  <label className="mt-4 cursor-pointer bg-black text-white text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-md hover:bg-stone-800 transition-colors">
                     Upload Photo
                     <input type="file" accept="image/*" className="hidden" onChange={e => handleFileChange(e, showEditModal)} />
                   </label>
@@ -263,7 +269,7 @@ const ManageArtisan = () => {
 
                 <div className="flex gap-3 w-full pt-4">
                   <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="flex-1 border border-gray-300 rounded-md py-2.5 font-bold text-gray-700 hover:bg-gray-50">Cancel</button>
-                  <button type="submit" className="flex-1 bg-[#333333] text-white rounded-md py-2.5 font-bold hover:bg-black transition-colors">{showAddModal ? "Add Artisan" : "Save Changes"}</button>
+                  <button type="submit" className="flex-1 bg-black text-white rounded-md py-2.5 font-bold hover:bg-stone-800 transition-colors uppercase text-[10px] tracking-widest shadow-lg">{showAddModal ? "Add Artisan" : "Save Changes"}</button>
                 </div>
               </div>
             </form>

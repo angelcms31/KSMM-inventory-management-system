@@ -127,6 +127,19 @@ app.get("/api/users", async (req, res) => {
   } catch (err) { res.status(500).send("Database error"); }
 });
 
+app.get("/api/user/profile/:email", async (req, res) => {
+  const { email } = req.params;
+  try {
+    const result = await pool.query(
+      "SELECT Profile_Image FROM PersonalData WHERE Email = $1",
+      [email]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 app.post("/api/add_user", async (req, res) => {
   const { firstName, lastName, email, contactNo, role, gender, profileImage } = req.body;
   const client = await pool.connect();
@@ -170,6 +183,29 @@ app.put("/api/user/update", async (req, res) => {
   } finally { client.release(); }
 });
 
+
+app.put("/api/user/status", async (req, res) => {
+  const { userId, status, adminId, adminRole } = req.body;
+  try {
+    await pool.query('UPDATE personaldata SET status = $1 WHERE user_id = $2', [status, userId]);
+    await createAuditLog(adminId, `User ${status}: ID ${userId}`, adminRole);
+    res.send(`User status updated to ${status}`);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.put("/api/user/unlock", async (req, res) => {
+  const { userId, adminId, adminRole } = req.body;
+  try {
+    await pool.query('UPDATE userlogin SET is_locked = FALSE, failed_attempts = 0 WHERE user_id = $1', [userId]);
+    await createAuditLog(adminId, `Unlocked User: ID ${userId}`, adminRole);
+    res.send("User account unlocked");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 app.get("/api/artisans", async (req, res) => {
   try {
     const { search = "", page = 1, limit = 6 } = req.query;
@@ -207,6 +243,48 @@ app.put("/api/artisan/update", async (req, res) => {
     );
     res.send("Success");
   } catch (err) { res.status(500).send(err.message); }
+});
+
+app.post("/api/artisan/status", async (req, res) => {
+  const { email, status } = req.body;
+  
+  try {
+    const result = await pool.query(
+      "UPDATE artisan SET status = $1 WHERE email = $2",
+      [status, email]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).send("Artisan not found with that email.");
+    }
+
+    res.status(200).send(`Artisan status updated to ${status}`);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Database error: " + err.message);
+  }
+});
+
+app.put("/api/artisans/:id", async (req, res) => {
+  const { id } = req.params;
+  const { first_name, last_name, email, contact, department, status } = req.body;
+  
+  try {
+    const result = await pool.query(
+      `UPDATE artisan 
+       SET first_name = $1, last_name = $2, email = $3, contact = $4, department = $5, status = $6 
+       WHERE artisan_id = $7`,
+      [first_name, last_name, email, contact, department, status, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).send("Artisan not found");
+    }
+
+    res.status(200).send("Updated successfully");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/suppliers", async (req, res) => {
@@ -247,6 +325,187 @@ app.get("/api/all_orders", async (req, res) => {
     `);
     res.json(result.rows);
   } catch (err) { res.status(500).send(err.message); }
+});
+
+app.get("/api/products", async (req, res) => {
+  try {
+    const { search = "" } = req.query;
+    const result = await pool.query(
+      "SELECT * FROM FinishedGoods WHERE sku ILIKE $1 OR collection ILIKE $1 OR brand ILIKE $1 ORDER BY sku ASC",
+      [`%${search}%`]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.get("/api/products", async (req, res) => {
+  try {
+    const { search = "" } = req.query;
+    const result = await pool.query(
+      `SELECT * FROM FinishedGoods 
+       WHERE sku ILIKE $1 OR name ILIKE $1 OR collection ILIKE $1 OR brand ILIKE $1 
+       ORDER BY sku ASC`,
+      [`%${search}%`]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.put("/api/products/:sku", async (req, res) => {
+  const { sku } = req.params;
+  const { name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks } = req.body;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE FinishedGoods SET 
+        name = $1, collection = $2, brand = $3, 
+        selling_price = $4, product_image = $5, 
+        warehouse_location = $6, category = $7,
+        current_stock = $8, min_stocks = $9
+        WHERE sku = $10`,
+      [name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks || 0, sku]
+    );
+    await client.query("COMMIT");
+    res.status(200).send("Product updated successfully");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(500).send("Database Error: " + err.message);
+  } finally { client.release(); }
+});
+
+app.get("/api/products/unique-list", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT sku, name, collection, brand, base_cost, selling_price, current_stock, status, product_image FROM FinishedGoods ORDER BY sku ASC"
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).send(err.message); }
+});
+
+app.post("/api/sales_Add_inventory", async (req, res) => {
+  const { sku, name, location, quantity, selling_price, product_image, collection, brand } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `INSERT INTO FinishedGoods (sku, name, collection, brand, selling_price, product_image, current_stock, warehouse_location, category, min_stocks) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (sku) DO UPDATE SET 
+       name = EXCLUDED.name,
+       category = EXCLUDED.category,
+       min_stocks = EXCLUDED.min_stocks,
+       current_stock = FinishedGoods.current_stock + EXCLUDED.current_stock`,
+      [sku, name, collection, brand || '', selling_price || 0, product_image, quantity || 0, location, category, min_stocks || 0]
+    );
+
+    const warehouseRes = await client.query("SELECT warehouse_id FROM Warehouse WHERE name = $1 LIMIT 1", [location]);
+    if (warehouseRes.rows.length === 0) throw new Error(`Warehouse location '${location}' not found.`);
+
+    const warehouseId = warehouseRes.rows[0].warehouse_id;
+
+    await client.query(
+      `INSERT INTO WarehouseInventory (warehouse_id, sku, quantity) 
+       VALUES ($1, $2, $3)
+       ON CONFLICT (warehouse_id, sku) DO UPDATE SET 
+       quantity = WarehouseInventory.quantity + EXCLUDED.quantity`,
+      [warehouseId, sku, quantity || 0]
+    );
+
+    await client.query("COMMIT");
+    res.status(200).send("Success");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Database Error:", err.message); 
+    res.status(500).send("Database Error: " + err.message);
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/api/warehouses", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        w.warehouse_id, 
+        w.name, 
+        w.location, 
+        w.capacity_total, 
+        w.manager_name, 
+        (SELECT COUNT(DISTINCT sku) FROM WarehouseInventory WHERE warehouse_id = w.warehouse_id) as product_types,
+        COALESCE((SELECT SUM(quantity) FROM WarehouseInventory WHERE warehouse_id = w.warehouse_id), 0) as current_utilization,
+        (SELECT COUNT(*) FROM FinishedGoods fg 
+         JOIN WarehouseInventory wi ON fg.sku = wi.sku 
+         WHERE wi.warehouse_id = w.warehouse_id AND wi.quantity <= fg.min_stocks) as low_stock_count
+      FROM Warehouse w 
+      ORDER BY w.name ASC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.get("/api/warehouses/all", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT w.*, 
+      (SELECT COUNT(DISTINCT sku) FROM WarehouseInventory WHERE warehouse_id = w.warehouse_id) as product_types,
+      (SELECT SUM(quantity) FROM WarehouseInventory WHERE warehouse_id = w.warehouse_id) as current_utilization
+      FROM Warehouse w ORDER BY w.warehouse_id ASC
+    `);
+    res.json(result.rows);
+  } catch (err) { res.status(500).send(err.message); }
+});
+
+app.post("/api/warehouses/add", async (req, res) => {
+  const { name, location, capacity, manager } = req.body;
+  try {
+    await pool.query(
+      "INSERT INTO Warehouse (name, location, capacity_total, manager_name) VALUES ($1, $2, $3, $4)",
+      [name, location, capacity, manager]
+    );
+    res.status(201).send("Warehouse added successfully");
+  } catch (err) { res.status(500).send(err.message); }
+});
+
+app.put("/api/warehouses/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, location, capacity_total, manager_name } = req.body;
+  try {
+    await pool.query(
+      "UPDATE Warehouse SET name=$1, location=$2, capacity_total=$3, manager_name=$4 WHERE warehouse_id=$5",
+      [name, location, capacity_total, manager_name, id]
+    );
+    res.status(200).send("Warehouse updated successfully");
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.get("/api/materials", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        material_id,
+        unique_code AS sku, 
+        cost_per_unit AS price, 
+        stock_quantity AS stock, 
+        reorder_threshold AS min_stock,
+        (SELECT name FROM Supplier WHERE supplier_id = Material.supplier_id) AS supplier
+      FROM Material 
+      ORDER BY material_id DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json([]);
+  }
 });
 
 app.get("/api/audit_logs", async (req, res) => {

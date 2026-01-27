@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { HiOutlinePlus, HiOutlineMail, HiOutlinePhone, HiX, HiCamera, HiDotsHorizontal, HiChevronDown, HiOutlineSearch } from "react-icons/hi";
+import { 
+  HiOutlinePlus, HiOutlineMail, HiOutlinePhone, HiX, 
+  HiCamera, HiDotsHorizontal, HiChevronDown, HiOutlineSearch 
+} from "react-icons/hi";
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
@@ -15,7 +18,8 @@ const ManageUsers = () => {
   const usersPerPage = 6;
 
   const initialFormState = { 
-    firstName: '', middleName: '', lastName: '', email: '', contactNo: '', role: 'Sales', gender: 'Male', profileImage: '' 
+    firstName: '', middleName: '', lastName: '', email: '', 
+    contactNo: '', role: 'Sales', gender: 'Male', profileImage: '' 
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -64,15 +68,15 @@ const ManageUsers = () => {
     
     setSelectedUser({
       ...user,
-      firstName: user.firstname || user.FirstName,
-      middleName: user.middlename || user.MiddleName || '',
-      lastName: user.lastname || user.LastName,
-      email: user.email || user.Email,
-      contactNo: user.contact_no || user.Contact_No,
-      role: user.user_role || user.User_Role,
-      gender: user.gender || user.Gender || 'Male',
-      profileImage: user.profile_image || user.Profile_Image,
-      originalEmail: user.email || user.Email,
+      firstName: user.firstname,
+      middleName: user.middlename || '',
+      lastName: user.lastname,
+      email: user.email,
+      contactNo: user.contact_no,
+      role: user.user_role,
+      gender: user.gender || 'Male',
+      profileImage: user.profile_image,
+      originalEmail: user.email,
       displayId: displayId
     });
     setShowEditModal(true);
@@ -91,7 +95,12 @@ const ManageUsers = () => {
 
   const handleUnlock = async (user) => {
     try {
-      await axios.post("http://localhost:5000/api/user/unlock", { email: user.email || user.Email });
+      // FIX: Ginawang PUT at user_id ang ginamit
+      await axios.put("http://localhost:5000/api/user/unlock", { 
+        userId: user.user_id,
+        adminId: localStorage.getItem("user_id"), 
+        adminRole: localStorage.getItem("role")
+      });
       fetchUsers();
       setActiveMenu(null);
       alert("Account unlocked successfully!");
@@ -102,7 +111,13 @@ const ManageUsers = () => {
     const currentStatus = user.status || user.Status;
     const newStatus = currentStatus === 'Active' ? 'Deactivated' : 'Active';
     try {
-      await axios.post("http://localhost:5000/api/user/status", { email: user.email || user.Email, status: newStatus });
+      // FIX: Ginawang PUT at user_id ang ginamit
+      await axios.put("http://localhost:5000/api/user/status", { 
+        userId: user.user_id, 
+        status: newStatus,
+        adminId: localStorage.getItem("user_id"),
+        adminRole: localStorage.getItem("role")
+      });
       fetchUsers();
       setActiveMenu(null);
     } catch (err) { alert("Error updating status"); }
@@ -113,7 +128,7 @@ const ManageUsers = () => {
   const labelStyle = "block text-[13px] font-semibold text-gray-800 mb-1 ml-1";
 
   if (loading && currentPage === 1 && searchTerm === "") {
-    return <div className="h-screen flex items-center justify-center font-bold">Loading...</div>;
+    return <div className="h-screen flex items-center justify-center font-bold">Loading Users...</div>;
   }
 
   return (
@@ -140,7 +155,7 @@ const ManageUsers = () => {
         />
       </div>
 
-      <div className="flex-1 min-h-0 mb-2 overflow-hidden">
+      <div className="flex-1 min-h-0 mb-2 overflow-y-auto custom-scrollbar">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {users.map((user, index) => {
             const userStatus = user.status || user.Status;
@@ -155,16 +170,12 @@ const ManageUsers = () => {
                 {activeMenu === index && (
                   <div className="absolute top-12 right-5 bg-white border rounded-lg shadow-xl z-10 w-44 py-1 text-[11px] font-bold animate-in fade-in zoom-in duration-200">
                     {isLocked ? (
-                      <>
-                        <button onClick={() => handleUnlock(user)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600">Activate User (Unlock)</button>
-                        <div className="border-t"></div>
-                        <button onClick={() => toggleStatus(user)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">Deactivate User</button>
-                      </>
+                      <button onClick={() => handleUnlock(user)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600">Unlock & Activate</button>
                     ) : (
                       <>
                         <button onClick={() => handleEditClick(user)} className="w-full text-left px-4 py-2 hover:bg-gray-50">Update Information</button>
                         <div className="border-t"></div>
-                        <button onClick={() => toggleStatus(user)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-500">
+                        <button onClick={() => toggleStatus(user)} className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}>
                           {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
                         </button>
                       </>
@@ -175,8 +186,8 @@ const ManageUsers = () => {
                 <div className="flex items-start gap-3 mb-5">
                   <div className="relative flex-shrink-0">
                     <img 
-                      src={user.profile_image || user.Profile_Image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.FirstName}`} 
-                      className="w-16 h-16 rounded-full object-cover" 
+                      src={user.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.firstname}`} 
+                      className="w-16 h-16 rounded-full object-cover border" 
                       alt="Profile"
                     />
                     <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[2.5px] border-white 
@@ -184,27 +195,23 @@ const ManageUsers = () => {
                   </div>
                   
                   <div className="flex-1 pt-0.5 min-w-0">
-                    <h3 className="font-bold text-base text-black leading-tight mb-1.5">{user.firstname} {user.lastname}</h3>
-                    
+                    <h3 className="font-bold text-base text-black leading-tight mb-1.5 truncate">{user.firstname} {user.lastname}</h3>
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-[#9CA3AF] text-sm font-normal">{user.user_role}</p>
-                      {isLocked ? (
-                        <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase">Locked</span>
-                      ) : userStatus === 'Deactivated' && (
-                        <span className="bg-[#EF4444] text-white text-[10px] font-bold px-2.5 py-0.5 rounded uppercase tracking-wide">Deactivated</span>
-                      )}
+                      {isLocked && <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase">Locked</span>}
+                      {userStatus === 'Deactivated' && <span className="bg-[#EF4444] text-white text-[10px] font-bold px-2.5 py-0.5 rounded uppercase tracking-wide">Deactivated</span>}
                     </div>
                   </div>
                 </div>
 
                 <div className="border border-gray-300 rounded-2xl p-4 bg-white">
-                  <div className="flex justify-between text-[#9CA3AF] text-[11px] font-normal mb-2">
+                  <div className="flex justify-between text-[#9CA3AF] text-[11px] font-bold uppercase mb-2">
                     <span>ID No.</span>
                     <span>Date Added</span>
                   </div>
                   <div className="flex justify-between font-bold text-black text-sm mb-4 pb-3 border-b border-gray-200">
                     <span>{(user.user_role || "US").substring(0,2).toUpperCase()}00{user.permanent_id}</span>
-                    <span>{user.date_added ? new Date(user.date_added).toLocaleDateString('en-US', {month: 'numeric', day: 'numeric', year: '2-digit'}) : '7/27/13'}</span>
+                    <span>{user.date_added ? new Date(user.date_added).toLocaleDateString() : 'N/A'}</span>
                   </div>
                   <div className="space-y-2.5">
                     <p className="flex items-center gap-2.5 text-black text-sm font-normal truncate">
@@ -276,7 +283,7 @@ const ManageUsers = () => {
 
                 <div>
                   <label className={labelStyle}>ID number</label>
-                  <p className="text-[13px] text-gray-600 font-bold bg-gray-100 p-2 rounded-md">
+                  <p className="text-[13px] text-gray-600 font-bold bg-gray-100 p-2 rounded-md tracking-wider">
                     {showAddModal ? "Generated Automatically" : (selectedUser?.displayId || "Loading...")}
                   </p>
                 </div>
@@ -303,8 +310,8 @@ const ManageUsers = () => {
                 </div>
 
                 <div className="flex gap-3 w-full pt-4">
-                  <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="flex-1 border border-gray-300 rounded-md py-2.5 font-bold text-gray-700 hover:bg-gray-50">Cancel</button>
-                  <button type="submit" className="flex-1 bg-[#333333] text-white rounded-md py-2.5 font-bold hover:bg-black transition-colors">{showAddModal ? "Add User" : "Save Changes"}</button>
+                  <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="flex-1 border border-gray-300 rounded-md py-2.5 font-bold text-gray-700 hover:bg-gray-50 uppercase text-[11px] tracking-widest">Cancel</button>
+                  <button type="submit" className="flex-1 bg-[#333333] text-white rounded-md py-2.5 font-bold hover:bg-black transition-colors uppercase text-[11px] tracking-widest">{showAddModal ? "Add User" : "Save Changes"}</button>
                 </div>
               </div>
             </form>

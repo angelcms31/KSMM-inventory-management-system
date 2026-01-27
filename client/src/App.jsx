@@ -19,9 +19,12 @@ import AuditLogs from "./pages/admin/AuditLogs";
 import FinanceTransactions from "./pages/finance/FinanceTransaction";
 import Inventory from "./pages/production/Inventory";
 import Order from "./pages/production/Order";
+import Artisan from "./pages/production/Artisan";
+import SalesInventory from "./pages/sales/SalesInventory";
+import FinanceLogs from "./pages/finance/FinanceLogs";
+
 
 const AdminDashboard = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Admin Dashboard</div>;
-const SalesInventory = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Sales Inventory</div>;
 const StatisticsPage = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Sales Statistics</div>;
 const ProductionOrders = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Production Orders</div>;
 const FinanceReports = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Finance Reports</div>;
@@ -58,14 +61,14 @@ function App() {
         </Route>
 
         <Route path="/sales" element={<SalesLayout />}>
-          <Route index element={<SalesInventory />} />
+          <Route index element={<div className="p-4 font-black text-2xl uppercase tracking-tighter">Dashboard</div>} />
           <Route path="inventory" element={<SalesInventory />} />
           <Route path="statistics" element={<StatisticsPage />} />
         </Route>
 
         <Route path="/production" element={<ProductionLayout />}>
           <Route index element={<ProductionOrders />} />
-          <Route path="artisan" element={<div className="p-4 font-black text-2xl uppercase tracking-tighter">Artisan</div>} />
+          <Route path="artisan" element={<Artisan />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="order" element={<Order />} />
         </Route>
@@ -73,7 +76,7 @@ function App() {
         <Route path="/finance" element={<FinanceLayout />}>
           <Route index element={<FinanceReports />} />
           <Route path="transactions" element={<FinanceTransactions />} /> 
-          <Route path="logs" element={<AuditLogs />} /> 
+          <Route path="logs" element={<FinanceLogs />} /> 
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />

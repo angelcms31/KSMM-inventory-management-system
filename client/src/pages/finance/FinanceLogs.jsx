@@ -7,7 +7,7 @@ import {
 import { FaRegFilePdf, FaRegFileExcel } from "react-icons/fa";
 
 
-const AuditLogs = () => {
+const FinanceLogs = () => {
  const [logs, setLogs] = useState([]);
  const [loading, setLoading] = useState(true);
  const [searchTerm, setSearchTerm] = useState("");
@@ -25,6 +25,7 @@ const AuditLogs = () => {
  const [filterDay, setFilterDay] = useState("");
 
 
+ // Refs & dropdown states
  const yearRef = useRef(null);
  const monthRef = useRef(null);
  const dayRef = useRef(null);
@@ -39,6 +40,7 @@ const AuditLogs = () => {
  const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
 
+ /* ================= FETCH LOGS ================= */
  const fetchLogs = async () => {
    setLoading(true);
    try {
@@ -61,6 +63,7 @@ const AuditLogs = () => {
  useEffect(() => { setFilterYear(""); setFilterMonth(""); setFilterDay(""); }, [logType]);
 
 
+ /* ================= CLICK OUTSIDE ================= */
  useEffect(() => {
    const handleClickOutside = (event) => {
      if (yearRef.current && !yearRef.current.contains(event.target)) setIsYearOpen(false);
@@ -72,6 +75,7 @@ const AuditLogs = () => {
  }, []);
 
 
+ /* ================= FILTER LOGS ================= */
  const filteredLogs = logs.filter(log => {
    const nameMatch = log.merged_name?.toLowerCase().includes(searchTerm.toLowerCase());
    const roleMatch = log.role?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -112,6 +116,7 @@ const AuditLogs = () => {
  };
 
 
+ /* ================= EXPORT FUNCTIONS ================= */
  const exportToExcel = async () => {
    try {
      const XLSX = await import('xlsx');
@@ -424,5 +429,5 @@ const AuditLogs = () => {
 };
 
 
-export default AuditLogs;
+export default FinanceLogs;
 

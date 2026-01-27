@@ -1,6 +1,7 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import FinanceSidebar from "../sidebars/FinanceSidebar"; 
+import FinanceRightSidebar from "../sidebars/FinanceRightSideBar";
 
 export default function FinanceLayout() {
   return (
@@ -13,6 +14,7 @@ export default function FinanceLayout() {
           <Outlet />
         </main>
       </div>
+            <FinanceRightSidebar />
     </div>
   );
 }
