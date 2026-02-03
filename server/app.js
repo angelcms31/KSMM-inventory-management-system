@@ -208,41 +208,61 @@ app.put("/api/user/unlock", async (req, res) => {
 
 app.get("/api/artisans", async (req, res) => {
   try {
-    const { search = "", page = 1, limit = 6 } = req.query;
+    const { search = "", page = 1, limit = 9 } = req.query;
     const offset = (page - 1) * limit;
+
     const result = await pool.query(`
-      SELECT *, COUNT(*) OVER() as total_count FROM artisan 
-      WHERE first_name ILIKE $1 OR last_name ILIKE $1 OR email ILIKE $1
+      SELECT *, COUNT(*) OVER() as total_count 
+      FROM artisan 
+      WHERE (first_name ILIKE $1 OR last_name ILIKE $1 OR email ILIKE $1)
       ORDER BY 
-        CASE WHEN status = 'Active' THEN 1 ELSE 2 END ASC, 
+        CASE 
+          WHEN status = 'Active' THEN 1 
+          WHEN status = 'Deactivated' THEN 2 
+          ELSE 3 
+        END ASC, 
         artisan_id DESC 
-      LIMIT $2 OFFSET $3`, [`%${search}%`, limit, offset]);
-    res.json({ artisans: result.rows, totalArtisans: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 });
-  } catch (err) { res.status(500).send(err.message); }
+      LIMIT $2 OFFSET $3`, 
+      [`%${search}%`, limit, offset]
+    );
+
+    res.json({ 
+      artisans: result.rows, 
+      totalArtisans: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 
+    });
+  } catch (err) { 
+    res.status(500).send(err.message); 
+  }
 });
 
 app.post("/api/add_artisan", async (req, res) => {
-  const { firstName, middleName, lastName, email, contactNo, department, profileImage } = req.body;
+  const { first_name, middle_name, last_name, email, contact_no, department, profile_image } = req.body;
   try {
-    await pool.query(
+    const result = await pool.query(
       `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, department, profile_image, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active')`,
-      [firstName, middleName, lastName, email, contactNo, department, profileImage]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active') RETURNING *`,
+      [first_name, middle_name, last_name, email, contact_no, department, profile_image]
     );
-    res.status(201).send("Success");
-  } catch (err) { res.status(500).send(err.message); }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
-app.put("/api/artisan/update", async (req, res) => {
-  const { artisan_id, firstName, middleName, lastName, email, contactNo, department, profileImage } = req.body;
+app.put("/api/artisans/:id", async (req, res) => {
+  const { id } = req.params;
+  const { first_name, middle_name, last_name, email, contact_no, department, profile_image, status } = req.body;
   try {
-    await pool.query(
-      `UPDATE artisan SET first_name=$1, middle_name=$2, last_name=$3, email=$4, contact_no=$5, department=$6, profile_image=$7 
-       WHERE artisan_id=$8`,
-      [firstName, middleName, lastName, email, contactNo, department, profileImage, artisan_id]
+    const result = await pool.query(
+      `UPDATE artisan 
+       SET first_name = $1, middle_name = $2, last_name = $3, email = $4, contact_no = $5, department = $6, profile_image = $7, status = $8 
+       WHERE artisan_id = $9 RETURNING *`,
+      [first_name, middle_name, last_name, email, contact_no, department, profile_image, status, id]
     );
-    res.send("Success");
-  } catch (err) { res.status(500).send(err.message); }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/artisan/status", async (req, res) => {
@@ -267,21 +287,15 @@ app.post("/api/artisan/status", async (req, res) => {
 
 app.put("/api/artisans/:id", async (req, res) => {
   const { id } = req.params;
-  const { first_name, last_name, email, contact, department, status } = req.body;
-  
+  const { first_name, middle_name, last_name, email, contact_no, department, profile_image, status } = req.body;
   try {
     const result = await pool.query(
       `UPDATE artisan 
-       SET first_name = $1, last_name = $2, email = $3, contact = $4, department = $5, status = $6 
-       WHERE artisan_id = $7`,
-      [first_name, last_name, email, contact, department, status, id]
+       SET first_name = $1, middle_name = $2, last_name = $3, email = $4, contact_no = $5, department = $6, profile_image = $7, status = $8 
+       WHERE artisan_id = $9 RETURNING *`,
+      [first_name, middle_name, last_name, email, contact_no, department, profile_image, status, id]
     );
-
-    if (result.rowCount === 0) {
-      return res.status(404).send("Artisan not found");
-    }
-
-    res.status(200).send("Updated successfully");
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -289,9 +303,21 @@ app.put("/api/artisans/:id", async (req, res) => {
 
 app.get("/api/suppliers", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM Supplier WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY supplier_id DESC", [`%${req.query.search || ""}%`]);
-    res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+    const result = await pool.query('SELECT * FROM supplier ORDER BY supplier_id DESC');    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch("/api/suppliers/status/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    await pool.query('UPDATE supplier SET status = $1 WHERE supplier_id = $2', [status, id]);
+    res.status(200).send("Status updated");
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/add_supplier", async (req, res) => {
@@ -387,6 +413,88 @@ app.get("/api/products/unique-list", async (req, res) => {
     res.json(result.rows);
   } catch (err) { res.status(500).send(err.message); }
 });
+
+app.get("/api/materials", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT m.*, s.name as supplier_name 
+      FROM material m 
+      LEFT JOIN supplier s ON m.supplier_id = s.supplier_id 
+      ORDER BY m.material_id DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/add_material", async (req, res) => {
+  const { 
+    unique_code, 
+    supplier_id, 
+    cost_per_unit, 
+    stock_quantity, 
+    reorder_threshold, 
+    material_image, 
+    material_name
+  } = req.body;
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO material (
+        unique_code, 
+        supplier_id, 
+        cost_per_unit, 
+        stock_quantity, 
+        reorder_threshold, 
+        material_image,
+        material_name
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Add Error:", err.message);
+    res.status(500).json({ error: "Database error: " + err.message });
+  }
+});
+
+app.put("/api/materials/:id", async (req, res) => {
+  const { id } = req.params;
+  const { 
+    material_name, 
+    supplier_id, 
+    cost_per_unit, 
+    stock_quantity, 
+    reorder_threshold, 
+    material_image 
+  } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE material 
+       SET material_name = $1, 
+           supplier_id = $2, 
+           cost_per_unit = $3, 
+           stock_quantity = $4, 
+           reorder_threshold = $5, 
+           material_image = $6
+       WHERE material_id = $7 RETURNING *`,
+      [material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Material not found" });
+    }
+
+    res.json({ success: true, message: "Material updated!", data: result.rows[0] });
+  } catch (err) {
+    console.error("Update Error:", err.message);
+    res.status(500).json({ error: "Server error during update: " + err.message });
+  }
+});
+
 
 app.post("/api/sales_Add_inventory", async (req, res) => {
   const { sku, name, location, quantity, selling_price, product_image, collection, brand } = req.body;
@@ -489,23 +597,162 @@ app.put("/api/warehouses/:id", async (req, res) => {
   }
 });
 
-app.get("/api/materials", async (req, res) => {
+app.get("/api/artisan_work_orders", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        material_id,
-        unique_code AS sku, 
-        cost_per_unit AS price, 
-        stock_quantity AS stock, 
-        reorder_threshold AS min_stock,
-        (SELECT name FROM Supplier WHERE supplier_id = Material.supplier_id) AS supplier
-      FROM Material 
-      ORDER BY material_id DESC
+        wo.*, 
+        a.first_name, a.last_name, a.department, a.email, a.contact_no, a.profile_image as artisan_image
+      FROM WorkOrder wo
+      LEFT JOIN artisan a ON wo.artisan_id = a.artisan_id
+      ORDER BY wo.work_order_id DESC
     `);
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json([]);
+    console.error("Fetch WorkOrders Error:", err.message);
+    res.status(500).send(err.message);
   }
+});
+
+app.post("/api/work_orders", async (req, res) => {
+  const { sku, quantity, target_date, artisan_id, status, total_cost, selectedMaterials } = req.body;
+  
+  try {
+    await pool.query('BEGIN');
+
+    const result = await pool.query(
+      `INSERT INTO WorkOrder (sku, quantity_needed, status, target_date, artisan_id, total_cost) 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING work_order_id`,
+      [sku, parseInt(quantity), status || 'In Production', target_date, parseInt(artisan_id), parseFloat(total_cost)]
+    );
+
+    const newOrderId = result.rows[0].work_order_id;
+
+    if (selectedMaterials && selectedMaterials.length > 0) {
+      for (const mat of selectedMaterials) {
+        const matId = parseInt(mat.material_id);
+        const qtyToUse = parseInt(mat.qty);
+        const subtotal = Number(mat.total) || (qtyToUse * (Number(mat.cost) || 0));
+
+        await pool.query(
+          `INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) 
+           VALUES ($1, $2, $3, $4)`,
+          [newOrderId, matId, qtyToUse, subtotal]
+        );
+
+        const checkStock = await pool.query(
+          "UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2 AND stock_quantity >= $1 RETURNING stock_quantity",
+          [qtyToUse, matId]
+        );
+
+        if (checkStock.rows.length === 0) {
+          throw new Error(`Insufficient stock for Material ID: ${matId}`);
+        }
+      }
+    }
+
+    await pool.query('COMMIT');
+    res.status(201).json({ success: true, work_order_id: newOrderId });
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    console.error("Create WO Error:", err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/finished_goods", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT sku, name, collection, brand, work_order_id FROM FinishedGoods");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.put("/api/work_orders/:id/complete", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('BEGIN');
+    const order = await pool.query("SELECT * FROM WorkOrder WHERE work_order_id = $1", [id]);
+    const { sku, quantity_needed, product_image } = order.rows[0];
+    await pool.query("UPDATE WorkOrder SET status = 'Complete' WHERE work_order_id = $1", [id]);
+    await pool.query(
+      `INSERT INTO FinishedGoods (sku, work_order_id, stock_quantity, product_image) 
+       VALUES ($1, $2, $3, $4) 
+       ON CONFLICT (sku) DO UPDATE SET stock_quantity = FinishedGoods.stock_quantity + $3`,
+      [sku, id, quantity_needed, product_image]
+    );
+    await pool.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    res.status(500).send(err.message);
+  }
+});
+
+app.put('/api/work_orders/:id', async (req, res) => {
+    const { id } = req.params;
+    // FIX: Idagdag ang product_image dito para mabasa ng system
+    const { status, artisan_id, quantity, sku, target_date, selectedMaterials, product_image } = req.body;
+
+    // Iwasan ang error kung sakaling walang selectedMaterials na dumating
+    const materialsList = selectedMaterials || [];
+
+    const calculatedTotalCost = materialsList.reduce((sum, m) => {
+        const qty = Number(m.qty) || 0;
+        const cost = Number(m.cost) || 0;
+        return sum + (qty * cost);
+    }, 0);
+
+    console.log("💰 Calculated Total Cost:", calculatedTotalCost);
+
+    try {
+        await pool.query('BEGIN');
+
+      const updateResult = await pool.query(
+            'UPDATE WorkOrder SET status = $1, artisan_id = $2, quantity_needed = $3, sku = $4, target_date = $5, total_cost = $6, product_image = $7 WHERE work_order_id = $8 RETURNING *',
+            [status, artisan_id, quantity, sku, target_date, calculatedTotalCost, product_image, id]
+        );
+
+        console.log("✅ WorkOrder Updated:", updateResult.rows[0]);
+
+        await pool.query('DELETE FROM work_order_materials WHERE work_order_id = $1', [id]);
+
+        if (materialsList.length > 0) {
+            for (const m of materialsList) {
+                const qty = Number(m.qty) || 0;
+                const cost = Number(m.cost) || 0;
+                const subtotal = qty * cost;
+                
+                await pool.query(
+                    'INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) VALUES ($1, $2, $3, $4)',
+                    [id, m.material_id, qty, subtotal]
+                );
+            }
+        }
+
+        await pool.query('COMMIT');
+        res.status(200).json({ success: true, message: "Updated Successfully", totalCost: calculatedTotalCost });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        console.error("❌ Update Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/work_order_materials/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query(`
+            SELECT m.material_id, m.material_name, m.cost_per_unit, wom.material_qty, wom.subtotal 
+            FROM work_order_materials wom
+            JOIN material m ON wom.material_id = m.material_id
+            WHERE wom.work_order_id = $1`, [id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("GET Materials Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.get("/api/audit_logs", async (req, res) => {

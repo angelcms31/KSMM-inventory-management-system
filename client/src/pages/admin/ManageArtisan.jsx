@@ -12,7 +12,7 @@ const ManageArtisan = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalArtisans, setTotalArtisans] = useState(0);
-  const artisansPerPage = 6;
+  const artisansPerPage = 9;
 
   const initialFormState = { 
     firstName: '', middleName: '', lastName: '', email: '', contactNo: '', department: 'Necklace', profileImage: '' 
@@ -50,12 +50,20 @@ const ManageArtisan = () => {
   const handleAddArtisan = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:5000/api/add_artisan", formData);
+      await axios.post("http://localhost:5000/api/add_artisan", {
+        first_name: formData.firstName,
+        middle_name: formData.middleName,
+        last_name: formData.lastName,
+        email: formData.email,
+        contact_no: formData.contactNo,
+        department: formData.department,
+        profile_image: formData.profileImage
+      });
       setShowAddModal(false);
       setFormData(initialFormState);
       fetchArtisans();
       alert("Artisan added successfully!");
-    } catch (err) { alert(err.response?.data || "Error adding artisan"); }
+    } catch (err) { alert("Error adding artisan"); }
   };
 
   const handleEditClick = (artisan) => {
@@ -90,7 +98,7 @@ const ManageArtisan = () => {
       fetchArtisans();
       alert("Artisan updated successfully!");
     } catch (err) { 
-      alert("Update failed: " + (err.response?.data || "Check console")); 
+      alert("Update failed"); 
     }
   };
 
@@ -159,16 +167,20 @@ const ManageArtisan = () => {
                   <div className="relative flex-shrink-0">
                     <img 
                       src={artisan.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${artisan.first_name}`} 
-                      className="w-16 h-16 rounded-full object-cover border border-gray-100" 
+                      className="w-16 h-16 rounded-full object-cover border border-gray-100 shadow-sm" 
                       alt="Profile"
                     />
                     <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-[2.5px] border-white 
                       ${artisanStatus === 'Deactivated' ? 'bg-red-500' : 'bg-green-500'}`}></div>
                   </div>
                   
-                  <div className="flex-1 pt-0.5 min-w-0">
-                    <h3 className="font-bold text-base text-black leading-tight mb-1.5">{artisan.first_name} {artisan.last_name}</h3>
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex-1 pt-0.5 min-w-0 flex flex-col">
+                    <h3 className="font-bold text-base text-black leading-tight break-words">
+                        {artisan.first_name} {artisan.middle_name ? `${artisan.middle_name} ` : ''}
+                        <br />
+                        {artisan.last_name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
                       <p className="text-[#9CA3AF] text-sm font-normal">Artisan</p>
                       {artisanStatus === 'Deactivated' && (
                         <span className="bg-[#EF4444] text-white text-[10px] font-bold px-2.5 py-0.5 rounded uppercase tracking-wide">Deactivated</span>
@@ -193,7 +205,7 @@ const ManageArtisan = () => {
                     </p>
                     <p className="flex items-center gap-2.5 text-black text-sm font-normal">
                       <HiOutlinePhone size={20} className="text-black flex-shrink-0"/> 
-                      {artisan.contact_no}
+                      {artisan.contact_no || 'No Contact'}
                     </p>
                   </div>
                 </div>
@@ -219,10 +231,14 @@ const ManageArtisan = () => {
 
             <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan} className="grid grid-cols-5 gap-x-10 gap-y-4">
               <div className="col-span-3 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className={labelStyle}>First Name</label>
                     <input required className={inputStyle} value={showAddModal ? formData.firstName : selectedArtisan?.firstName} onChange={e => showAddModal ? setFormData({...formData, firstName: e.target.value}) : setSelectedArtisan({...selectedArtisan, firstName: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Middle Name</label>
+                    <input className={inputStyle} value={showAddModal ? formData.middleName : selectedArtisan?.middleName} onChange={e => showAddModal ? setFormData({...formData, middleName: e.target.value}) : setSelectedArtisan({...selectedArtisan, middleName: e.target.value})} />
                   </div>
                   <div>
                     <label className={labelStyle}>Last Name</label>
@@ -232,6 +248,10 @@ const ManageArtisan = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <label className={labelStyle}>Contact No.</label>
+                    <input required className={inputStyle} value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo} onChange={e => showAddModal ? setFormData({...formData, contactNo: e.target.value}) : setSelectedArtisan({...selectedArtisan, contactNo: e.target.value})} />
+                  </div>
+                  <div>
                     <label className={labelStyle}>Department</label>
                     <div className="relative">
                       <select className={`${inputStyle} appearance-none font-bold`} value={showAddModal ? formData.department : selectedArtisan?.department} onChange={e => showAddModal ? setFormData({...formData, department: e.target.value}) : setSelectedArtisan({...selectedArtisan, department: e.target.value})}>
@@ -239,10 +259,6 @@ const ManageArtisan = () => {
                       </select>
                       <HiChevronDown className="absolute right-3 top-2.5 text-gray-500" size={18} />
                     </div>
-                  </div>
-                  <div>
-                    <label className={labelStyle}>Contact No.</label>
-                    <input required className={inputStyle} value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo} onChange={e => showAddModal ? setFormData({...formData, contactNo: e.target.value}) : setSelectedArtisan({...selectedArtisan, contactNo: e.target.value})} />
                   </div>
                 </div>
 
@@ -254,14 +270,14 @@ const ManageArtisan = () => {
 
               <div className="col-span-2 flex flex-col items-center space-y-6 pt-4">
                 <div className="flex flex-col items-center">
-                  <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden relative bg-gray-50">
+                  <div className="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden relative bg-gray-50 shadow-inner">
                     {(showAddModal ? formData.profileImage : selectedArtisan?.profileImage) ? (
                       <img src={showAddModal ? formData.profileImage : selectedArtisan.profileImage} className="w-full h-full object-cover" alt="Preview" />
                     ) : (
                       <HiCamera size={48} className="text-gray-200" />
                     )}
                   </div>
-                  <label className="mt-4 cursor-pointer bg-black text-white text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-md hover:bg-stone-800 transition-colors">
+                  <label className="mt-4 cursor-pointer bg-black text-white text-[10px] font-black uppercase tracking-widest px-6 py-2 rounded-md hover:bg-stone-800 transition-colors shadow-md">
                     Upload Photo
                     <input type="file" accept="image/*" className="hidden" onChange={e => handleFileChange(e, showEditModal)} />
                   </label>
