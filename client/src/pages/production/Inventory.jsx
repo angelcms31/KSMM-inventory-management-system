@@ -174,13 +174,13 @@ export default function Inventory() {
   });
 
   return (
-    <div className="flex-1 flex flex-col px-10 py-8 bg-[#F8F9FA] h-screen overflow-hidden font-sans antialiased text-slate-900">
+    <div className="w-full flex flex-col font-sans antialiased text-slate-900">
       <div className="mb-8">
         <h1 className="text-4xl font-black uppercase leading-none tracking-tighter">Inventory</h1>
         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Resource Allocation & Production Tracking</p>
       </div>
 
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center flex-shrink-0">
+      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
         <div className="relative flex-1 group">
           <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input 
@@ -204,8 +204,8 @@ export default function Inventory() {
         </select>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex-1 flex flex-col overflow-hidden">
-        <div className="overflow-y-auto no-scrollbar flex-1">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col mb-10">
+        <div className="overflow-x-auto">
           <table className="w-full border-separate border-spacing-y-4">
             <thead>
               <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
@@ -234,7 +234,7 @@ export default function Inventory() {
                             {truncateText(order.sku, 15)}
                           </span>
                           <span className="text-slate-300 text-[10px] flex-shrink-0">•</span>
-                          <span className="text-slate-400 text-[10px] font-bold uppercase whitespace-nowrap">{order.quantity_needed} Units</span>
+                          <span className="text-slate-400 text-[10px] font-bold uppercase whitespace-nowrap">{order.quantity_needed} Unit/s</span>
                         </div>
                       </div>
                     </div>
@@ -267,7 +267,7 @@ export default function Inventory() {
 
       {showEditModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-[100] p-6">
-          <div className="bg-white rounded-[3rem] w-full max-w-3xl p-10 relative shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar">
+          <div className="bg-white rounded-[3rem] w-full max-w-3xl p-10 relative shadow-2xl overflow-y-auto max-h-[90vh] no-scrollbar text-left">
             <div className="flex justify-between items-start mb-8">
               <div>
                 <h2 className="text-4xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Modify Record</h2>
@@ -306,27 +306,27 @@ export default function Inventory() {
               <div className="grid grid-cols-2 gap-6 font-bold">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">SKU / Product</label>
-                  <select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent focus:border-slate-200 font-bold transition-all text-sm" value={editForm.sku} onChange={e => setEditForm({...editForm, sku: e.target.value})}>
+                  <select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-bold text-sm" value={editForm.sku} onChange={e => setEditForm({...editForm, sku: e.target.value})}>
                     <option value="">Select Product...</option>
                     {finishedGoods.map(fg => <option key={fg.sku} value={fg.sku}>{fg.sku} - {fg.name || fg.collection}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Quantity</label>
-                  <input type="number" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent focus:border-slate-200 font-bold transition-all text-sm" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: e.target.value})} />
+                  <input type="number" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-bold text-sm" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: e.target.value})} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-6 font-bold">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assigned Artisan</label>
-                  <select className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent focus:border-slate-200 font-bold transition-all text-sm" value={editForm.artisan_id} onChange={e => setEditForm({...editForm, artisan_id: e.target.value})}>
+                  <select className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-bold text-sm" value={editForm.artisan_id} onChange={e => setEditForm({...editForm, artisan_id: e.target.value})}>
                     {artisans.map(a => <option key={a.artisan_id} value={a.artisan_id}>{a.first_name} {a.last_name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
-                  <input type="date" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent focus:border-slate-200 font-bold transition-all text-sm" value={editForm.target_date} onChange={e => setEditForm({...editForm, target_date: e.target.value})} />
+                  <input type="date" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-bold text-sm" value={editForm.target_date} onChange={e => setEditForm({...editForm, target_date: e.target.value})} />
                 </div>
               </div>
 

@@ -16,6 +16,7 @@ import ManageUsers from "./pages/admin/ManageUsers";
 import ManageArtisan from "./pages/admin/ManageArtisan";
 import Suppliers from "./pages/admin/suppliers"; 
 import AuditLogs from "./pages/admin/AuditLogs";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import FinanceTransactions from "./pages/finance/FinanceTransaction";
 import Inventory from "./pages/production/Inventory";
 import Order from "./pages/production/Order";
@@ -24,7 +25,6 @@ import SalesInventory from "./pages/sales/SalesInventory";
 import FinanceLogs from "./pages/finance/FinanceLogs";
 
 
-const AdminDashboard = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Admin Dashboard</div>;
 const StatisticsPage = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Sales Statistics</div>;
 const ProductionOrders = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Production Orders</div>;
 const FinanceReports = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Finance Reports</div>;
@@ -53,7 +53,7 @@ function App() {
         <Route path="/recovered" element={<Recovered />} />
 
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
+          <Route path="" element={<AdminDashboard />} />
           <Route path="artisan" element={<ManageArtisan />} />
           <Route path="suppliers" element={<Suppliers />} />          
           <Route path="audit-logs" element={<AuditLogs />} />

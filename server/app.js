@@ -111,20 +111,28 @@ app.get("/api/users", async (req, res) => {
     const { search = "", page = 1, limit = 6 } = req.query;
     const offset = (page - 1) * limit;
     const result = await pool.query(`
-      SELECT * FROM (
+      WITH numbered_users AS (
         SELECT p.*, u.user_role, u.is_locked, u.date_added,
                ROW_NUMBER() OVER(ORDER BY u.date_added ASC) as permanent_id,
                COUNT(*) OVER() as total_count
-        FROM personaldata p JOIN userlogin u ON p.user_id = u.user_id
-        WHERE p.firstname ILIKE $1 OR p.lastname ILIKE $1 OR p.email ILIKE $1
-      ) sub
+        FROM personaldata p 
+        JOIN userlogin u ON p.user_id = u.user_id
+      )
+      SELECT * FROM numbered_users
+      WHERE firstname ILIKE $1 
+         OR lastname ILIKE $1 
+         OR email ILIKE $1
+         OR CONCAT(SUBSTRING(user_role, 1, 2), '-', permanent_id::TEXT) ILIKE $1
       ORDER BY 
         CASE WHEN is_locked = TRUE THEN 1 ELSE 2 END ASC, 
         CASE WHEN status = 'Active' THEN 1 ELSE 2 END ASC, 
         date_added DESC 
       LIMIT $2 OFFSET $3`, [`%${search}%`, limit, offset]);
     res.json({ users: result.rows, totalUsers: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 });
-  } catch (err) { res.status(500).send("Database error"); }
+  } catch (err) { 
+    console.error(err);
+    res.status(500).send("Database error"); 
+  }
 });
 
 app.get("/api/user/profile/:email", async (req, res) => {
@@ -214,7 +222,14 @@ app.get("/api/artisans", async (req, res) => {
     const result = await pool.query(`
       SELECT *, COUNT(*) OVER() as total_count 
       FROM artisan 
-      WHERE (first_name ILIKE $1 OR last_name ILIKE $1 OR email ILIKE $1)
+      WHERE (
+        first_name ILIKE $1 OR 
+        last_name ILIKE $1 OR 
+        email ILIKE $1 OR 
+        department ILIKE $1 OR 
+        contact_no ILIKE $1 OR
+        CONCAT('AR-', artisan_id) ILIKE $1
+      )
       ORDER BY 
         CASE 
           WHEN status = 'Active' THEN 1 
@@ -341,16 +356,103 @@ app.get("/api/supplier/orders/:id", async (req, res) => {
   } catch (err) { res.status(500).send(err.message); }
 });
 
+app.get("/api/user/name/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "SELECT CONCAT(firstname, ' ', lastname) as name FROM personaldata WHERE user_id = $1",
+      [id]
+    );
+    if (result.rows.length > 0) {
+      res.json({ name: result.rows[0].name });
+    } else {
+      res.status(404).json({ name: "Unknown User" });
+    }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 app.get("/api/all_orders", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT o.order_id, o.total_value, o.status, s.name as supplier_name 
-      FROM orders o 
-      LEFT JOIN supplier s ON o.supplier_id = s.supplier_id 
-      ORDER BY o.order_id DESC
+      SELECT 
+        po.*, 
+        s.name AS supplier_name, 
+        m.material_name, 
+        CONCAT(p.firstname, ' ', p.lastname) AS requisitioner_name
+      FROM purchase_order po
+      LEFT JOIN supplier s ON po.supplier_id = s.supplier_id
+      LEFT JOIN material m ON po.material_id = m.material_id
+      LEFT JOIN personaldata p ON po.user_id = p.user_id
+      ORDER BY po.purchase_order_id DESC
     `);
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.post("/api/create_order", async (req, res) => {
+  const { supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status } = req.body;
+  try {
+    const newOrder = await pool.query(
+      `INSERT INTO purchase_order 
+       (supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status, order_date) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
+       RETURNING *`,
+      [supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status || 'Pending']
+    );
+    res.json(newOrder.rows[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.put("/api/orders/:id", async (req, res) => {
+  const { id } = req.params;
+  const { supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, status } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE purchase_order 
+       SET supplier_id = $1, material_id = $2, ordered_quantity = $3, total_amount = $4, expected_delivery = $5, status = $6
+       WHERE purchase_order_id = $7 RETURNING *`,
+      [supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, status, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Update Order Error:", err.message);
+    res.status(500).send(err.message);
+  }
+});
+
+app.patch("/api/orders/receive/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const order = await pool.query("SELECT * FROM purchase_order WHERE purchase_order_id = $1", [id]);
+    
+    if (order.rows[0].status === 'Delivered') {
+      return res.status(400).send("Order already received.");
+    }
+
+    await pool.query("BEGIN");
+    
+    await pool.query(
+      "UPDATE purchase_order SET status = 'Delivered' WHERE purchase_order_id = $1",
+      [id]
+    );
+
+    await pool.query(
+      "UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2",
+      [order.rows[0].ordered_quantity, order.rows[0].material_id]
+    );
+
+    await pool.query("COMMIT");
+    res.send("Inventory updated successfully!");
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/products", async (req, res) => {
@@ -692,10 +794,8 @@ app.put("/api/work_orders/:id/complete", async (req, res) => {
 
 app.put('/api/work_orders/:id', async (req, res) => {
     const { id } = req.params;
-    // FIX: Idagdag ang product_image dito para mabasa ng system
     const { status, artisan_id, quantity, sku, target_date, selectedMaterials, product_image } = req.body;
 
-    // Iwasan ang error kung sakaling walang selectedMaterials na dumating
     const materialsList = selectedMaterials || [];
 
     const calculatedTotalCost = materialsList.reduce((sum, m) => {
