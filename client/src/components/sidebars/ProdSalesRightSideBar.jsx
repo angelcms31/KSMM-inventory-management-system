@@ -9,7 +9,7 @@ const ProdSalesRightSidebar = () => {
   const userName = localStorage.getItem("userName") || "User";
   const userRole = localStorage.getItem("userRole") || "Production";
 
-  const formatTime = (timestamp) => {
+   const formatTime = (timestamp) => {
     if (!timestamp) return "Just now";
     const now = new Date();
     const past = new Date(timestamp);
@@ -43,10 +43,26 @@ const ProdSalesRightSidebar = () => {
   };
 
   useEffect(() => {
+  const fetchUserProfile = async () => {
+    try {
+      const userId = localStorage.getItem("user_id"); 
+      if (userId) {
+        const res = await axios.get(`http://localhost:5000/api/user/${userId}`);
+        console.log("Profile Data:", res.data);
+        setProfilePic(res.data.profile_image);
+      }
+    } catch (err) {
+      console.error("Error Fetching:", err);
+    }
+  };
+  fetchUserProfile();
+}, []);
+  useEffect(() => {
     fetchActivities();
     const interval = setInterval(fetchActivities, 30000);
     return () => clearInterval(interval);
   }, []);
+
 
   return (
     <div className="w-[280px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 right-0 font-sans border-l border-white/5">

@@ -31,22 +31,29 @@ const AdminSidebar = () => {
     { name: 'Users', path: '/admin/users', icon: <HiOutlineUserGroup size={18} /> },
   ];
 
-  const handleLogout = async () => {
-    const userId = localStorage.getItem("userId");
+const handleLogout = async () => {
+  try {
+    const userId = localStorage.getItem("user_id");
     const role = localStorage.getItem("userRole");
 
-    try {
-      await axios.post("http://localhost:5000/api/logout", {
-        userId: userId,
-        role: role
-      });
-    } catch (err) {
-      console.error("Logout log failed:", err);
+    if (userId) {
+      await axios.post("http://localhost:5000/api/logout", { userId, role });
     }
 
     localStorage.clear();
-    navigate('/', { replace: true });
-  };
+
+    window.history.pushState(null, null, window.location.href);
+    window.onpopstate = function () {
+        window.history.go(1);
+    };
+
+    navigate("/", { replace: true });
+    window.location.reload(); 
+  } catch (err) {
+    localStorage.clear();
+    navigate("/", { replace: true });
+  }
+};
 
   return (
     <div className="w-[240px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 left-0 font-sans overflow-hidden border-r border-white/5">

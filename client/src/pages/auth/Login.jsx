@@ -50,7 +50,7 @@ export default function Login() {
 
         localStorage.setItem("userName", nameToSave || "User");
         localStorage.setItem("userRole", role);
-        localStorage.setItem("userId", user_id);
+        localStorage.setItem("user_id", user_id);
 
         const userRole = role.toLowerCase();
         if (userRole === "admin") navigate("/admin");
@@ -126,7 +126,6 @@ export default function Login() {
                     if(error) setError(false); 
                   }}
                   className={`w-full border rounded-md p-3.5 text-sm outline-none transition-all ${error ? "border-red-400 ring-1 ring-red-100" : "border-gray-200 focus:border-stone-800"}`} 
-                  placeholder="john.doe@gmail.com" 
                 />
               </div>
               
@@ -142,7 +141,6 @@ export default function Login() {
                      if(error) setError(false);
                    }}
                    className="w-full border border-gray-200 rounded-md p-3.5 pr-12 text-sm outline-none focus:border-stone-800" 
-                   placeholder="••••••••••••" 
                  />
                  <button
                    type="button"
@@ -192,7 +190,7 @@ export default function Login() {
       <div 
         className="hidden md:block w-1/2 bg-cover bg-center transition-all duration-700" 
         style={{ 
-          backgroundImage: "url('https://ken-samudio.com/wp-content/uploads/2018/05/ken-pictorial__MG_5993-1-683x1024.jpg')" 
+          backgroundImage: "url('https://silverkris.singaporeair.com/wp-content/uploads/2019/10/Ken-Samudio.jpg')" 
         }}
       >
       </div>

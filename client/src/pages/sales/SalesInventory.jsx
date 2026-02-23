@@ -141,7 +141,7 @@ export default function SalesInventory() {
                   <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
                     <th className="pb-2 text-left pl-6 w-[30%]">Product Details</th>
                     <th className="pb-2 text-center w-[15%]">Category</th>
-                    <th className="pb-2 text-center w-[15%]">Stock Level</th>
+                    <th className="pb-2 text-center w-[15%]">Stocks</th>
                     <th className="pb-2 text-center w-[15%]">Status</th>
                     <th className="pb-2 text-center w-[15%]">Price</th>
                     <th className="pb-2 text-right pr-8">Actions</th>
@@ -202,6 +202,11 @@ export default function SalesInventory() {
                       </tr>
                     );
                   })}
+                  {filteredWarehouses.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">No Matching Products Found</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -224,7 +229,7 @@ export default function SalesInventory() {
               <table className="w-full border-separate border-spacing-y-4">
                 <thead>
                   <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
-                    <th className="pb-2 text-left pl-6 w-[25%]">Location Name</th>
+                    <th className="pb-2 text-left pl-6 w-[25%]">Location</th>
                     <th className="pb-2 text-center w-[30%]">Address / Zone</th>
                     <th className="pb-2 text-center w-[20%]">Manager</th>
                     <th className="pb-2 text-center w-[15%]">Capacity</th>

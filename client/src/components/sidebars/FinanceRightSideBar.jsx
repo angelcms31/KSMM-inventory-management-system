@@ -12,43 +12,13 @@ const FinanceRightSidebar = () => {
   const userRole = localStorage.getItem("userRole") || "Finance";
   const userEmail = localStorage.getItem("userEmail");
 
-  const fetchUserProfile = async () => {
-    try {
-      if (userEmail) {
-        const res = await axios.get(`http://localhost:5000/api/user/profile/${userEmail}`);
-        if (res.data && res.data.Profile_Image) {
-          setProfileImage(res.data.Profile_Image);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching profile image:", err);
-    }
-  };
-
-  const fetchActivities = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/audit_logs");
-      const latestLogs = (Array.isArray(res.data) ? res.data : []).slice(0, 4);
-      setActivities(latestLogs);
-    } catch (err) {
-      console.error("Error fetching logs:", err);
-      setActivities([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchUserProfile();
-    fetchActivities();
-    const interval = setInterval(fetchActivities, 30000);
-    return () => clearInterval(interval);
-  }, [userEmail]);
-
-  const formatTime = (timestamp) => {
+   const formatTime = (timestamp) => {
     if (!timestamp) return "Just now";
     const now = new Date();
     const past = new Date(timestamp);
     const diffInMs = now - past;
     const diffInMins = Math.floor(diffInMs / 60000);
+
     if (diffInMins < 1) return "Just now";
     if (diffInMins < 60) return `${diffInMins} mins ago`;
     const diffInHours = Math.floor(diffInMins / 60);
@@ -63,6 +33,40 @@ const FinanceRightSidebar = () => {
     if (act.includes('logout') || act.includes('delete')) return "bg-red-600";
     return "bg-yellow-600";
   };
+
+  const fetchActivities = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/audit_logs");
+      const latestLogs = (Array.isArray(res.data) ? res.data : []).slice(0, 4);
+      setActivities(latestLogs);
+    } catch (err) {
+      console.error("Error fetching logs for sidebar:", err);
+      setActivities([]);
+    }
+  };
+
+  useEffect(() => {
+  const fetchUserProfile = async () => {
+    try {
+      const userId = localStorage.getItem("user_id"); 
+      if (userId) {
+        const res = await axios.get(`http://localhost:5000/api/user/${userId}`);
+        console.log("Profile Data:", res.data);
+        setProfilePic(res.data.profile_image);
+      }
+    } catch (err) {
+      console.error("Error Fetching:", err);
+    }
+  };
+  fetchUserProfile();
+}, []);
+  useEffect(() => {
+    fetchActivities();
+    const interval = setInterval(fetchActivities, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+
 
   return (
     <div className="w-[280px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 right-0 font-sans border-l border-white/5">

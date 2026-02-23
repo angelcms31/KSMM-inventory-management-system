@@ -13,7 +13,7 @@ const ManageUsers = () => {
   const [activeMenu, setActiveMenu] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const usersPerPage = 9;
 
@@ -29,7 +29,7 @@ const ManageUsers = () => {
       const res = await axios.get(`http://localhost:5000/api/users`, {
         params: { 
           search: searchTerm, 
-          page: currentPage + 1, 
+          page: currentPage, 
           limit: usersPerPage 
         }
       });
@@ -187,7 +187,7 @@ const ManageUsers = () => {
   if (loading) return <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">Loading...</div>;
 
   return (
-    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden">
+    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden" onClick={() => setActiveMenu(null)}>
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -196,7 +196,7 @@ const ManageUsers = () => {
             placeholder="Search..." 
             className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           />
         </div>
       </div>
@@ -209,10 +209,10 @@ const ManageUsers = () => {
             </div>
             <div className="flex items-center gap-3">
               <div className="flex gap-1 mr-2">
-                <button onClick={() => setCurrentPage(p => Math.max(p - 1, 0))} disabled={currentPage === 0} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronLeft size={16}/></button>
-                <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= totalPages - 1} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronRight size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 1)); }} disabled={currentPage === 1} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronLeft size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.min(p + 1, totalPages)); }} disabled={currentPage >= totalPages} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronRight size={16}/></button>
               </div>
-              <button onClick={() => setShowAddModal(true)} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest">+ Add User</button>
+              <button onClick={(e) => { e.stopPropagation(); setShowAddModal(true); }} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest">+ Add User</button>
             </div>
           </div>
 
@@ -233,19 +233,19 @@ const ManageUsers = () => {
 
                 return (
                   <div key={index} className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm hover:shadow-md transition-all flex flex-col ${userStatus === 'Deactivated' ? 'opacity-80' : ''}`}>
-                    <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === index ? null : index); }} className="absolute top-4 right-4 text-gray-600 hover:text-black">
+                    <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === index ? null : index); }} className="absolute top-4 right-4 text-gray-600 hover:text-black z-20">
                       <HiDotsHorizontal size={20} />
                     </button>
 
                     {activeMenu === index && (
-                      <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-10 w-44 py-1 text-[11px] font-bold">
+                      <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-44 py-1 text-[11px] font-bold">
                         {isLocked ? (
-                          <button onClick={() => handleUnlock(user)} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600">Unlock & Activate</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleUnlock(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600">Unlock & Activate</button>
                         ) : (
                           <>
-                            <button onClick={() => handleEditClick(user)} className="w-full text-left px-4 py-2 hover:bg-gray-50">Update Information</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleEditClick(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">Update Information</button>
                             <div className="border-t"></div>
-                            <button onClick={() => toggleStatus(user)} className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}>
+                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(user); }} className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}>
                               {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
                             </button>
                           </>
@@ -312,84 +312,85 @@ const ManageUsers = () => {
             <h2 className="text-3xl font-black text-slate-900 uppercase mb-8 tracking-tighter leading-none">{showAddModal ? "Add New User" : "Update User"}</h2>
 
             <form onSubmit={showAddModal ? handleAddUser : handleUpdateUser} className="grid grid-cols-5 gap-x-10">
-              <div className="col-span-3 space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">First Name</label>
-                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? formData.firstName : selectedUser?.firstName} onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Middle Name</label>
-                    <input className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? formData.middleName : selectedUser?.middleName} onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Last Name</label>
-                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? formData.lastName : selectedUser?.lastName} onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
-                  </div>
+              <div className="col-span-3 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">First Name</label>
+                  <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.firstName : selectedUser?.firstName} onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Position</label>
-                    <div className="relative">
-                      <select className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm appearance-none" value={showAddModal ? formData.role : selectedUser?.role} onChange={e => showAddModal ? setFormData({...formData, role: e.target.value}) : setSelectedUser({...selectedUser, role: e.target.value})}>
-                        <option value="Sales">Sales</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Production">Production</option>
-                        <option value="Finance">Finance</option>
-                      </select>
-                      <HiChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={18} />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Gender</label>
-                    <div className="relative">
-                      <select className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm appearance-none" value={showAddModal ? formData.gender : selectedUser?.gender} onChange={e => showAddModal ? setFormData({...formData, gender: e.target.value}) : setSelectedUser({...selectedUser, gender: e.target.value})}>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                      </select>
-                      <HiChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={18} />
-                    </div>
-                  </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Middle Name</label>
+                  <input className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.middleName : selectedUser?.middleName} onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Last Name</label>
+                  <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.lastName : selectedUser?.lastName} onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? formData.contactNo : selectedUser?.contactNo} onChange={e => handlePhoneChange(e.target.value, showEditModal)} />
+                  <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.contactNo : selectedUser?.contactNo} onChange={e => handlePhoneChange(e.target.value, showEditModal)} />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>
-                  <input required type="email" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? formData.email : selectedUser?.email} onChange={e => handleEmailChange(e.target.value, showEditModal)} />
+                  <input required type="email" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.email : selectedUser?.email} onChange={e => handleEmailChange(e.target.value, showEditModal)} />
                 </div>
               </div>
 
               <div className="col-span-2 flex flex-col items-center justify-between py-2">
-                <div className="flex flex-col items-center w-full">
-                  <div className="w-32 h-32 rounded-[2.5rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group mb-4">
+                <div className="flex flex-col items-center w-full space-y-3">
+                  <div className="w-28 h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
                     {(showAddModal ? formData.profileImage : selectedUser?.profileImage) ? (
                       <img src={showAddModal ? formData.profileImage : selectedUser.profileImage} className="w-full h-full object-cover" alt="Preview" />
                     ) : (
-                      <HiCamera size={48} className="text-gray-200" />
+                      <HiCamera size={40} className="text-gray-200" />
                     )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                      <p className="text-white text-[10px] font-black uppercase">Upload Photo</p>
+                      <p className="text-white text-[9px] font-black uppercase">Upload Photo</p>
                     </div>
                     <input type="file" accept="image/jpeg,image/png" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleFileChange(e, showEditModal)} />
                   </div>
                   
                   <div className="w-full space-y-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">ID Number</label>
-                    <div className="w-full bg-[#E9ECEF] rounded-2xl p-4 font-black text-sm text-slate-600 text-center">
-                      {showAddModal ? "Generated Automatically" : (selectedUser?.displayId || "Loading...")}
+                    <div className="w-full bg-[#E9ECEF] rounded-xl p-3 font-bold text-sm text-slate-600 text-center">
+                      {showAddModal ? "Auto Generated" : (selectedUser?.displayId || "Loading...")}
+                    </div>
+                  </div>
+
+                  <div className="w-full space-y-1">
+                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Gender</label>
+                    <div className="w-full space-y-1">
+                    <div className="relative">
+                      <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none" value={showAddModal ? formData.gender : selectedUser?.gender} onChange={e => showAddModal ? setFormData({...formData, gender: e.target.value}) : setSelectedUser({...selectedUser, gender: e.target.value})}>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <HiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16} />
+                    </div>
+                  </div>
+                  </div>
+
+                  <div className="w-full space-y-1">
+                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Position</label>
+                    <div className="relative">
+                      <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none" value={showAddModal ? formData.role : selectedUser?.role} onChange={e => showAddModal ? setFormData({...formData, role: e.target.value}) : setSelectedUser({...selectedUser, role: e.target.value})}>
+                        <option value="Sales">Sales</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Production">Production</option>
+                        <option value="Finance">Finance</option>
+                      </select>
+                      <HiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16} />
                     </div>
                   </div>
                 </div>
 
-                <div className="flex gap-3 w-full mt-6">
-                  <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="flex-1 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button>
-                  <button type="submit" className="flex-1 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm</button>
+                <div className="flex gap-3 w-full mt-4">
+                  <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="flex-1 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all">Cancel</button>
+                  <button type="submit" className="flex-1 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm</button>
                 </div>
               </div>
             </form>

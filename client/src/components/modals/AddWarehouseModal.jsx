@@ -14,9 +14,9 @@ export default function AddWarehouseModal({ warehouse, onClose, fetchWarehouses 
     if (warehouse) {
       setFormData({
         name: warehouse.name || '', 
-        location: warehouse.location || 'Manila',
+        location: warehouse.location || '',
         capacity_total: warehouse.capacity_total || 50000,
-        manager_name: warehouse.manager_name || warehouse.manager || '' // Fallback sa manager kung wala pang alias
+        manager_name: warehouse.manager_name || warehouse.manager || '' 
       });
     }
   }, [warehouse]);
@@ -82,7 +82,7 @@ export default function AddWarehouseModal({ warehouse, onClose, fetchWarehouses 
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Max Capacity</label>
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Capacity</label>
               <input 
                 type="number"
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 font-bold outline-none" 

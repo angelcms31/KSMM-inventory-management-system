@@ -8,6 +8,7 @@ const AdminFinanceRightSidebar = () => {
   const navigate = useNavigate(); 
   const userName = localStorage.getItem("userName") || "Admin User";
   const userRole = localStorage.getItem("userRole") || "Admin";
+  const [profilePic, setProfilePic] = useState(null);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "Just now";
@@ -43,11 +44,27 @@ const AdminFinanceRightSidebar = () => {
   };
 
   useEffect(() => {
+  const fetchUserProfile = async () => {
+    try {
+      const userId = localStorage.getItem("user_id"); 
+      if (userId) {
+        const res = await axios.get(`http://localhost:5000/api/user/${userId}`);
+        console.log("Profile Data:", res.data);
+        setProfilePic(res.data.profile_image);
+      }
+    } catch (err) {
+      console.error("Error Fetching:", err);
+    }
+  };
+  fetchUserProfile();
+}, []);
+  useEffect(() => {
     fetchActivities();
     const interval = setInterval(fetchActivities, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  
   return (
     <div className="w-[280px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 right-0 font-sans border-l border-white/5">
       
@@ -55,10 +72,19 @@ const AdminFinanceRightSidebar = () => {
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10">
             <img 
-              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} 
-              alt="User" 
-              className="w-full h-full object-cover"
-            />
+  src={
+    profilePic 
+      ? (profilePic.startsWith('data:') || profilePic.startsWith('http') 
+          ? profilePic 
+          : `http://localhost:5000${profilePic}`) 
+          : `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`
+          } 
+          alt="User" 
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`;
+          }}
+        />
           </div>
           <div>
             <h4 className="text-[14px] font-bold leading-none">{userName}</h4>

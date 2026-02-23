@@ -52,7 +52,7 @@ app.post("/login", async (req, res) => {
         return res.status(403).json({ message: "Account Locked" });
       } else {
         await pool.query('UPDATE userlogin SET failed_attempts = $1 WHERE user_id = $2', [newAttempts, user.user_id]);
-        return res.status(401).json({ message: `Invalid credentials. ${3 - newAttempts} attempts left.` });
+        return res.status(401).json({ message: `Invalid credentials.` });
       }
     }
   } catch (error) { res.status(500).json({ message: "Login error" }); }
@@ -251,28 +251,29 @@ app.get("/api/artisans", async (req, res) => {
 });
 
 app.post("/api/add_artisan", async (req, res) => {
-  const { first_name, middle_name, last_name, email, contact_no, department, profile_image } = req.body;
+  const { first_name, middle_name, last_name, email, contact_no, profile_image } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, department, profile_image, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active') RETURNING *`,
-      [first_name, middle_name, last_name, email, contact_no, department, profile_image]
+      `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, profile_image, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING *`,
+      [first_name, middle_name, last_name, email, contact_no,  profile_image]
     );
     res.json(result.rows[0]);
   } catch (err) {
+    console.error("Database Error:", err.message);
     res.status(500).send(err.message);
   }
 });
 
 app.put("/api/artisans/:id", async (req, res) => {
   const { id } = req.params;
-  const { first_name, middle_name, last_name, email, contact_no, department, profile_image, status } = req.body;
+  const { first_name, middle_name, last_name, email, contact_no, profile_image, status } = req.body;
   try {
     const result = await pool.query(
       `UPDATE artisan 
-       SET first_name = $1, middle_name = $2, last_name = $3, email = $4, contact_no = $5, department = $6, profile_image = $7, status = $8 
-       WHERE artisan_id = $9 RETURNING *`,
-      [first_name, middle_name, last_name, email, contact_no, department, profile_image, status, id]
+       SET first_name = $1, middle_name = $2, last_name = $3, email = $4, contact_no = $5, profile_image = $6, status = $7 
+       WHERE artisan_id = $8 RETURNING *`,
+      [first_name, middle_name, last_name, email, contact_no, profile_image, status, id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -335,6 +336,23 @@ app.patch("/api/suppliers/status/:id", async (req, res) => {
   }
 });
 
+
+app.put("/api/suppliers/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, email, contact_no } = req.body;
+  try {
+    const result = await pool.query(
+      "UPDATE supplier SET name = $1, email = $2, contact_no = $3 WHERE supplier_id = $4 RETURNING *",
+      [name, email, contact_no, id]
+    );
+    if (result.rows.length === 0) return res.status(404).send("Supplier not found");
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+
 app.post("/api/add_supplier", async (req, res) => {
   const { name, email, phone } = req.body;
   try {
@@ -378,17 +396,19 @@ app.get("/api/all_orders", async (req, res) => {
     const result = await pool.query(`
       SELECT 
         po.*, 
-        s.name AS supplier_name, 
-        m.material_name, 
-        CONCAT(p.firstname, ' ', p.lastname) AS requisitioner_name
-      FROM purchase_order po
+        po.assignment_id AS purchase_order_id, 
+        COALESCE(s.name, 'Unknown Supplier') AS supplier_name, 
+        COALESCE(m.material_name, 'Unknown Material') AS material_name, 
+        COALESCE(CONCAT(p.firstname, ' ', p.lastname), 'Unknown Requisitioner') AS requisitioner_name
+      FROM purchaseorder po
       LEFT JOIN supplier s ON po.supplier_id = s.supplier_id
       LEFT JOIN material m ON po.material_id = m.material_id
       LEFT JOIN personaldata p ON po.user_id = p.user_id
-      ORDER BY po.purchase_order_id DESC
+      ORDER BY po.assignment_id DESC
     `);
     res.json(result.rows);
   } catch (err) {
+    console.error("Database Error:", err.message); 
     res.status(500).send(err.message);
   }
 });
@@ -397,7 +417,7 @@ app.post("/api/create_order", async (req, res) => {
   const { supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status } = req.body;
   try {
     const newOrder = await pool.query(
-      `INSERT INTO purchase_order 
+      `INSERT INTO purchaseorder 
        (supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status, order_date) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) 
        RETURNING *`,
@@ -414,9 +434,9 @@ app.put("/api/orders/:id", async (req, res) => {
   const { supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, status } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE purchase_order 
+      `UPDATE purchaseorder 
        SET supplier_id = $1, material_id = $2, ordered_quantity = $3, total_amount = $4, expected_delivery = $5, status = $6
-       WHERE purchase_order_id = $7 RETURNING *`,
+       WHERE assignment_id = $7 RETURNING *`,
       [supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, status, id]
     );
     res.json(result.rows[0]);
@@ -429,7 +449,7 @@ app.put("/api/orders/:id", async (req, res) => {
 app.patch("/api/orders/receive/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    const order = await pool.query("SELECT * FROM purchase_order WHERE purchase_order_id = $1", [id]);
+    const order = await pool.query("SELECT * FROM purchaseorder WHERE assignment_id = $1", [id]);
     
     if (order.rows[0].status === 'Delivered') {
       return res.status(400).send("Order already received.");
@@ -438,7 +458,7 @@ app.patch("/api/orders/receive/:id", async (req, res) => {
     await pool.query("BEGIN");
     
     await pool.query(
-      "UPDATE purchase_order SET status = 'Delivered' WHERE purchase_order_id = $1",
+      "UPDATE purchaseorder SET status = 'Delivered' WHERE assignment_id = $1",
       [id]
     );
 
@@ -703,10 +723,13 @@ app.get("/api/artisan_work_orders", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        wo.*, 
-        a.first_name, a.last_name, a.department, a.email, a.contact_no, a.profile_image as artisan_image
+        wo.*,
+        COALESCE(wo.product_image, fg.product_image) AS product_image,
+        a.first_name, a.last_name, a.department, a.email, a.contact_no, 
+        a.profile_image as artisan_image
       FROM WorkOrder wo
       LEFT JOIN artisan a ON wo.artisan_id = a.artisan_id
+      LEFT JOIN FinishedGoods fg ON wo.sku = fg.sku
       ORDER BY wo.work_order_id DESC
     `);
     res.json(result.rows);
@@ -764,30 +787,54 @@ app.post("/api/work_orders", async (req, res) => {
 
 app.get("/api/finished_goods", async (req, res) => {
   try {
-    const result = await pool.query("SELECT sku, name, collection, brand, work_order_id FROM FinishedGoods");
+    const result = await pool.query("SELECT sku, name, collection, brand, work_order_id, product_image FROM FinishedGoods");
     res.json(result.rows);
   } catch (err) {
     res.status(500).send(err.message);
   }
 });
 
+
 app.put("/api/work_orders/:id/complete", async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('BEGIN');
-    const order = await pool.query("SELECT * FROM WorkOrder WHERE work_order_id = $1", [id]);
-    const { sku, quantity_needed, product_image } = order.rows[0];
-    await pool.query("UPDATE WorkOrder SET status = 'Complete' WHERE work_order_id = $1", [id]);
-    await pool.query(
-      `INSERT INTO FinishedGoods (sku, work_order_id, stock_quantity, product_image) 
-       VALUES ($1, $2, $3, $4) 
-       ON CONFLICT (sku) DO UPDATE SET stock_quantity = FinishedGoods.stock_quantity + $3`,
-      [sku, id, quantity_needed, product_image]
+
+    const order = await pool.query(
+      "SELECT * FROM WorkOrder WHERE work_order_id = $1",
+      [id]
     );
+
+    if (order.rows.length === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(404).send("Work order not found.");
+    }
+
+    const { sku, quantity_needed } = order.rows[0];
+
+    await pool.query(
+      "UPDATE WorkOrder SET status = 'Complete' WHERE work_order_id = $1",
+      [id]
+    );
+
+    const updateResult = await pool.query(
+      `UPDATE FinishedGoods 
+       SET current_stock = current_stock + $1
+       WHERE sku = $2
+       RETURNING sku, current_stock`,
+      [quantity_needed, sku]
+    );
+
+    if (updateResult.rows.length === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(404).send(`Product with SKU '${sku}' not found in FinishedGoods.`);
+    }
+
     await pool.query('COMMIT');
-    res.json({ success: true });
+    res.json({ success: true, updated: updateResult.rows[0] });
   } catch (err) {
     await pool.query('ROLLBACK');
+    console.error("Complete WO Error:", err.message);
     res.status(500).send(err.message);
   }
 });
@@ -795,7 +842,6 @@ app.put("/api/work_orders/:id/complete", async (req, res) => {
 app.put('/api/work_orders/:id', async (req, res) => {
     const { id } = req.params;
     const { status, artisan_id, quantity, sku, target_date, selectedMaterials, product_image } = req.body;
-
     const materialsList = selectedMaterials || [];
 
     const calculatedTotalCost = materialsList.reduce((sum, m) => {
@@ -804,39 +850,62 @@ app.put('/api/work_orders/:id', async (req, res) => {
         return sum + (qty * cost);
     }, 0);
 
-    console.log("💰 Calculated Total Cost:", calculatedTotalCost);
+    const client = await pool.connect();
 
     try {
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
-      const updateResult = await pool.query(
-            'UPDATE WorkOrder SET status = $1, artisan_id = $2, quantity_needed = $3, sku = $4, target_date = $5, total_cost = $6, product_image = $7 WHERE work_order_id = $8 RETURNING *',
+       
+        const oldMaterials = await client.query(
+            'SELECT material_id, material_qty FROM work_order_materials WHERE work_order_id = $1',
+            [id]
+        );
+
+        for (const oldMat of oldMaterials.rows) {
+            await client.query(
+                'UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2',
+                [oldMat.material_qty, oldMat.material_id]
+            );
+        }
+
+        await client.query(
+            'UPDATE WorkOrder SET status = $1, artisan_id = $2, quantity_needed = $3, sku = $4, target_date = $5, total_cost = $6, product_image = $7 WHERE work_order_id = $8',
             [status, artisan_id, quantity, sku, target_date, calculatedTotalCost, product_image, id]
         );
 
-        console.log("✅ WorkOrder Updated:", updateResult.rows[0]);
-
-        await pool.query('DELETE FROM work_order_materials WHERE work_order_id = $1', [id]);
+        await client.query('DELETE FROM work_order_materials WHERE work_order_id = $1', [id]);
 
         if (materialsList.length > 0) {
             for (const m of materialsList) {
                 const qty = Number(m.qty) || 0;
                 const cost = Number(m.cost) || 0;
                 const subtotal = qty * cost;
-                
-                await pool.query(
+
+                await client.query(
                     'INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) VALUES ($1, $2, $3, $4)',
                     [id, m.material_id, qty, subtotal]
                 );
+
+                const updateStock = await client.query(
+                    'UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2 RETURNING stock_quantity',
+                    [qty, m.material_id]
+                );
+
+                if (updateStock.rows[0].stock_quantity < 0) {
+                    throw new Error(`Insufficient stock for material ID: ${m.material_id}`);
+                }
             }
         }
 
-        await pool.query('COMMIT');
-        res.status(200).json({ success: true, message: "Updated Successfully", totalCost: calculatedTotalCost });
+        await client.query('COMMIT');
+        res.status(200).json({ success: true, message: "Order and Stock Updated Successfully" });
+
     } catch (err) {
-        await pool.query('ROLLBACK');
-        console.error("❌ Update Error:", err.message);
+        await client.query('ROLLBACK');
+        console.error("❌ Transaction Error:", err.message);
         res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 });
 
@@ -867,10 +936,26 @@ app.get("/api/audit_logs", async (req, res) => {
         ) as merged_name
       FROM audit_logs l 
       ORDER BY l.timestamp DESC 
-      LIMIT 100
     `);
     res.json(result.rows); 
   } catch (err) { res.status(500).send(err.message); }
+});
+
+app.get("/api/user/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "SELECT profile_image, firstname, lastname FROM personaldata WHERE user_id = $1",
+      [id]
+    );
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 const PORT = 5000;

@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 import { RecoveryContext } from "./context/RecoveryContext";
 
 import Login from "./pages/auth/Login";
@@ -14,7 +15,7 @@ import FinanceLayout from "./components/layouts/FinanceLayout";
 
 import ManageUsers from "./pages/admin/ManageUsers";
 import ManageArtisan from "./pages/admin/ManageArtisan";
-import Suppliers from "./pages/admin/suppliers"; 
+import Suppliers from "./pages/admin/Suppliers"; 
 import AuditLogs from "./pages/admin/AuditLogs";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import FinanceTransactions from "./pages/finance/FinanceTransaction";
@@ -22,24 +23,82 @@ import Inventory from "./pages/production/Inventory";
 import Order from "./pages/production/Order";
 import Artisan from "./pages/production/Artisan";
 import SalesInventory from "./pages/sales/SalesInventory";
+import Statistics from "./pages/sales/Statisctics"
 import FinanceLogs from "./pages/finance/FinanceLogs";
 
+const ProtectedRoute = ({ children, allowedRole }) => {
+  const userId = localStorage.getItem("user_id");
+  const userRole = localStorage.getItem("userRole");
 
-const StatisticsPage = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Sales Statistics</div>;
-const ProductionOrders = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Production Orders</div>;
-const FinanceReports = () => <div className="p-4 font-black text-2xl uppercase tracking-tighter">Finance Reports</div>;
+  if (!userId) return <Navigate to="/" replace />;
+  if (allowedRole && userRole?.toLowerCase() !== allowedRole.toLowerCase()) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
 
 function App() {
   const [email, setEmail] = useState("");
   const [otp, setOTP] = useState();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const timerRef = useRef(null);
+
+  const handleLogoutLogic = async () => {
+    const userId = localStorage.getItem("user_id");
+    const role = localStorage.getItem("userRole");
+
+    if (userId) {
+      try {
+        await axios.post("http://localhost:5000/api/logout", { userId, role });
+      } catch (err) {
+        console.error("Logout log failed", err);
+      }
+    }
+    localStorage.clear();
+  };
+
+  const handleAutoLogout = async () => {
+    await handleLogoutLogic();
+    navigate("/", { replace: true });
+    window.location.reload();
+  };
+
+  const resetTimer = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(handleAutoLogout, 300000);
+  };
+
+  useEffect(() => {
+    if (location.pathname === "/") {
+      const userId = localStorage.getItem("user_id");
+      if (userId) {
+        handleLogoutLogic(); 
+      }
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
+    const handleActivity = () => resetTimer();
+
+    if (localStorage.getItem("user_id")) {
+      resetTimer();
+      events.forEach((event) => window.addEventListener(event, handleActivity));
+    }
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      events.forEach((event) => window.removeEventListener(event, handleActivity));
+    };
+  }, [location.pathname]);
 
   useEffect(() => {
     const syncLogout = (event) => {
-      if (event.key === "userId" && !event.newValue) {
+      if (event.key === "user_id" && !event.newValue) {
         window.location.href = "/";
       }
     };
-
     window.addEventListener("storage", syncLogout);
     return () => window.removeEventListener("storage", syncLogout);
   }, []);
@@ -52,7 +111,7 @@ function App() {
         <Route path="/reset" element={<Reset />} />
         <Route path="/recovered" element={<Recovered />} />
 
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/admin" element={<ProtectedRoute allowedRole="Admin"><AdminLayout /></ProtectedRoute>}>
           <Route path="" element={<AdminDashboard />} />
           <Route path="artisan" element={<ManageArtisan />} />
           <Route path="suppliers" element={<Suppliers />} />          
@@ -60,26 +119,27 @@ function App() {
           <Route path="users" element={<ManageUsers />} />
         </Route>
 
-        <Route path="/sales" element={<SalesLayout />}>
-          <Route index element={<div className="p-4 font-black text-2xl uppercase tracking-tighter">Dashboard</div>} />
+        <Route path="/sales" element={<ProtectedRoute allowedRole="Sales"><SalesLayout /></ProtectedRoute>}>
+          <Route index element={<div className="p-4 uppercase font-black text-2xl">Dashboard</div>} />
           <Route path="inventory" element={<SalesInventory />} />
-          <Route path="statistics" element={<StatisticsPage />} />
+          <Route path="statistics" element={<Statistics />} />
+
         </Route>
 
-        <Route path="/production" element={<ProductionLayout />}>
-          <Route index element={<ProductionOrders />} />
+        <Route path="/production" element={<ProtectedRoute allowedRole="Production"><ProductionLayout /></ProtectedRoute>}>
+          <Route index element={<div className="p-4 uppercase font-black text-2xl">Orders</div>} />
           <Route path="artisan" element={<Artisan />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="order" element={<Order />} />
         </Route>
 
-        <Route path="/finance" element={<FinanceLayout />}>
-          <Route index element={<FinanceReports />} />
+        <Route path="/finance" element={<ProtectedRoute allowedRole="Finance"><FinanceLayout /></ProtectedRoute>}>
+          <Route index element={<div className="p-4 uppercase font-black text-2xl">Reports</div>} />
           <Route path="transactions" element={<FinanceTransactions />} /> 
           <Route path="logs" element={<FinanceLogs />} /> 
         </Route>
 
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </RecoveryContext.Provider>
   );
