@@ -192,7 +192,7 @@ export default function SalesInventory() {
                           </span>
                         </td>
                         <td className="py-4 text-center font-black text-[#10B981] border-y border-transparent group-hover:border-slate-100 whitespace-nowrap">
-                          ₱{parseFloat(p.selling_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                          ${parseFloat(p.selling_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}
                         </td>
                         <td className="py-4 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
                           <button onClick={() => handleEditClick(p)} className="w-10 h-10 bg-white text-slate-900 hover:shadow-md rounded-xl transition-all border border-slate-100 inline-flex items-center justify-center shadow-sm">

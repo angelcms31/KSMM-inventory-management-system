@@ -60,6 +60,11 @@ export default function Artisan() {
     }
   };
 
+  const getProductName = (sku) => {
+    const product = finishedGoods.find(fg => fg.sku === sku);
+    return product ? product.name : "Unknown Product";
+  };
+
   useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
@@ -73,6 +78,16 @@ export default function Artisan() {
     if (!woForm.sku) return null;
     const fg = finishedGoods.find(f => f.sku === woForm.sku);
     return fg?.product_image || null;
+  };
+
+  const handleSKUChange = (e) => {
+    const selectedSKU = e.target.value;
+    const product = finishedGoods.find(fg => fg.sku === selectedSKU);
+    setWoForm({ 
+      ...woForm, 
+      sku: selectedSKU, 
+      product_image: product ? product.product_image : null 
+    });
   };
 
   const addMaterialToWO = () => {
@@ -96,25 +111,34 @@ export default function Artisan() {
 
   const handleCreateWorkOrder = async (e) => {
     e.preventDefault();
+
+    const validMaterials = woForm.selectedMaterials.filter(m => m.material_id !== '' && Number(m.qty) > 0);
+
+    if (validMaterials.length === 0) {
+      alert("Please add at least one raw material with a valid quantity.");
+      return;
+    }
+
     const skuImage = getSelectedSkuImage();
     const payload = {
       ...woForm,
+      status: 'In Production',
       artisan_id: parseInt(woForm.artisan_id),
       quantity: parseInt(woForm.quantity),
       total_cost: calculateSubtotal(),
       product_image: skuImage,
-      selectedMaterials: woForm.selectedMaterials.map(m => ({
+      selectedMaterials: validMaterials.map(m => ({
         material_id: parseInt(m.material_id),
         qty: parseInt(m.qty),
         cost: Number(m.cost)
-      })).filter(m => !isNaN(m.material_id) && m.qty > 0)
+      }))
     };
     try {
       await axios.post("http://localhost:5000/api/work_orders", payload);
       setShowWorkOrderModal(false);
       setWoForm({ sku: '', quantity: '', category: '', target_date: '', artisan_id: '', status: 'In Production', selectedMaterials: [] });
       await fetchData();
-    } catch (err) {
+    } catch (err) { 
       console.error(err);
     }
   };
@@ -184,11 +208,6 @@ export default function Artisan() {
 
   const currentMaterials = filteredMaterials.slice(currentMatPage * matsPerPage, (currentMatPage + 1) * matsPerPage);
 
-  const getProductName = (sku) => {
-    const product = finishedGoods.find(fg => fg.sku === sku);
-    return product ? product.name : "Unknown Product";
-  };
-
   return (
     <div className="w-full flex flex-col font-sans antialiased text-slate-900">
       <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
@@ -249,13 +268,13 @@ export default function Artisan() {
                       <p className="text-slate-900 text-[11px] truncate font-bold">{order.sku}</p>
                     </div>
                     <div className="min-w-0">
-                      <p>Product</p>
+                      <p>Material</p>
                       <p className="text-slate-900 text-[11px] truncate font-bold">{getProductName(order.sku)}</p>
                     </div>
                   </div>
                   <div className="pt-2 border-t font-semibold space-y-1">
-                    <p className="text-slate-700 text-[11px]">Target: {order.quantity_needed} Units</p>
-                    <p className="text-emerald-600 font-semibold text-[11px]">Cost: ₱{Number(order.total_cost || 0).toLocaleString()}</p>
+                      <p className="text-slate-700 text-[11px]">Target: {order.quantity_needed} Units</p>
+                      <p className="text-emerald-600 font-semibold text-[11px]">Cost: ₱{Number(order.total_cost || 0).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -290,11 +309,7 @@ export default function Artisan() {
               <tbody className="font-bold text-slate-700">
                 {currentMaterials.map((m) => (
                   <tr key={m.material_id} className="hover:bg-slate-50 transition-all group">
-                    <td className="py-4 pl-4 rounded-l-2xl border-y border-l border-transparent group-hover:border-slate-100">
-                      <div className="w-12 h-12 mx-auto bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200">
-                        {m.material_image ? <img src={m.material_image} className="w-full h-full object-cover" alt="Material" /> : <HiPhoto className="text-slate-300" size={20}/>}
-                      </div>
-                    </td>
+                    <td className="py-4 pl-4 rounded-l-2xl border-y border-l border-transparent group-hover:border-slate-100"><div className="w-12 h-12 mx-auto bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200">{m.material_image ? <img src={m.material_image} className="w-full h-full object-cover" alt="Material" /> : <HiPhoto className="text-slate-300" size={20}/>}</div></td>
                     <td className="py-4 uppercase text-slate-900 font-black border-y border-transparent group-hover:border-slate-100 truncate max-w-[150px]">{m.material_name}</td>
                     <td className="py-4 text-slate-400 text-[11px] font-bold border-y border-transparent group-hover:border-slate-100">{m.unique_code}</td>
                     <td className="py-4 border-y border-transparent group-hover:border-slate-100">
@@ -309,9 +324,7 @@ export default function Artisan() {
                         {parseInt(m.stock_quantity) > parseInt(m.reorder_threshold) ? "In Stock" : "Low Stock"}
                       </span>
                     </td>
-                    <td className="py-4 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
-                      <button onClick={() => { setSelectedMatId(m.material_id); setMatForm({...m}); setIsUpdateMat(true); setShowMatModal(true); }} className="p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100"><HiPencil size={18}/></button>
-                    </td>
+                    <td className="py-4 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100"><button onClick={() => { setSelectedMatId(m.material_id); setMatForm({...m}); setIsUpdateMat(true); setShowMatModal(true); }} className="p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100"><HiPencil size={18}/></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -321,61 +334,28 @@ export default function Artisan() {
       </div>
 
       {showWorkOrderModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[3rem] w-full max-w-4xl p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
+          <div className="bg-white rounded-[3rem] w-full max-w-4xl p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-100">
             <div className="flex justify-between items-start mb-6">
               <h2 className="text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Work Order Form</h2>
-              <div className="flex items-center gap-4">
-                <select className={`${getStatusColor(woForm.status)} text-white px-5 py-2.5 rounded-2xl font-black uppercase text-[10px] outline-none cursor-pointer border-none shadow-lg tracking-widest`} value={woForm.status} onChange={(e) => setWoForm({...woForm, status: e.target.value})}>
-                  <option value="In Production">In Production</option>
-                  <option value="Complete">Complete</option>
-                  <option value="Quality Control">Quality Control</option>
-                </select>
-                <button onClick={() => setShowWorkOrderModal(false)} className="text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"><HiXMark size={24}/></button>
-              </div>
+              <button onClick={() => setShowWorkOrderModal(false)} className="text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"><HiXMark size={24}/></button>
             </div>
-
             <form onSubmit={handleCreateWorkOrder} className="flex-1 flex flex-col min-h-0">
               <div className="grid grid-cols-2 gap-8 mb-6 overflow-y-auto pr-2 no-scrollbar">
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3 text-left">
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Product SKU & Name</label>
-                      <select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.sku} onChange={e => setWoForm({...woForm, sku: e.target.value})}>
-                        <option value="">Select Product...</option>
-                        {finishedGoods.map(fg => (<option key={fg.sku} value={fg.sku}>{fg.sku} - {fg.name}</option>))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Quantity</label>
-                      <input type="number" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.quantity} onChange={e => setWoForm({...woForm, quantity: e.target.value})} />
-                    </div>
+                    <div className="space-y-1"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black text-left">Product SKU & Name</label><select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.sku} onChange={handleSKUChange}><option value="">Select Product...</option>{finishedGoods.map(fg => (<option key={fg.sku} value={fg.sku}>{fg.sku} - {fg.name}</option>))}</select></div>
+                    <div className="space-y-1"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black text-left">Target Quantity</label><input type="number" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.quantity} onChange={e => setWoForm({...woForm, quantity: e.target.value})} /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-left">
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Category</label>
-                      <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.category} onChange={e => setWoForm({...woForm, category: e.target.value})}>
-                        <option value="">Select category...</option>
-                        <option>Earrings</option><option>Necklace</option><option>Bracelets</option><option>Bag</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
-                      <input type="date" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.target_date} onChange={e => setWoForm({...woForm, target_date: e.target.value})} />
-                    </div>
+                    <div className="space-y-1"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Category</label><select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.category} onChange={e => setWoForm({...woForm, category: e.target.value})}><option value="">Select category...</option><option>Earrings</option><option>Necklace</option><option>Bracelets</option><option>Bag</option></select></div>
+                    <div className="space-y-1"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label><input type="date" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.target_date} onChange={e => setWoForm({...woForm, target_date: e.target.value})} /></div>
                   </div>
-                  <div className="space-y-1 text-left">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assigned Artisan</label>
-                    <select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.artisan_id} onChange={e => setWoForm({...woForm, artisan_id: e.target.value})}>
-                      <option value="">Select Artisan...</option>
-                      {artisans.map(a => <option key={a.artisan_id} value={a.artisan_id}>{a.first_name} {a.last_name} ({a.department})</option>)}
-                    </select>
-                  </div>
+                  <div className="space-y-1 text-left"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assigned Artisan</label><select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={woForm.artisan_id} onChange={e => setWoForm({...woForm, artisan_id: e.target.value})}><option value="">Select Artisan...</option>{artisans.map(a => <option key={a.artisan_id} value={a.artisan_id}>{a.first_name} {a.last_name} ({a.department})</option>)}</select></div>
                 </div>
-
                 <div className="flex flex-col">
                   <div className="flex justify-center mb-4 flex-shrink-0">
-                    <div className="w-28 h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden">
+                    <div className="w-28 h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative">
                       {getSelectedSkuImage()
                         ? <img src={getSelectedSkuImage()} className="w-full h-full object-cover" alt="Product Preview" />
                         : (
@@ -387,7 +367,6 @@ export default function Artisan() {
                       }
                     </div>
                   </div>
-
                   <div className="flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="text-base font-black text-slate-800 uppercase tracking-tighter">Raw Materials</h3>
@@ -395,27 +374,14 @@ export default function Artisan() {
                     </div>
                     <div className="border border-slate-100 rounded-2xl overflow-y-auto no-scrollbar bg-white flex-1 max-h-[180px]">
                       <table className="w-full text-left text-xs border-separate border-spacing-0">
-                        <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black border-b sticky top-0 z-10">
-                          <tr><th className="p-2">Material</th><th className="p-2 text-center w-16">Qty</th><th className="p-2 text-center w-20">Cost</th><th className="p-2 w-8"></th></tr>
-                        </thead>
+                        <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black border-b sticky top-0 z-10"><tr><th className="p-2">Material</th><th className="p-2 text-center w-16">Qty</th><th className="p-2 text-center w-20">Cost</th><th className="p-2 w-8"></th></tr></thead>
                         <tbody className="divide-y divide-slate-50">
                           {woForm.selectedMaterials.map((item, index) => (
                             <tr key={index} className="text-slate-600 font-bold hover:bg-slate-50 transition-colors">
-                              <td className="p-2 text-left">
-                                <select className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-[11px]" value={item.material_id} onChange={(e) => handleMaterialChange(index, 'material_id', e.target.value)}>
-                                  <option value="">Choose...</option>
-                                  {materials.map(m => <option key={m.material_id} value={m.material_id}>{m.material_name}</option>)}
-                                </select>
-                              </td>
-                              <td className="p-2 text-center">
-                                <input type="number" className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[11px]" value={item.qty} onChange={(e) => handleMaterialChange(index, 'qty', e.target.value)} />
-                              </td>
+                              <td className="p-2 text-left"><select className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-[11px]" value={item.material_id} onChange={(e) => handleMaterialChange(index, 'material_id', e.target.value)}><option value="">Choose...</option>{materials.map(m => <option key={m.material_id} value={m.material_id}>{m.material_name}</option>)}</select></td>
+                              <td className="p-2 text-center"><input type="number" className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[11px]" value={item.qty} onChange={(e) => handleMaterialChange(index, 'qty', e.target.value)} /></td>
                               <td className="p-2 text-center text-slate-400 font-black text-[10px]">₱{(Number(item.cost) || 0).toFixed(2)}</td>
-                              <td className="p-2 text-center">
-                                <button type="button" onClick={() => setWoForm({...woForm, selectedMaterials: woForm.selectedMaterials.filter((_, i) => i !== index)})}>
-                                  <HiTrash className="text-rose-400 hover:text-rose-600 transition-colors" size={14}/>
-                                </button>
-                              </td>
+                              <td className="p-2 text-center"><button type="button" onClick={() => setWoForm({...woForm, selectedMaterials: woForm.selectedMaterials.filter((_, i) => i !== index)})}><HiTrash className="text-rose-400 hover:text-rose-600 transition-colors" size={14}/></button></td>
                             </tr>
                           ))}
                         </tbody>
@@ -424,7 +390,6 @@ export default function Artisan() {
                   </div>
                 </div>
               </div>
-
               <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0">
                 <div className="flex items-center gap-6">
                   <span className="text-slate-400 font-black uppercase text-[9px] tracking-[0.2em]">Total Cost</span>
@@ -432,7 +397,7 @@ export default function Artisan() {
                 </div>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setShowWorkOrderModal(false)} className="px-8 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all">Cancel</button>
-                  <button type="submit" className="px-10 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-2xl hover:bg-stone-800 transition-all tracking-widest">Assign Order</button>
+                  <button type="submit" className="px-10 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Assign Order</button>
                 </div>
               </div>
             </form>
@@ -441,44 +406,33 @@ export default function Artisan() {
       )}
 
       {showMatModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-12 relative shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-12 relative shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border border-slate-100">
             <button onClick={() => { setShowMatModal(false); setImagePreview(null); }} className="absolute top-10 right-10 text-gray-400 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"><HiXMark size={28}/></button>
             <h2 className="text-4xl font-black text-slate-900 uppercase mb-8 tracking-tighter leading-none">{isUpdateMat ? "Modify Material" : "Register Material"}</h2>
             <form onSubmit={handleMatSubmit} className="space-y-6 overflow-y-auto no-scrollbar flex-1 pr-2">
               <div className="flex flex-col items-center mb-10 flex-shrink-0">
                 <div className="w-32 h-32 rounded-[2.5rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
-                  {imagePreview
-                    ? <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
-                    : matForm.material_image
-                      ? <img src={matForm.material_image} className="w-full h-full object-cover" alt="Material" />
-                      : <HiPhoto size={40} className="text-slate-200" />
-                  }
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <p className="text-white text-[10px] font-black uppercase text-center">Upload Photo</p>
-                  </div>
+                  {imagePreview ? <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" /> : (matForm.material_image ? <img src={matForm.material_image} className="w-full h-full object-cover" alt="Material" /> : <HiPhoto size={40} className="text-slate-200" />)}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><p className="text-white text-[10px] font-black uppercase text-center">Upload Photo</p></div>
                   <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-6 font-bold text-left">
-                <div className="space-y-2"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Material Name</label><input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" placeholder="Leather" value={matForm.material_name} onChange={e => setMatForm({...matForm, material_name: e.target.value})} /></div>
-                <div className="space-y-2"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Unique Code</label><input disabled className="w-full bg-[#F3F4F6] rounded-2xl p-4 opacity-50 outline-none cursor-not-allowed font-black text-sm" value={matForm.unique_code} /></div>
+                <div className="space-y-2 text-left"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Material Name</label><input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" placeholder="Leather" value={matForm.material_name} onChange={e => setMatForm({...matForm, material_name: e.target.value})} /></div>
+                <div className="space-y-2 text-left"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Unique Code</label><input disabled className="w-full bg-[#F3F4F6] rounded-2xl p-4 opacity-50 outline-none cursor-not-allowed font-black text-sm" value={matForm.unique_code} /></div>
               </div>
               <div className="grid grid-cols-3 gap-4 font-black">
                 <div className="space-y-2 text-left"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Current Stock</label><input type="number" required className="w-full bg-[#F3F4F6] rounded-xl p-4 outline-none border border-transparent text-sm" value={matForm.stock_quantity} onChange={e => setMatForm({...matForm, stock_quantity: e.target.value})} /></div>
                 <div className="space-y-2 text-left"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Min Threshold</label><input type="number" required className="w-full bg-[#F3F4F6] rounded-xl p-4 outline-none border border-transparent text-sm" value={matForm.reorder_threshold} onChange={e => setMatForm({...matForm, reorder_threshold: e.target.value})} /></div>
                 <div className="space-y-2 text-left"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Unit Price</label><input type="number" step="0.01" required className="w-full bg-[#F3F4F6] rounded-xl p-4 outline-none border border-transparent text-sm" value={matForm.cost_per_unit} onChange={e => setMatForm({...matForm, cost_per_unit: e.target.value})} /></div>
               </div>
-              <div className="space-y-2 font-bold text-left">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Supplier Assignment</label>
-                <select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 appearance-none outline-none border border-transparent font-black text-sm cursor-pointer" value={matForm.supplier_id} onChange={e => setMatForm({...matForm, supplier_id: e.target.value})}>
-                  <option value="">Select Supplier...</option>
-                  {suppliers.map(s => <option key={s.supplier_id} value={s.supplier_id}>{s.name}</option>)}
-                </select>
-              </div>
+              <div className="space-y-2 font-bold text-left"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Supplier Assignment</label><select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 appearance-none outline-none border border-transparent font-black text-sm cursor-pointer" value={matForm.supplier_id} onChange={e => setMatForm({...matForm, supplier_id: e.target.value})}>
+                <option value="">Select Supplier...</option>{suppliers.map(s => <option key={s.supplier_id} value={s.supplier_id}>{s.name}</option>)}
+              </select></div>
               <div className="flex gap-4 pt-1 justify-end flex-shrink-0">
                 <button type="button" onClick={() => { setShowMatModal(false); setImagePreview(null); }} className="px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button>
-                <button type="submit" className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">{isUpdateMat ? "Save Changes" : "Confirm Registry"}</button>
+                <button type="submit" className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm Registry</button>
               </div>
             </form>
           </div>

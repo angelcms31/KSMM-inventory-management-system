@@ -133,11 +133,8 @@ export default function AddProductModal({ product, onClose, fetchProducts }) {
           <div className="space-y-6">
             <header className="mb-8">
               <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-tight">
-                {product ? "Modify Record" : "New Entry"}
+                {product ? "Update Record" : "Add Product"}
               </h2>
-              <p className="text-slate-400 font-bold mt-1 tracking-tight">
-                {product ? "Update resource and production tracking data." : "Enter resource allocation and production tracking details."}
-              </p>
             </header>
 
             <div className="flex flex-col items-center mb-10">
@@ -148,18 +145,17 @@ export default function AddProductModal({ product, onClose, fetchProducts }) {
                   <HiPhoto size={48} className="text-slate-200" />
                 )}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                  <p className="text-white text-[10px] font-black uppercase tracking-widest text-center px-2">Change Image</p>
+                  <p className="text-white text-[10px] font-black uppercase tracking-widest text-center px-2">Upload Image</p>
                 </div>
                 <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={handleFileChange} />
               </div>
-              <p className="mt-3 text-[10px] font-black uppercase text-slate-300 tracking-widest">Product Display</p>
             </div>
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Product Name</label>
-                  <input className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent focus:border-slate-200 font-bold transition-all text-sm" placeholder="e.g. Classic Tote" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                  <input className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent focus:border-slate-200 font-bold transition-all text-sm" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">SKU Code</label>

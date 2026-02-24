@@ -54,6 +54,11 @@ export default function Inventory() {
     return product ? (product.name || product.collection) : "Unknown Product";
   };
 
+  const getCategoryBySku = (sku) => {
+    const product = finishedGoods.find(fg => fg.sku === sku);
+    return product ? product.category : null;
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -85,7 +90,7 @@ export default function Inventory() {
       setEditForm({
         sku: order.sku || '',
         quantity: order.quantity_needed || '',
-        category: order.department || '',
+        category: getCategoryBySku(order.sku) || order.department || '',
         target_date: order.target_date?.split('T')[0] || '',
         artisan_id: order.artisan_id || '',
         status: order.status || 'In Production',
@@ -96,7 +101,7 @@ export default function Inventory() {
       setEditForm({
         sku: order.sku || '',
         quantity: order.quantity_needed || '',
-        category: order.department || '',
+        category: getCategoryBySku(order.sku) || order.department || '',
         target_date: order.target_date?.split('T')[0] || '',
         artisan_id: order.artisan_id || '',
         status: order.status || 'In Production',
@@ -145,8 +150,9 @@ export default function Inventory() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    if (editForm.selectedMaterials.length === 0) {
-      alert("Please add at least one raw material.");
+    const validMaterials = editForm.selectedMaterials.filter(m => m.material_id !== '' && Number(m.qty) > 0);
+    if (validMaterials.length === 0) {
+      alert("Please add at least one raw material with a valid quantity.");
       return;
     }
     const payload = {
@@ -154,12 +160,12 @@ export default function Inventory() {
       artisan_id: parseInt(editForm.artisan_id),
       quantity: parseInt(editForm.quantity),
       total_cost: calculateSubtotal(),
-      selectedMaterials: editForm.selectedMaterials.map(m => ({
+      selectedMaterials: validMaterials.map(m => ({
         material_id: parseInt(m.material_id),
         qty: Number(m.qty) || 0,
         cost: Number(m.cost) || 0,
         total: (Number(m.qty) || 0) * (Number(m.cost) || 0)
-      })).filter(m => !isNaN(m.material_id) && m.qty > 0)
+      }))
     };
     try {
       await axios.put(`http://localhost:5000/api/work_orders/${selectedOrder.work_order_id}`, payload);
@@ -180,7 +186,8 @@ export default function Inventory() {
   };
 
   const filteredOrders = workOrders.filter(order => {
-    const searchString = `${order.sku} ${order.first_name} ${order.last_name} ${order.department} ${getProductName(order.sku)}`.toLowerCase();
+    const cat = getCategoryBySku(order.sku) || order.department || '';
+    const searchString = `${order.sku} ${order.first_name} ${order.last_name} ${cat} ${getProductName(order.sku)}`.toLowerCase();
     const searchMatch = searchString.includes(searchTerm.toLowerCase());
     const statusMatch = statusFilter === "All Status" || order.status === statusFilter;
     return searchMatch && statusMatch;
@@ -193,7 +200,7 @@ export default function Inventory() {
           <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search SKU, Artisan, or Product..."
             className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-black/5 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -212,7 +219,7 @@ export default function Inventory() {
         </select>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col mb-10">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col mb-10 text-left">
         <div className="overflow-x-auto">
           <table className="w-full border-separate border-spacing-y-4">
             <thead>
@@ -228,6 +235,7 @@ export default function Inventory() {
             <tbody className="font-bold text-slate-700">
               {filteredOrders.map((order) => {
                 const isComplete = order.status === 'Complete';
+                const displayCategory = getCategoryBySku(order.sku) || order.department || "N/A";
                 return (
                   <tr key={order.work_order_id} className="group hover:bg-slate-50/80 transition-all">
                     <td className="py-4 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100">
@@ -256,7 +264,7 @@ export default function Inventory() {
                       {order.first_name} {order.last_name}
                     </td>
                     <td className="py-4 text-left pl-0 text-slate-400 text-[10px] uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest">
-                      {order.department}
+                      {displayCategory}
                     </td>
                     <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100">
                       <span className={`px-4 py-1.5 rounded-xl text-[10px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
@@ -267,30 +275,23 @@ export default function Inventory() {
                       ₱{Number(order.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                     <td className="py-4 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
-                      {isComplete ? (
-                        <div className="flex justify-end gap-2 opacity-30">
-                          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 cursor-not-allowed">
-                            <HiPencil size={18} className="text-slate-400" />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2">
+                        {!isComplete && (
                           <button
                             onClick={() => handleMarkComplete(order)}
                             className="p-3 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-2xl transition-all border border-emerald-100"
-                            title="Mark as Complete & add to Finished Goods"
                           >
                             <HiCheckCircle size={18} />
                           </button>
-                          <button
-                            onClick={() => handleOpenEdit(order)}
-                            className="p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100"
-                            title="Edit Work Order"
-                          >
-                            <HiPencil size={18} />
-                          </button>
-                        </div>
-                      )}
+                        )}
+                        <button 
+                          onClick={() => handleOpenEdit(order)} 
+                          className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isComplete ? 'opacity-30 cursor-not-allowed' : ''}`}
+                          disabled={isComplete}
+                        >
+                          <HiPencil size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -301,8 +302,8 @@ export default function Inventory() {
       </div>
 
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[3rem] w-full max-w-4xl p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
+          <div className="bg-white rounded-[3rem] w-full max-w-4xl p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-100">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Update Record</h2>
@@ -326,21 +327,24 @@ export default function Inventory() {
             <form onSubmit={handleUpdate} className="flex-1 flex flex-col min-h-0">
               <div className="grid grid-cols-2 gap-8 mb-6 overflow-y-auto pr-2 no-scrollbar">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
                       <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Product SKU & Name</label>
-                      <select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={editForm.sku} onChange={e => setEditForm({...editForm, sku: e.target.value})}>
+                      <select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={editForm.sku} onChange={e => {
+                        const newSku = e.target.value;
+                        setEditForm({...editForm, sku: newSku, category: getCategoryBySku(newSku) || ''});
+                      }}>
                         <option value="">Select Product...</option>
                         {finishedGoods.map(fg => <option key={fg.sku} value={fg.sku}>{fg.sku} - {fg.name || fg.collection}</option>)}
                       </select>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1 text-left">
                       <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Quantity</label>
                       <input type="number" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: e.target.value})} />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
                       <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Category</label>
                       <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})}>
@@ -348,13 +352,13 @@ export default function Inventory() {
                         <option>Earrings</option><option>Necklace</option><option>Bracelets</option><option>Bag</option>
                       </select>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1 text-left">
                       <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
                       <input type="date" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={editForm.target_date} onChange={e => setEditForm({...editForm, target_date: e.target.value})} />
                     </div>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 text-left">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assigned Artisan</label>
                     <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-xs" value={editForm.artisan_id} onChange={e => setEditForm({...editForm, artisan_id: e.target.value})}>
                       {artisans.map(a => <option key={a.artisan_id} value={a.artisan_id}>{a.first_name} {a.last_name}</option>)}
@@ -369,8 +373,8 @@ export default function Inventory() {
                         ? <img src={editForm.product_image} className="w-full h-full object-cover" alt="Product" />
                         : <HiPhoto size={40} className="text-slate-200" />
                       }
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <p className="text-white text-[9px] font-black uppercase text-center">Change<br/>Photo</p>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                        <p className="text-white text-[9px] font-black uppercase text-center px-1">Change Photo</p>
                       </div>
                       <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                     </div>

@@ -300,7 +300,7 @@ export default function Order() {
               <HiX size={28} />
             </button>
             <h2 className="text-4xl font-black text-slate-900 uppercase mb-4 tracking-tighter leading-none">
-              {isEdit ? "Modify PO" : "Create PO"}
+              {isEdit ? "Edit Purchase Order" : "Create Purchase Order"}
             </h2>
             <p className="text-sm text-slate-500 mb-8 font-semibold uppercase tracking-widest">
               Logged as: <span className="text-black font-black">{userName}</span>

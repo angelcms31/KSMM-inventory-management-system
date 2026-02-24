@@ -13,17 +13,21 @@ import SalesLayout from "./components/layouts/SalesLayout";
 import ProductionLayout from "./components/layouts/ProductionLayout";
 import FinanceLayout from "./components/layouts/FinanceLayout";
 
+
 import ManageUsers from "./pages/admin/ManageUsers";
 import ManageArtisan from "./pages/admin/ManageArtisan";
 import Suppliers from "./pages/admin/Suppliers"; 
 import AuditLogs from "./pages/admin/AuditLogs";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import FinanceDashboard from "./pages/finance/FinanceDashboard";
 import FinanceTransactions from "./pages/finance/FinanceTransaction";
+import ProductionDashboard from "./pages/production/ProductionDashboard";
 import Inventory from "./pages/production/Inventory";
 import Order from "./pages/production/Order";
 import Artisan from "./pages/production/Artisan";
+import SalesDashboard from "./pages/sales/SalesDashboard";
 import SalesInventory from "./pages/sales/SalesInventory";
-import Statistics from "./pages/sales/Statisctics"
+import Statistics from "./pages/sales/Statistics"
 import FinanceLogs from "./pages/finance/FinanceLogs";
 
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -66,7 +70,7 @@ function App() {
 
   const resetTimer = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(handleAutoLogout, 300000);
+    timerRef.current = setTimeout(handleAutoLogout, 180000);
   };
 
   useEffect(() => {
@@ -120,21 +124,21 @@ function App() {
         </Route>
 
         <Route path="/sales" element={<ProtectedRoute allowedRole="Sales"><SalesLayout /></ProtectedRoute>}>
-          <Route index element={<div className="p-4 uppercase font-black text-2xl">Dashboard</div>} />
+          <Route path="" element={<SalesDashboard />} /> 
           <Route path="inventory" element={<SalesInventory />} />
           <Route path="statistics" element={<Statistics />} />
 
         </Route>
 
         <Route path="/production" element={<ProtectedRoute allowedRole="Production"><ProductionLayout /></ProtectedRoute>}>
-          <Route index element={<div className="p-4 uppercase font-black text-2xl">Orders</div>} />
+          <Route path="" element={<ProductionDashboard />} /> 
           <Route path="artisan" element={<Artisan />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="order" element={<Order />} />
         </Route>
 
         <Route path="/finance" element={<ProtectedRoute allowedRole="Finance"><FinanceLayout /></ProtectedRoute>}>
-          <Route index element={<div className="p-4 uppercase font-black text-2xl">Reports</div>} />
+          <Route path="" element={<FinanceDashboard />} /> 
           <Route path="transactions" element={<FinanceTransactions />} /> 
           <Route path="logs" element={<FinanceLogs />} /> 
         </Route>

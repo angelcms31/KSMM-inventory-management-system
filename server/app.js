@@ -204,12 +204,23 @@ app.put("/api/user/status", async (req, res) => {
 });
 
 app.put("/api/user/unlock", async (req, res) => {
-  const { userId, adminId, adminRole } = req.body;
+  const { userId, adminId } = req.body;
   try {
-    await pool.query('UPDATE userlogin SET is_locked = FALSE, failed_attempts = 0 WHERE user_id = $1', [userId]);
+    await pool.query(
+      'UPDATE userlogin SET is_locked = FALSE, failed_attempts = 0 WHERE user_id = $1',
+      [userId]
+    );
+
+    const adminRes = await pool.query(
+      'SELECT user_role FROM userlogin WHERE user_id = $1',
+      [adminId]
+    );
+    const adminRole = adminRes.rows[0]?.user_role || 'Admin';
+
     await createAuditLog(adminId, `Unlocked User: ID ${userId}`, adminRole);
     res.send("User account unlocked");
   } catch (err) {
+    console.error("Unlock Error:", err);
     res.status(500).send(err.message);
   }
 });
@@ -224,10 +235,8 @@ app.get("/api/artisans", async (req, res) => {
       FROM artisan 
       WHERE (
         first_name ILIKE $1 OR 
+        middle_name ILIKE $1 OR 
         last_name ILIKE $1 OR 
-        email ILIKE $1 OR 
-        department ILIKE $1 OR 
-        contact_no ILIKE $1 OR
         CONCAT('AR-', artisan_id) ILIKE $1
       )
       ORDER BY 
@@ -246,17 +255,18 @@ app.get("/api/artisans", async (req, res) => {
       totalArtisans: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 
     });
   } catch (err) { 
+    console.error("❌ Search Error:", err.message);
     res.status(500).send(err.message); 
   }
 });
 
 app.post("/api/add_artisan", async (req, res) => {
-  const { first_name, middle_name, last_name, email, contact_no, profile_image } = req.body;
+  const { first_name, middle_name, last_name, email, contact_no, department, profile_image } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, profile_image, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING *`,
-      [first_name, middle_name, last_name, email, contact_no,  profile_image]
+      `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, profile_image, department, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active') RETURNING *`,
+      [first_name, middle_name, last_name, email, contact_no, department,  profile_image]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -267,13 +277,13 @@ app.post("/api/add_artisan", async (req, res) => {
 
 app.put("/api/artisans/:id", async (req, res) => {
   const { id } = req.params;
-  const { first_name, middle_name, last_name, email, contact_no, profile_image, status } = req.body;
+  const { first_name, middle_name, last_name, email, contact_no, profile_image, department, status } = req.body;
   try {
     const result = await pool.query(
       `UPDATE artisan 
-       SET first_name = $1, middle_name = $2, last_name = $3, email = $4, contact_no = $5, profile_image = $6, status = $7 
-       WHERE artisan_id = $8 RETURNING *`,
-      [first_name, middle_name, last_name, email, contact_no, profile_image, status, id]
+       SET first_name = $1, middle_name = $2, last_name = $3, email = $4, contact_no = $5, profile_image = $6, department = $7, status = $8 
+       WHERE artisan_id = $9 RETURNING *`,
+      [first_name, middle_name, last_name, email, contact_no, profile_image, department, status, id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -619,7 +629,7 @@ app.put("/api/materials/:id", async (req, res) => {
 
 
 app.post("/api/sales_Add_inventory", async (req, res) => {
-  const { sku, name, location, quantity, selling_price, product_image, collection, brand } = req.body;
+  const { sku, name, location, quantity, selling_price, product_image, collection, brand, category, min_stocks } = req.body;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -628,7 +638,7 @@ app.post("/api/sales_Add_inventory", async (req, res) => {
       `INSERT INTO FinishedGoods (sku, name, collection, brand, selling_price, product_image, current_stock, warehouse_location, category, min_stocks) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (sku) DO UPDATE SET 
-       name = EXCLUDED.name,
+       name = EXCLUDED.name, 
        category = EXCLUDED.category,
        min_stocks = EXCLUDED.min_stocks,
        current_stock = FinishedGoods.current_stock + EXCLUDED.current_stock`,

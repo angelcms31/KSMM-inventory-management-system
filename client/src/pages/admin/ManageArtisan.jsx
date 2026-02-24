@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { HiOutlinePlus, HiOutlineMail, HiOutlinePhone, HiX, HiCamera, HiDotsHorizontal, HiChevronDown, HiOutlineSearch, HiChevronLeft, HiChevronRight } from "react-icons/hi";
+import { HiOutlineMail, HiOutlinePhone, HiX, HiCamera, HiDotsHorizontal, HiOutlineSearch, HiChevronLeft, HiChevronRight } from "react-icons/hi";
 
 const ManageArtisan = () => {
-  const [artisans, setArtisans] = useState([]);
+  const [allArtisans, setAllArtisans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -11,11 +11,10 @@ const ManageArtisan = () => {
   const [selectedArtisan, setSelectedArtisan] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
-  const [totalArtisans, setTotalArtisans] = useState(0);
   const artisansPerPage = 9;
 
-  const initialFormState = { 
-    firstName: '', middleName: '', lastName: '', email: '', contactNo: '', profileImage: '' 
+  const initialFormState = {
+    firstName: '', middleName: '', lastName: '', email: '', contactNo: '', profileImage: '', department: ''
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -23,36 +22,48 @@ const ManageArtisan = () => {
   const fetchArtisans = async () => {
     try {
       const res = await axios.get(`http://localhost:5000/api/artisans`, {
-        params: { search: searchTerm, page: currentPage + 1, limit: artisansPerPage }
+        params: { page: 1, limit: 9999 }
       });
-      setArtisans(res.data.artisans || []);
-      setTotalArtisans(res.data.totalArtisans || 0);
+      setAllArtisans(res.data.artisans || []);
       setLoading(false);
     } catch (err) {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchArtisans(); }, [currentPage, searchTerm]);
+  useEffect(() => { fetchArtisans(); }, []);
+
+  useEffect(() => { setCurrentPage(0); }, [searchTerm]);
+
+  const filteredArtisans = allArtisans.filter(a => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.trim().toLowerCase();
+    const firstName = (a.first_name || '').toLowerCase();
+    const lastName = (a.last_name || '').toLowerCase();
+    const dept = (a.department || '').toLowerCase();
+    const arId = `ar-${a.artisan_id}`;
+    return (
+      firstName.startsWith(term) ||
+      lastName.startsWith(term) ||
+      arId.startsWith(term) ||
+      dept.startsWith(term)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredArtisans.length / artisansPerPage);
+  const currentArtisans = filteredArtisans.slice(currentPage * artisansPerPage, (currentPage + 1) * artisansPerPage);
 
   const handleFileChange = (e, isEdit = false) => {
     const file = e.target.files[0];
     if (file) {
       const validTypes = ['image/jpeg', 'image/png'];
-      if (!validTypes.includes(file.type)) {
-        alert("Only JPEG and PNG images are allowed");
-        return;
-      }
-      if (file.size <= 10 * 1024 * 1024) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (isEdit) setSelectedArtisan({ ...selectedArtisan, profileImage: reader.result });
-          else setFormData({ ...formData, profileImage: reader.result });
-        };
-        reader.readAsDataURL(file);
-      } else {
-        alert("Max 10MB only");
-      }
+      if (!validTypes.includes(file.type)) { alert("Only JPEG and PNG images are allowed"); return; }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (isEdit) setSelectedArtisan({ ...selectedArtisan, profileImage: reader.result });
+        else setFormData({ ...formData, profileImage: reader.result });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -72,7 +83,8 @@ const ManageArtisan = () => {
         last_name: formData.lastName,
         email: formData.email,
         contact_no: formData.contactNo,
-        profile_image: formData.profileImage
+        profile_image: formData.profileImage,
+        department: formData.department
       });
       setShowAddModal(false);
       setFormData(initialFormState);
@@ -90,6 +102,7 @@ const ManageArtisan = () => {
       email: artisan.email || '',
       contactNo: artisan.contact_no || '',
       profileImage: artisan.profile_image || '',
+      department: artisan.department || '',
       displayId: `AR-${artisan.artisan_id}`
     });
     setShowEditModal(true);
@@ -106,7 +119,8 @@ const ManageArtisan = () => {
         email: selectedArtisan.email,
         contact_no: selectedArtisan.contactNo,
         profile_image: selectedArtisan.profileImage,
-        status: selectedArtisan.status
+        status: selectedArtisan.status,
+        department: selectedArtisan.department
       });
       setShowEditModal(false);
       fetchArtisans();
@@ -136,7 +150,13 @@ const ManageArtisan = () => {
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input type="text" placeholder="Search Artisan..." className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }} />
+          <input
+            type="text"
+            placeholder="Search by name, ID, or department..."
+            className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
 
@@ -147,15 +167,15 @@ const ManageArtisan = () => {
             <div className="flex items-center gap-3">
               <div className="flex gap-1 mr-2">
                 <button onClick={() => setCurrentPage(p => Math.max(p - 1, 0))} disabled={currentPage === 0} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={16}/></button>
-                <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(totalArtisans / artisansPerPage) - 1} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={16}/></button>
+                <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= totalPages - 1} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={16}/></button>
               </div>
               <button onClick={() => setShowAddModal(true)} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg tracking-widest hover:scale-105 transition-all">+ Add Artisan</button>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-5">
-            {artisans.map((artisan, index) => (
-              <div key={index} className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm flex flex-col ${artisan.status === 'Deactivated' ? 'opacity-80' : ''}`}>
+            {currentArtisans.map((artisan, index) => (
+              <div key={artisan.artisan_id} className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm flex flex-col ${artisan.status === 'Deactivated' ? 'opacity-80' : ''}`}>
                 <button onClick={() => setActiveMenu(activeMenu === index ? null : index)} className="absolute top-4 right-4 text-gray-600 transition-colors hover:text-black"><HiDotsHorizontal size={20} /></button>
 
                 {activeMenu === index && (
@@ -174,7 +194,7 @@ const ManageArtisan = () => {
                   </div>
                   <div className="flex-1 pt-0.5 min-w-0 pr-8">
                     <h3 className="font-bold text-sm text-black truncate">{artisan.first_name} {artisan.last_name}</h3>
-                    <p className="text-[#9CA3AF] text-xs">Artisan</p>
+                    <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-wider">{artisan.department || 'No Dept'}</p>
                   </div>
                 </div>
 
@@ -188,6 +208,13 @@ const ManageArtisan = () => {
                 </div>
               </div>
             ))}
+
+            {currentArtisans.length === 0 && (
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
+                <HiOutlineSearch size={48} className="mb-2 opacity-20" />
+                <p className="text-lg font-bold">No results found</p>
+              </div>
+            )}
           </div>
         </section>
       </div>
@@ -199,53 +226,65 @@ const ManageArtisan = () => {
             <h2 className="text-4xl font-black text-slate-900 uppercase mb-10 tracking-tighter leading-none">{showAddModal ? "Add Artisan" : "Update Artisan"}</h2>
 
             <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan}>
-
-              <div className="grid grid-cols-2 gap-x-12 mb-6">
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase text-slate-400 font-black ml-1">First Name</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.firstName : selectedArtisan?.firstName} onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
-                </div>
-
-                <div className="flex justify-center items-center">
-                  <div className="w-24 h-24 rounded-[1.5rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
-                    {(showAddModal ? formData.profileImage : selectedArtisan?.profileImage) ? (
-                      <img src={showAddModal ? formData.profileImage : selectedArtisan.profileImage} className="w-full h-full object-cover" alt="Preview" />
-                    ) : <HiCamera size={36} className="text-gray-200" />}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                      <p className="text-white text-[9px] font-black uppercase">Change Photo</p>
-                    </div>
-                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleFileChange(e, showEditModal)} accept="image/*" />
+              <div className="grid grid-cols-2 gap-x-12 mb-6 items-start">
+                <div className="space-y-5">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-slate-400 font-black ml-1">First Name</label>
+                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.firstName : selectedArtisan?.firstName} onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Middle Name</label>
+                    <input className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.middleName : selectedArtisan?.middleName} onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Last Name</label>
+                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.lastName : selectedArtisan?.lastName} onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Department</label>
+                    <select 
+                      required 
+                      className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200 appearance-none cursor-pointer"
+                      value={showAddModal ? formData.department : selectedArtisan?.department}
+                      onChange={e => showAddModal ? setFormData({...formData, department: e.target.value}) : setSelectedArtisan({...selectedArtisan, department: e.target.value})}
+                    >
+                      <option value="">Select Department</option>
+                      <option value="Earrings">Earrings</option>
+                      <option value="Necklace">Necklace</option>
+                      <option value="Bracelets">Bracelets</option>
+                      <option value="Bag">Bag</option>
+                      <option value="Accessory">Accessory</option>
+                    </select>
                   </div>
                 </div>
 
-                <div className="space-y-1 mt-5">
-                  <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Middle Name</label>
-                  <input className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.middleName : selectedArtisan?.middleName} onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
+                <div className="space-y-5 flex flex-col h-full">
+                  <div className="flex justify-center items-center py-2 mb-2">
+                    <div className="w-24 h-24 rounded-[1.5rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
+                      {(showAddModal ? formData.profileImage : selectedArtisan?.profileImage) ? (
+                        <img src={showAddModal ? formData.profileImage : selectedArtisan.profileImage} className="w-full h-full object-cover" alt="Preview" />
+                      ) : <HiCamera size={36} className="text-gray-200" />}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-center">
+                        <p className="text-white text-[8px] font-black uppercase">Change Photo</p>
+                      </div>
+                      <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleFileChange(e, showEditModal)} accept="image/*" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Email Address</label>
+                    <input required type="email" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.email : selectedArtisan?.email} onChange={e => showAddModal ? setFormData({...formData, email: e.target.value}) : setSelectedArtisan({...selectedArtisan, email: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Contact No.</label>
+                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo} onChange={e => { if (/^\d*$/.test(e.target.value)) showAddModal ? setFormData({...formData, contactNo: e.target.value}) : setSelectedArtisan({...selectedArtisan, contactNo: e.target.value}) }} />
+                  </div>
                 </div>
-
-                <div className="space-y-1 mt-5">
-                  <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Email Address</label>
-                  <input required type="email" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.email : selectedArtisan?.email} onChange={e => showAddModal ? setFormData({...formData, email: e.target.value}) : setSelectedArtisan({...selectedArtisan, email: e.target.value})} />
-                </div>
-
-                <div className="space-y-1 mt-5">
-                  <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Last Name</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.lastName : selectedArtisan?.lastName} onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
-                </div>
-
-                <div className="space-y-1 mt-5">
-                  <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Contact No.</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo} onChange={e => { if (/^\d*$/.test(e.target.value)) showAddModal ? setFormData({...formData, contactNo: e.target.value}) : setSelectedArtisan({...selectedArtisan, contactNo: e.target.value}) }} />
-                </div>
-
               </div>
 
-              <div className="flex gap-4 justify-end">
+              <div className="flex gap-4 justify-end mt-8">
                 <button type="button" onClick={closeModal} className="px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button>
                 <button type="submit" className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm</button>
               </div>
-
             </form>
           </div>
         </div>

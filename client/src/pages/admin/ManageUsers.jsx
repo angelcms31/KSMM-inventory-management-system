@@ -6,15 +6,14 @@ import {
 } from "react-icons/hi";
 
 const ManageUsers = () => {
-  const [users, setUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
   const usersPerPage = 9;
 
   const initialFormState = { 
@@ -27,30 +26,42 @@ const ManageUsers = () => {
   const fetchUsers = async () => {
     try {
       const res = await axios.get(`http://localhost:5000/api/users`, {
-        params: { 
-          search: searchTerm, 
-          page: currentPage, 
-          limit: usersPerPage 
-        }
+        params: { page: 1, limit: 9999 }
       });
-      setUsers(res.data.users || []);
-      setTotalUsers(res.data.totalUsers || 0);
+      setAllUsers(res.data.users || []);
       setLoading(false);
     } catch (err) {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchUsers(); }, [currentPage, searchTerm]);
+  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => { setCurrentPage(0); }, [searchTerm]);
+
+  const filteredUsers = allUsers.filter(u => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.trim().toLowerCase();
+    const firstName = (u.firstname || '').toLowerCase();
+    const middleName = (u.middlename || '').toLowerCase();
+    const lastName = (u.lastname || '').toLowerCase();
+    const idPrefix = (u.user_role || "US").substring(0, 2).toUpperCase();
+    const displayId = `${idPrefix}-${u.permanent_id || '0'}`.toLowerCase();
+    return (
+      firstName.startsWith(term) ||
+      middleName.startsWith(term) ||
+      lastName.startsWith(term) ||
+      displayId.startsWith(term)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+  const currentUsers = filteredUsers.slice(currentPage * usersPerPage, (currentPage + 1) * usersPerPage);
 
   const handleFileChange = (e, isEdit = false) => {
     const file = e.target.files[0];
     if (file) {
       const validTypes = ['image/jpeg', 'image/png'];
-      if (!validTypes.includes(file.type)) {
-        alert("Only JPEG and PNG images are allowed");
-        return;
-      }
+      if (!validTypes.includes(file.type)) { alert("Only JPEG and PNG images are allowed"); return; }
       if (file.size <= 10 * 1024 * 1024) {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -72,19 +83,13 @@ const ManageUsers = () => {
   const handleNameChange = (field, value, isEdit = false) => {
     const lettersOnly = /^[a-zA-Z\s]*$/;
     if (!lettersOnly.test(value)) return;
-    if (!validateTextInput(value)) {
-      alert("Emoticons are not allowed");
-      return;
-    }
+    if (!validateTextInput(value)) { alert("Emoticons are not allowed"); return; }
     if (isEdit) setSelectedUser({ ...selectedUser, [field]: value });
     else setFormData({ ...formData, [field]: value });
   };
 
   const handleEmailChange = (value, isEdit = false) => {
-    if (!validateTextInput(value)) {
-      alert("Emoticons are not allowed");
-      return;
-    }
+    if (!validateTextInput(value)) { alert("Emoticons are not allowed"); return; }
     if (isEdit) setSelectedUser({ ...selectedUser, email: value });
     else setFormData({ ...formData, email: value });
   };
@@ -97,10 +102,7 @@ const ManageUsers = () => {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!formData.email.includes('@')) {
-      alert("Email must contain @");
-      return;
-    }
+    if (!formData.email.includes('@')) { alert("Email must contain @"); return; }
     try {
       await axios.post("http://localhost:5000/api/add_user", formData);
       setShowAddModal(false);
@@ -113,7 +115,6 @@ const ManageUsers = () => {
   const handleEditClick = (user) => {
     const idPrefix = (user.user_role || "US").substring(0, 2).toUpperCase();
     const displayId = `${idPrefix}-${user.permanent_id || '0'}`;
-    
     setSelectedUser({
       ...user,
       firstName: user.firstname || '',
@@ -124,7 +125,7 @@ const ManageUsers = () => {
       role: user.user_role || '',
       gender: user.gender || 'Male',
       profileImage: user.profile_image || '',
-      displayId: displayId
+      displayId
     });
     setShowEditModal(true);
     setActiveMenu(null);
@@ -132,10 +133,7 @@ const ManageUsers = () => {
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
-    if (!selectedUser.email.includes('@')) {
-      alert("Email must contain @");
-      return;
-    }
+    if (!selectedUser.email.includes('@')) { alert("Email must contain @"); return; }
     try {
       await axios.put("http://localhost:5000/api/user/update", {
         firstName: selectedUser.firstName,
@@ -156,10 +154,10 @@ const ManageUsers = () => {
 
   const handleUnlock = async (user) => {
     try {
-      await axios.put("http://localhost:5000/api/user/unlock", { 
+      await axios.put("http://localhost:5000/api/user/unlock", {
         userId: user.user_id,
-        adminId: localStorage.getItem("user_id"), 
-        adminRole: localStorage.getItem("role")
+        adminId: localStorage.getItem("user_id"),
+        adminRole: localStorage.getItem("user_role") || localStorage.getItem("role")
       });
       fetchUsers();
       setActiveMenu(null);
@@ -182,8 +180,6 @@ const ManageUsers = () => {
     } catch (err) { alert("Error updating status"); }
   };
 
-  const totalPages = Math.ceil(totalUsers / usersPerPage);
-
   if (loading) return <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">Loading...</div>;
 
   return (
@@ -193,10 +189,10 @@ const ManageUsers = () => {
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             type="text" 
-            placeholder="Search..." 
+            placeholder="Search by name or ID..." 
             className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
@@ -209,14 +205,14 @@ const ManageUsers = () => {
             </div>
             <div className="flex items-center gap-3">
               <div className="flex gap-1 mr-2">
-                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 1)); }} disabled={currentPage === 1} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronLeft size={16}/></button>
-                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.min(p + 1, totalPages)); }} disabled={currentPage >= totalPages} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronRight size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 0)); }} disabled={currentPage === 0} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronLeft size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => p + 1); }} disabled={currentPage >= totalPages - 1} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronRight size={16}/></button>
               </div>
               <button onClick={(e) => { e.stopPropagation(); setShowAddModal(true); }} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest">+ Add User</button>
             </div>
           </div>
 
-          {users.length === 0 ? (
+          {currentUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <HiOutlineSearch size={48} className="mb-2 opacity-20" />
               <p className="text-lg font-bold">No user found</p>
@@ -224,7 +220,7 @@ const ManageUsers = () => {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-5">
-              {users.map((user, index) => {
+              {currentUsers.map((user, index) => {
                 const userStatus = user.status || user.Status;
                 const isLocked = user.is_locked || user.Is_Locked;
                 const idPrefix = (user.user_role || "US").substring(0, 2).toUpperCase();
@@ -262,11 +258,8 @@ const ManageUsers = () => {
                         />
                         <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${isLocked ? 'bg-yellow-400' : userStatus === 'Deactivated' ? 'bg-red-500' : 'bg-green-500'}`}></div>
                       </div>
-                      
                       <div className="flex-1 pt-0.5 min-w-0 flex flex-col pr-8">
-                        <h3 className="font-bold text-sm text-black leading-tight truncate" title={fullName}>
-                          {fullName}
-                        </h3>
+                        <h3 className="font-bold text-sm text-black leading-tight truncate" title={fullName}>{fullName}</h3>
                         <div className="flex items-center gap-2 mt-0.5">
                           <p className="text-[#9CA3AF] text-xs font-normal">{user.user_role}</p>
                           {isLocked && <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Locked</span>}
@@ -317,22 +310,18 @@ const ManageUsers = () => {
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">First Name</label>
                   <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.firstName : selectedUser?.firstName} onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
                 </div>
-                
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Middle Name</label>
                   <input className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.middleName : selectedUser?.middleName} onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
                 </div>
-                
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Last Name</label>
                   <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.lastName : selectedUser?.lastName} onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
                 </div>
-
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
                   <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.contactNo : selectedUser?.contactNo} onChange={e => handlePhoneChange(e.target.value, showEditModal)} />
                 </div>
-
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>
                   <input required type="email" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.email : selectedUser?.email} onChange={e => handleEmailChange(e.target.value, showEditModal)} />
@@ -352,7 +341,7 @@ const ManageUsers = () => {
                     </div>
                     <input type="file" accept="image/jpeg,image/png" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleFileChange(e, showEditModal)} />
                   </div>
-                  
+
                   <div className="w-full space-y-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">ID Number</label>
                     <div className="w-full bg-[#E9ECEF] rounded-xl p-3 font-bold text-sm text-slate-600 text-center">
@@ -362,7 +351,6 @@ const ManageUsers = () => {
 
                   <div className="w-full space-y-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Gender</label>
-                    <div className="w-full space-y-1">
                     <div className="relative">
                       <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none" value={showAddModal ? formData.gender : selectedUser?.gender} onChange={e => showAddModal ? setFormData({...formData, gender: e.target.value}) : setSelectedUser({...selectedUser, gender: e.target.value})}>
                         <option value="Male">Male</option>
@@ -371,7 +359,6 @@ const ManageUsers = () => {
                       </select>
                       <HiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16} />
                     </div>
-                  </div>
                   </div>
 
                   <div className="w-full space-y-1">
