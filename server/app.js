@@ -94,7 +94,6 @@ app.post("/api/reset_password", async (req, res) => {
       "UPDATE userlogin SET password = $1, failed_attempts = 0, is_locked = FALSE WHERE LOWER(user_account) = LOWER($2) RETURNING user_id, user_role",
       [newPassword, email]
     );
-
     if (result.rows.length > 0) {
       await createAuditLog(result.rows[0].user_id, "Password Reset", result.rows[0].user_role);
       res.status(200).send("Password updated successfully");
@@ -154,23 +153,31 @@ app.post("/api/add_user", async (req, res) => {
   try {
     await client.query("BEGIN");
     const pRes = await client.query(
-      'INSERT INTO personaldata (firstname, lastname, email, contact_no, gender, profile_image, status) VALUES ($1, $2, $3, $4, $5, $6, \'Active\') RETURNING user_id',
+      `INSERT INTO personaldata (firstname, lastname, email, contact_no, gender, profile_image, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'Active') RETURNING user_id`,
       [firstName, lastName, email, contactNo, gender, profileImage]
     );
+    const userId = pRes.rows[0].user_id;
     await client.query(
-      'INSERT INTO userlogin (user_account, password, user_role, user_id, failed_attempts, is_locked) VALUES ($1, $2, $3, $4, 0, FALSE)',
-      [email, "password123", role, pRes.rows[0].user_id]
+      `INSERT INTO userlogin (user_account, password, user_role, user_id, failed_attempts, is_locked) 
+       VALUES ($1, $2, $3, $4, 0, FALSE)`,
+      [email, "password123", role, userId]
     );
     await client.query("COMMIT");
     await transporter.sendMail({
-      from: process.env.MY_EMAIL, to: email, subject: "Welcome to Matthew & Melka",
+      from: process.env.MY_EMAIL, 
+      to: email, 
+      subject: "Welcome to Matthew & Melka",
       html: `<h3>Account Created!</h3><p>Hi ${firstName}, use these credentials:</p><p>User: ${email}<br>Pass: password123</p>`
     });
-    res.status(201).send("Success");
+    res.status(201).send("User created successfully");
   } catch (err) {
     await client.query("ROLLBACK");
+    console.error("Transaction Error:", err.message);
     res.status(500).send(err.message);
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
 
 app.put("/api/user/update", async (req, res) => {
@@ -191,7 +198,6 @@ app.put("/api/user/update", async (req, res) => {
   } finally { client.release(); }
 });
 
-
 app.put("/api/user/status", async (req, res) => {
   const { userId, status, adminId, adminRole } = req.body;
   try {
@@ -210,13 +216,11 @@ app.put("/api/user/unlock", async (req, res) => {
       'UPDATE userlogin SET is_locked = FALSE, failed_attempts = 0 WHERE user_id = $1',
       [userId]
     );
-
     const adminRes = await pool.query(
       'SELECT user_role FROM userlogin WHERE user_id = $1',
       [adminId]
     );
     const adminRole = adminRes.rows[0]?.user_role || 'Admin';
-
     await createAuditLog(adminId, `Unlocked User: ID ${userId}`, adminRole);
     res.send("User account unlocked");
   } catch (err) {
@@ -229,7 +233,6 @@ app.get("/api/artisans", async (req, res) => {
   try {
     const { search = "", page = 1, limit = 9 } = req.query;
     const offset = (page - 1) * limit;
-
     const result = await pool.query(`
       SELECT *, COUNT(*) OVER() as total_count 
       FROM artisan 
@@ -249,13 +252,12 @@ app.get("/api/artisans", async (req, res) => {
       LIMIT $2 OFFSET $3`, 
       [`%${search}%`, limit, offset]
     );
-
     res.json({ 
       artisans: result.rows, 
       totalArtisans: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 
     });
   } catch (err) { 
-    console.error("❌ Search Error:", err.message);
+    console.error("Search Error:", err.message);
     res.status(500).send(err.message); 
   }
 });
@@ -266,7 +268,7 @@ app.post("/api/add_artisan", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, profile_image, department, status) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active') RETURNING *`,
-      [first_name, middle_name, last_name, email, contact_no, department,  profile_image]
+      [first_name, middle_name, last_name, email, contact_no, profile_image, department]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -293,17 +295,14 @@ app.put("/api/artisans/:id", async (req, res) => {
 
 app.post("/api/artisan/status", async (req, res) => {
   const { email, status } = req.body;
-  
   try {
     const result = await pool.query(
       "UPDATE artisan SET status = $1 WHERE email = $2",
       [status, email]
     );
-
     if (result.rowCount === 0) {
       return res.status(404).send("Artisan not found with that email.");
     }
-
     res.status(200).send(`Artisan status updated to ${status}`);
   } catch (err) {
     console.error(err.message);
@@ -311,25 +310,10 @@ app.post("/api/artisan/status", async (req, res) => {
   }
 });
 
-app.put("/api/artisans/:id", async (req, res) => {
-  const { id } = req.params;
-  const { first_name, middle_name, last_name, email, contact_no, department, profile_image, status } = req.body;
-  try {
-    const result = await pool.query(
-      `UPDATE artisan 
-       SET first_name = $1, middle_name = $2, last_name = $3, email = $4, contact_no = $5, department = $6, profile_image = $7, status = $8 
-       WHERE artisan_id = $9 RETURNING *`,
-      [first_name, middle_name, last_name, email, contact_no, department, profile_image, status, id]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
-
 app.get("/api/suppliers", async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM supplier ORDER BY supplier_id DESC');    res.json(result.rows);
+    const result = await pool.query('SELECT * FROM supplier ORDER BY supplier_id DESC');
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -346,7 +330,6 @@ app.patch("/api/suppliers/status/:id", async (req, res) => {
   }
 });
 
-
 app.put("/api/suppliers/:id", async (req, res) => {
   const { id } = req.params;
   const { name, email, contact_no } = req.body;
@@ -361,7 +344,6 @@ app.put("/api/suppliers/:id", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
-
 
 app.post("/api/add_supplier", async (req, res) => {
   const { name, email, phone } = req.body;
@@ -458,43 +440,28 @@ app.put("/api/orders/:id", async (req, res) => {
 
 app.patch("/api/orders/receive/:id", async (req, res) => {
   const { id } = req.params;
+  const client = await pool.connect();
   try {
-    const order = await pool.query("SELECT * FROM purchaseorder WHERE assignment_id = $1", [id]);
-    
+    const order = await client.query("SELECT * FROM purchaseorder WHERE assignment_id = $1", [id]);
     if (order.rows[0].status === 'Delivered') {
       return res.status(400).send("Order already received.");
     }
-
-    await pool.query("BEGIN");
-    
-    await pool.query(
+    await client.query("BEGIN");
+    await client.query(
       "UPDATE purchaseorder SET status = 'Delivered' WHERE assignment_id = $1",
       [id]
     );
-
-    await pool.query(
+    await client.query(
       "UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2",
       [order.rows[0].ordered_quantity, order.rows[0].material_id]
     );
-
-    await pool.query("COMMIT");
+    await client.query("COMMIT");
     res.send("Inventory updated successfully!");
   } catch (err) {
-    await pool.query("ROLLBACK");
+    await client.query("ROLLBACK");
     res.status(500).send(err.message);
-  }
-});
-
-app.get("/api/products", async (req, res) => {
-  try {
-    const { search = "" } = req.query;
-    const result = await pool.query(
-      "SELECT * FROM FinishedGoods WHERE sku ILIKE $1 OR collection ILIKE $1 OR brand ILIKE $1 ORDER BY sku ASC",
-      [`%${search}%`]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).send(err.message);
+  } finally {
+    client.release();
   }
 });
 
@@ -513,30 +480,6 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-app.put("/api/products/:sku", async (req, res) => {
-  const { sku } = req.params;
-  const { name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks } = req.body;
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query(
-      `UPDATE FinishedGoods SET 
-        name = $1, collection = $2, brand = $3, 
-        selling_price = $4, product_image = $5, 
-        warehouse_location = $6, category = $7,
-        current_stock = $8, min_stocks = $9
-        WHERE sku = $10`,
-      [name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks || 0, sku]
-    );
-    await client.query("COMMIT");
-    res.status(200).send("Product updated successfully");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    res.status(500).send("Database Error: " + err.message);
-  } finally { client.release(); }
-});
-
 app.get("/api/products/unique-list", async (req, res) => {
   try {
     const result = await pool.query(
@@ -544,6 +487,80 @@ app.get("/api/products/unique-list", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) { res.status(500).send(err.message); }
+});
+
+app.put("/api/products/:sku", async (req, res) => {
+  const { sku } = req.params;
+  const { name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `UPDATE FinishedGoods SET 
+        name = $1, collection = $2, brand = $3, 
+        selling_price = $4, product_image = $5, 
+        warehouse_location = $6, category = $7,
+        current_stock = $8, min_stocks = $9
+       WHERE sku = $10`,
+      [name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks || 0, sku]
+    );
+
+    if (parseInt(quantity) <= parseInt(min_stocks || 0)) {
+      const existingRequest = await client.query(
+        `SELECT work_order_id FROM workorder 
+         WHERE sku = $1 AND status IN ('Pending Request', 'In Production')
+         LIMIT 1`,
+        [sku]
+      );
+      if (existingRequest.rowCount === 0) {
+        await client.query(
+          `INSERT INTO workorder (sku, quantity_needed, category, status, target_date) 
+           VALUES ($1, $2, $3, 'Pending Request', CURRENT_DATE + INTERVAL '7 days')`,
+          [sku, (parseInt(min_stocks) || 5) * 2, category]
+        );
+      }
+    }
+    await client.query("COMMIT");
+    res.status(200).send("Product updated and demand check complete");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("PUT /api/products/:sku Error:", err.message);
+    res.status(500).send("Database Error: " + err.message);
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/work_orders/trigger", async (req, res) => {
+  const { sku, quantity_needed, category } = req.body;
+  try {
+    const existing = await pool.query(
+      `SELECT work_order_id FROM WorkOrder 
+       WHERE sku = $1 AND status IN ('Pending', 'In Production', 'Quality Control')
+       LIMIT 1`,
+      [sku]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(200).json({
+        message: "Active work order already exists for this SKU.",
+        work_order_id: existing.rows[0].work_order_id
+      });
+    }
+    const result = await pool.query(
+      `INSERT INTO WorkOrder (sku, quantity_needed, category, status, target_date)
+       VALUES ($1, $2, $3, 'Pending', CURRENT_DATE + INTERVAL '7 days')
+       RETURNING work_order_id`,
+      [sku, quantity_needed || 10, category || null]
+    );
+    res.status(201).json({
+      message: "Work order created successfully.",
+      work_order_id: result.rows[0].work_order_id
+    });
+  } catch (err) {
+    console.error("WO Trigger Error:", err.message);
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/materials", async (req, res) => {
@@ -561,30 +578,13 @@ app.get("/api/materials", async (req, res) => {
 });
 
 app.post("/api/add_material", async (req, res) => {
-  const { 
-    unique_code, 
-    supplier_id, 
-    cost_per_unit, 
-    stock_quantity, 
-    reorder_threshold, 
-    material_image, 
-    material_name
-  } = req.body;
-
+  const { unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO material (
-        unique_code, 
-        supplier_id, 
-        cost_per_unit, 
-        stock_quantity, 
-        reorder_threshold, 
-        material_image,
-        material_name
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO material (unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name]
     );
-
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("Add Error:", err.message);
@@ -594,32 +594,18 @@ app.post("/api/add_material", async (req, res) => {
 
 app.put("/api/materials/:id", async (req, res) => {
   const { id } = req.params;
-  const { 
-    material_name, 
-    supplier_id, 
-    cost_per_unit, 
-    stock_quantity, 
-    reorder_threshold, 
-    material_image 
-  } = req.body;
-
+  const { material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image } = req.body;
   try {
     const result = await pool.query(
       `UPDATE material 
-       SET material_name = $1, 
-           supplier_id = $2, 
-           cost_per_unit = $3, 
-           stock_quantity = $4, 
-           reorder_threshold = $5, 
-           material_image = $6
+       SET material_name = $1, supplier_id = $2, cost_per_unit = $3, 
+           stock_quantity = $4, reorder_threshold = $5, material_image = $6
        WHERE material_id = $7 RETURNING *`,
       [material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, id]
     );
-
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Material not found" });
     }
-
     res.json({ success: true, message: "Material updated!", data: result.rows[0] });
   } catch (err) {
     console.error("Update Error:", err.message);
@@ -627,13 +613,11 @@ app.put("/api/materials/:id", async (req, res) => {
   }
 });
 
-
 app.post("/api/sales_Add_inventory", async (req, res) => {
   const { sku, name, location, quantity, selling_price, product_image, collection, brand, category, min_stocks } = req.body;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     await client.query(
       `INSERT INTO FinishedGoods (sku, name, collection, brand, selling_price, product_image, current_stock, warehouse_location, category, min_stocks) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -644,12 +628,9 @@ app.post("/api/sales_Add_inventory", async (req, res) => {
        current_stock = FinishedGoods.current_stock + EXCLUDED.current_stock`,
       [sku, name, collection, brand || '', selling_price || 0, product_image, quantity || 0, location, category, min_stocks || 0]
     );
-
     const warehouseRes = await client.query("SELECT warehouse_id FROM Warehouse WHERE name = $1 LIMIT 1", [location]);
     if (warehouseRes.rows.length === 0) throw new Error(`Warehouse location '${location}' not found.`);
-
     const warehouseId = warehouseRes.rows[0].warehouse_id;
-
     await client.query(
       `INSERT INTO WarehouseInventory (warehouse_id, sku, quantity) 
        VALUES ($1, $2, $3)
@@ -657,7 +638,6 @@ app.post("/api/sales_Add_inventory", async (req, res) => {
        quantity = WarehouseInventory.quantity + EXCLUDED.quantity`,
       [warehouseId, sku, quantity || 0]
     );
-
     await client.query("COMMIT");
     res.status(200).send("Success");
   } catch (err) {
@@ -669,15 +649,39 @@ app.post("/api/sales_Add_inventory", async (req, res) => {
   }
 });
 
+app.post("/api/procurement/approve/:id", async (req, res) => {
+  const { id } = req.params;
+  const { finance_id } = req.body;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const reqData = await client.query(
+      "UPDATE procurement_requests SET status = 'Approved', approved_by = $1 WHERE request_id = $2 RETURNING *",
+      [finance_id, id]
+    );
+
+    const { material_id, requested_qty } = reqData.rows[0];
+
+    await client.query(
+      "UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2",
+      [requested_qty, material_id]
+    );
+
+    await client.query("COMMIT");
+    res.send("Material stock updated via Finance approval.");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(500).send(err.message);
+  } finally { client.release(); }
+});
+
 app.get("/api/warehouses", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        w.warehouse_id, 
-        w.name, 
-        w.location, 
-        w.capacity_total, 
-        w.manager_name, 
+        w.warehouse_id, w.name, w.location, w.capacity_total, w.manager_name, 
         (SELECT COUNT(DISTINCT sku) FROM WarehouseInventory WHERE warehouse_id = w.warehouse_id) as product_types,
         COALESCE((SELECT SUM(quantity) FROM WarehouseInventory WHERE warehouse_id = w.warehouse_id), 0) as current_utilization,
         (SELECT COUNT(*) FROM FinishedGoods fg 
@@ -751,47 +755,42 @@ app.get("/api/artisan_work_orders", async (req, res) => {
 
 app.post("/api/work_orders", async (req, res) => {
   const { sku, quantity, target_date, artisan_id, status, total_cost, selectedMaterials } = req.body;
-  
+  const client = await pool.connect();
   try {
-    await pool.query('BEGIN');
-
-    const result = await pool.query(
+    await client.query('BEGIN');
+    const result = await client.query(
       `INSERT INTO WorkOrder (sku, quantity_needed, status, target_date, artisan_id, total_cost) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING work_order_id`,
       [sku, parseInt(quantity), status || 'In Production', target_date, parseInt(artisan_id), parseFloat(total_cost)]
     );
-
     const newOrderId = result.rows[0].work_order_id;
-
     if (selectedMaterials && selectedMaterials.length > 0) {
       for (const mat of selectedMaterials) {
         const matId = parseInt(mat.material_id);
         const qtyToUse = parseInt(mat.qty);
         const subtotal = Number(mat.total) || (qtyToUse * (Number(mat.cost) || 0));
-
-        await pool.query(
+        await client.query(
           `INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) 
            VALUES ($1, $2, $3, $4)`,
           [newOrderId, matId, qtyToUse, subtotal]
         );
-
-        const checkStock = await pool.query(
+        const checkStock = await client.query(
           "UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2 AND stock_quantity >= $1 RETURNING stock_quantity",
           [qtyToUse, matId]
         );
-
         if (checkStock.rows.length === 0) {
           throw new Error(`Insufficient stock for Material ID: ${matId}`);
         }
       }
     }
-
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
     res.status(201).json({ success: true, work_order_id: newOrderId });
   } catch (err) {
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error("Create WO Error:", err.message);
     res.status(400).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -804,134 +803,115 @@ app.get("/api/finished_goods", async (req, res) => {
   }
 });
 
-
 app.put("/api/work_orders/:id/complete", async (req, res) => {
   const { id } = req.params;
+  const client = await pool.connect();
   try {
-    await pool.query('BEGIN');
-
-    const order = await pool.query(
+    await client.query('BEGIN');
+    const order = await client.query(
       "SELECT * FROM WorkOrder WHERE work_order_id = $1",
       [id]
     );
-
     if (order.rows.length === 0) {
-      await pool.query('ROLLBACK');
+      await client.query('ROLLBACK');
       return res.status(404).send("Work order not found.");
     }
-
     const { sku, quantity_needed } = order.rows[0];
-
-    await pool.query(
+    await client.query(
       "UPDATE WorkOrder SET status = 'Complete' WHERE work_order_id = $1",
       [id]
     );
-
-    const updateResult = await pool.query(
+    const updateResult = await client.query(
       `UPDATE FinishedGoods 
        SET current_stock = current_stock + $1
        WHERE sku = $2
        RETURNING sku, current_stock`,
       [quantity_needed, sku]
     );
-
     if (updateResult.rows.length === 0) {
-      await pool.query('ROLLBACK');
+      await client.query('ROLLBACK');
       return res.status(404).send(`Product with SKU '${sku}' not found in FinishedGoods.`);
     }
-
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
     res.json({ success: true, updated: updateResult.rows[0] });
   } catch (err) {
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error("Complete WO Error:", err.message);
     res.status(500).send(err.message);
+  } finally {
+    client.release();
   }
 });
 
 app.put('/api/work_orders/:id', async (req, res) => {
-    const { id } = req.params;
-    const { status, artisan_id, quantity, sku, target_date, selectedMaterials, product_image } = req.body;
-    const materialsList = selectedMaterials || [];
-
-    const calculatedTotalCost = materialsList.reduce((sum, m) => {
+  const { id } = req.params;
+  const { status, artisan_id, quantity, sku, target_date, selectedMaterials, product_image } = req.body;
+  const materialsList = selectedMaterials || [];
+  const calculatedTotalCost = materialsList.reduce((sum, m) => {
+    const qty = Number(m.qty) || 0;
+    const cost = Number(m.cost) || 0;
+    return sum + (qty * cost);
+  }, 0);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const oldMaterials = await client.query(
+      'SELECT material_id, material_qty FROM work_order_materials WHERE work_order_id = $1',
+      [id]
+    );
+    for (const oldMat of oldMaterials.rows) {
+      await client.query(
+        'UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2',
+        [oldMat.material_qty, oldMat.material_id]
+      );
+    }
+    await client.query(
+      'UPDATE WorkOrder SET status = $1, artisan_id = $2, quantity_needed = $3, sku = $4, target_date = $5, total_cost = $6, product_image = $7 WHERE work_order_id = $8',
+      [status, artisan_id, quantity, sku, target_date, calculatedTotalCost, product_image, id]
+    );
+    await client.query('DELETE FROM work_order_materials WHERE work_order_id = $1', [id]);
+    if (materialsList.length > 0) {
+      for (const m of materialsList) {
         const qty = Number(m.qty) || 0;
         const cost = Number(m.cost) || 0;
-        return sum + (qty * cost);
-    }, 0);
-
-    const client = await pool.connect();
-
-    try {
-        await client.query('BEGIN');
-
-       
-        const oldMaterials = await client.query(
-            'SELECT material_id, material_qty FROM work_order_materials WHERE work_order_id = $1',
-            [id]
-        );
-
-        for (const oldMat of oldMaterials.rows) {
-            await client.query(
-                'UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2',
-                [oldMat.material_qty, oldMat.material_id]
-            );
-        }
-
+        const subtotal = qty * cost;
         await client.query(
-            'UPDATE WorkOrder SET status = $1, artisan_id = $2, quantity_needed = $3, sku = $4, target_date = $5, total_cost = $6, product_image = $7 WHERE work_order_id = $8',
-            [status, artisan_id, quantity, sku, target_date, calculatedTotalCost, product_image, id]
+          'INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) VALUES ($1, $2, $3, $4)',
+          [id, m.material_id, qty, subtotal]
         );
-
-        await client.query('DELETE FROM work_order_materials WHERE work_order_id = $1', [id]);
-
-        if (materialsList.length > 0) {
-            for (const m of materialsList) {
-                const qty = Number(m.qty) || 0;
-                const cost = Number(m.cost) || 0;
-                const subtotal = qty * cost;
-
-                await client.query(
-                    'INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) VALUES ($1, $2, $3, $4)',
-                    [id, m.material_id, qty, subtotal]
-                );
-
-                const updateStock = await client.query(
-                    'UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2 RETURNING stock_quantity',
-                    [qty, m.material_id]
-                );
-
-                if (updateStock.rows[0].stock_quantity < 0) {
-                    throw new Error(`Insufficient stock for material ID: ${m.material_id}`);
-                }
-            }
+        const updateStock = await client.query(
+          'UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2 RETURNING stock_quantity',
+          [qty, m.material_id]
+        );
+        if (updateStock.rows[0].stock_quantity < 0) {
+          throw new Error(`Insufficient stock for material ID: ${m.material_id}`);
         }
-
-        await client.query('COMMIT');
-        res.status(200).json({ success: true, message: "Order and Stock Updated Successfully" });
-
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error("❌ Transaction Error:", err.message);
-        res.status(500).json({ error: err.message });
-    } finally {
-        client.release();
+      }
     }
+    await client.query('COMMIT');
+    res.status(200).json({ success: true, message: "Order and Stock Updated Successfully" });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Transaction Error:", err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 app.get('/api/work_order_materials/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const result = await pool.query(`
-            SELECT m.material_id, m.material_name, m.cost_per_unit, wom.material_qty, wom.subtotal 
-            FROM work_order_materials wom
-            JOIN material m ON wom.material_id = m.material_id
-            WHERE wom.work_order_id = $1`, [id]);
-        res.json(result.rows);
-    } catch (err) {
-        console.error("GET Materials Error:", err.message);
-        res.status(500).json({ error: err.message });
-    }
+  const { id } = req.params;
+  try {
+    const result = await pool.query(`
+      SELECT m.material_id, m.material_name, m.cost_per_unit, wom.material_qty, wom.subtotal 
+      FROM work_order_materials wom
+      JOIN material m ON wom.material_id = m.material_id
+      WHERE wom.work_order_id = $1`, [id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("GET Materials Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/audit_logs", async (req, res) => {

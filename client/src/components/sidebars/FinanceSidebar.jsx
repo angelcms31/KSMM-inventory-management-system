@@ -5,7 +5,8 @@ import {
   HiOutlineHome, 
   HiOutlinePresentationChartBar, 
   HiOutlineShieldCheck, 
-  HiOutlineLogout 
+  HiOutlineLogout,
+  HiOutlineShoppingCart 
 } from "react-icons/hi";
 
 const FinanceSidebar = () => {
@@ -24,32 +25,33 @@ const FinanceSidebar = () => {
   const menuItems = [
     { name: 'Home', path: '/finance', icon: <HiOutlineHome size={22} /> },
     { name: 'Transactions', path: '/finance/transactions', icon: <HiOutlinePresentationChartBar size={22} /> },
+    { name: 'Purchase Orders', path: '/finance/PurchaseOrder', icon: <HiOutlineShoppingCart size={22} /> },
     { name: 'Audit Logs', path: '/finance/logs', icon: <HiOutlineShieldCheck size={22} /> },
   ];
 
-const handleLogout = async () => {
-  try {
-    const userId = localStorage.getItem("user_id");
-    const role = localStorage.getItem("userRole");
+  const handleLogout = async () => {
+    try {
+      const userId = localStorage.getItem("userId");
+      const role = localStorage.getItem("userRole");
 
-    if (userId) {
-      await axios.post("http://localhost:5000/api/logout", { userId, role });
+      if (userId) {
+        await axios.post("http://localhost:5000/api/logout", { userId, role });
+      }
+
+      localStorage.clear();
+
+      window.history.pushState(null, null, window.location.href);
+      window.onpopstate = function () {
+          window.history.go(1);
+      };
+
+      navigate("/", { replace: true });
+      window.location.reload(); 
+    } catch (err) {
+      localStorage.clear();
+      navigate("/", { replace: true });
     }
-
-    localStorage.clear();
-
-    window.history.pushState(null, null, window.location.href);
-    window.onpopstate = function () {
-        window.history.go(1);
-    };
-
-    navigate("/", { replace: true });
-    window.location.reload(); 
-  } catch (err) {
-    localStorage.clear();
-    navigate("/", { replace: true });
-  }
-};
+  };
 
   return (
     <div className="w-[240px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 left-0 font-sans overflow-hidden border-r border-white/5">
@@ -58,7 +60,7 @@ const handleLogout = async () => {
         <h3 className="text-[18px] font-bold leading-tight tracking-tight capitalize">
           Welcome back,<br />{userName}!
         </h3>
-        <p className="text-[11px] text-gray-500 mt-4 font-light">
+        <p className="text-[11px] text-gray-500 mt-4 font-light text-left">
           Last update: Today, {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()}
         </p>
       </div>

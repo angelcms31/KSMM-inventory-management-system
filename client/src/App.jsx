@@ -29,6 +29,7 @@ import SalesDashboard from "./pages/sales/SalesDashboard";
 import SalesInventory from "./pages/sales/SalesInventory";
 import Statistics from "./pages/sales/Statistics"
 import FinanceLogs from "./pages/finance/FinanceLogs";
+import PurchaseOrder from "./pages/finance/PurchaseOrder";
 
 const ProtectedRoute = ({ children, allowedRole }) => {
   const userId = localStorage.getItem("user_id");
@@ -141,6 +142,7 @@ function App() {
           <Route path="" element={<FinanceDashboard />} /> 
           <Route path="transactions" element={<FinanceTransactions />} /> 
           <Route path="logs" element={<FinanceLogs />} /> 
+          <Route path="PurchaseOrder" element={<PurchaseOrder />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

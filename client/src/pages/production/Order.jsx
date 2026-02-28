@@ -174,7 +174,6 @@ export default function Order() {
           <option>Approved</option>
           <option>Draft</option>
           <option>Received</option>
-          <option>Cancelled</option>
         </select>
       </div>
 
