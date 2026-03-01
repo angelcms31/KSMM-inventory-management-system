@@ -17,6 +17,7 @@ export default function PurchaseOrder() {
   const [isEdit, setIsEdit] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [userName, setUserName] = useState('');
+  const [suggestedQty, setSuggestedQty] = useState(null);
   const itemsPerPage = 5;
   const lowStockPerPage = 4;
 
@@ -65,8 +66,8 @@ export default function PurchaseOrder() {
 
   const lowStockMaterials = materials.filter(m => {
     const isLow = parseInt(m.stock_quantity) <= parseInt(m.reorder_threshold);
-    const hasActivePO = orders.some(o => 
-      parseInt(o.material_id) === parseInt(m.material_id) && 
+    const hasActivePO = orders.some(o =>
+      parseInt(o.material_id) === parseInt(m.material_id) &&
       (o.status === 'Ongoing' || o.status === 'Pending')
     );
     return isLow && !hasActivePO;
@@ -103,7 +104,7 @@ export default function PurchaseOrder() {
     try {
       await axios.patch(`http://localhost:5000/api/orders/receive/${id}`);
       fetchData();
-    } catch (err) {
+    } catch {
       alert('Error updating order');
     }
   };
@@ -111,6 +112,7 @@ export default function PurchaseOrder() {
   const handleEditClick = (order) => {
     setIsEdit(true);
     setSelectedOrderId(order.assignment_id);
+    setSuggestedQty(null);
     setFormData({
       supplier_id: order.supplier_id || '',
       material_id: order.material_id || '',
@@ -136,7 +138,7 @@ export default function PurchaseOrder() {
       setShowModal(false);
       resetForm();
       fetchData();
-    } catch (err) {
+    } catch {
       alert('Action failed.');
     }
   };
@@ -144,6 +146,7 @@ export default function PurchaseOrder() {
   const resetForm = () => {
     setIsEdit(false);
     setSelectedOrderId(null);
+    setSuggestedQty(null);
     setFormData({
       supplier_id: '',
       material_id: '',
@@ -209,33 +212,44 @@ export default function PurchaseOrder() {
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-6">
-            {lowStockMaterials.slice(lowStockPage * lowStockPerPage, (lowStockPage + 1) * lowStockPerPage).map(m => (
-              <div key={m.material_id} className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0"><span className="text-rose-600 text-[9px] font-black uppercase">Low</span></div>
-                  <div className="w-14 h-14 rounded-2xl overflow-hidden border bg-slate-50 flex items-center justify-center shadow-sm">
-                    {m.material_image ? <img src={m.material_image} className="w-full h-full object-cover" alt="" /> : <HiOutlinePhotograph size={20} className="text-slate-200" />}
+            {lowStockMaterials.slice(lowStockPage * lowStockPerPage, (lowStockPage + 1) * lowStockPerPage).map(m => {
+              const suggested = Math.max(m.reorder_threshold * 2 - m.stock_quantity, m.reorder_threshold);
+              return (
+                <div key={m.material_id} className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center flex-shrink-0">
+                      <span className="text-rose-600 text-[9px] font-black uppercase">Low</span>
+                    </div>
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden border bg-slate-50 flex items-center justify-center shadow-sm">
+                      {m.material_image ? <img src={m.material_image} className="w-full h-full object-cover" alt="" /> : <HiOutlinePhotograph size={20} className="text-slate-200" />}
+                    </div>
                   </div>
+                  <div className="mb-1 w-full text-left">
+                    <p className="font-black text-sm text-slate-900 leading-tight truncate uppercase">{m.material_name}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{m.unique_code}</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 my-3 text-[10px] font-black uppercase text-slate-500 tracking-tighter">
+                    Current: <span className="text-rose-500">{m.stock_quantity}</span> / Min: {m.reorder_threshold}
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetForm();
+                      setSuggestedQty(suggested);
+                      setFormData(prev => ({
+                        ...prev,
+                        material_id: String(m.material_id),
+                        ordered_quantity: String(suggested),
+                        status: 'Pending'
+                      }));
+                      setShowModal(true);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto shadow-md"
+                  >
+                    Create Purchase Order
+                  </button>
                 </div>
-                <div className="mb-1 w-full text-left">
-                  <p className="font-black text-sm text-slate-900 leading-tight truncate uppercase">{m.material_name}</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{m.unique_code}</p>
-                </div>
-                <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 my-3 text-[10px] font-black uppercase text-slate-500 tracking-tighter">
-                  Current: <span className="text-rose-500">{m.stock_quantity}</span> / Min: {m.reorder_threshold}
-                </div>
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setFormData(prev => ({ ...prev, material_id: String(m.material_id), status: 'Pending' }));
-                    setShowModal(true);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto shadow-md"
-                >
-                  Create Purchase Order
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -285,7 +299,7 @@ export default function PurchaseOrder() {
                         {!isDelivered && (
                           <button onClick={() => handleReceiveOrder(order.assignment_id)} className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-100 shadow-sm"><HiOutlineClipboardList size={18} /></button>
                         )}
-                        <button onClick={() => handleEditClick(order)} disabled={isDelivered} className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-30 cursor-not-allowed' : ''}`} title="Edit PO"><HiOutlinePencil size={18} /></button>
+                        <button onClick={() => handleEditClick(order)} disabled={isDelivered} className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-30 cursor-not-allowed' : ''}`}><HiOutlinePencil size={18} /></button>
                       </div>
                     </td>
                   </tr>
@@ -306,15 +320,54 @@ export default function PurchaseOrder() {
             <p className="text-xs text-slate-400 mb-8 font-black uppercase tracking-widest text-left">Processing for: <span className="text-black">{userName}</span></p>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-6 font-bold text-left">
-                <div className="space-y-2"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Vendor</label><select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-sm" value={formData.supplier_id} onChange={e => setFormData({ ...formData, supplier_id: e.target.value })}><option value="">Select Supplier...</option>{activeSuppliers.map(s => <option key={s.supplier_id} value={s.supplier_id}>{s.name}</option>)}</select></div>
-                <div className="space-y-2"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Raw Material</label><select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm opacity-60 pointer-events-none" value={formData.material_id}><option value="">Loading...</option>{materials.map(m => <option key={m.material_id} value={m.material_id}>{m.material_name}</option>)}</select></div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Vendor</label>
+                  <select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-sm" value={formData.supplier_id} onChange={e => setFormData({ ...formData, supplier_id: e.target.value })}>
+                    <option value="">Select Supplier...</option>
+                    {activeSuppliers.map(s => <option key={s.supplier_id} value={s.supplier_id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Raw Material</label>
+                  <select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm opacity-60 pointer-events-none" value={formData.material_id}>
+                    <option value="">Loading...</option>
+                    {materials.map(m => <option key={m.material_id} value={m.material_id}>{m.material_name}</option>)}
+                  </select>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-6 font-bold text-left">
-                <div className="space-y-2"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Quantity</label><input type="number" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm" value={formData.ordered_quantity} onChange={e => setFormData({ ...formData, ordered_quantity: e.target.value })} /></div>
-                <div className="space-y-2"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Expected Arrival</label><input type="date" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm" value={formData.expected_delivery} onChange={e => setFormData({ ...formData, expected_delivery: e.target.value })} /></div>
+
+              <div className="grid grid-cols-2 gap-6 font-bold text-left items-end">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">
+                    Quantity {suggestedQty !== null && (
+                      <span className="text-amber-500 normal-case font-bold tracking-normal">(suggested: {suggestedQty})</span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm"
+                    value={formData.ordered_quantity}
+                    onChange={e => setFormData({ ...formData, ordered_quantity: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Expected Arrival</label>
+                  <input type="date" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm" value={formData.expected_delivery} onChange={e => setFormData({ ...formData, expected_delivery: e.target.value })} />
+                </div>
               </div>
-              <div className="space-y-2 text-left"><label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Total Amount (₱)</label><input type="number" step="0.01" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-xl text-emerald-600 shadow-sm" value={formData.total_amount} onChange={e => setFormData({ ...formData, total_amount: e.target.value })} /></div>
-              <div className="flex gap-4 pt-4 justify-end text-left"><button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button><button type="submit" className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest uppercase">Confirm & Process</button></div>
+
+              <div className="space-y-2 text-left">
+                <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Total Amount (₱)</label>
+                <input type="number" step="0.01" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-xl text-emerald-600 shadow-sm" value={formData.total_amount} onChange={e => setFormData({ ...formData, total_amount: e.target.value })} />
+              </div>
+
+              <div className="flex gap-4 pt-4 justify-end">
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button>
+                <button type="submit" className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest">Confirm & Process</button>
+              </div>
             </form>
           </div>
         </div>

@@ -12,17 +12,14 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [completeOrder, setCompleteOrder] = useState(null);
+  const [completeActuals, setCompleteActuals] = useState([]);
 
   const [editForm, setEditForm] = useState({
-    sku: '',
-    quantity: '',
-    category: '',
-    target_date: '',
-    artisan_id: '',
-    status: '',
-    product_image: null,
-    selectedMaterials: []
+    sku: '', quantity: '', category: '', target_date: '',
+    artisan_id: '', status: '', product_image: null, selectedMaterials: []
   });
 
   const fetchData = async () => {
@@ -38,16 +35,11 @@ export default function Inventory() {
       setArtisans(artRes.data.artisans || []);
       setFinishedGoods(fgRes.data || []);
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error(err);
     }
   };
 
   useEffect(() => { fetchData(); }, []);
-
-  const truncateText = (text, limit = 20) => {
-    if (!text) return "---";
-    return text.length > limit ? text.substring(0, limit) + "..." : text;
-  };
 
   const getProductName = (sku) => {
     const product = finishedGoods.find(fg => fg.sku === sku);
@@ -63,10 +55,53 @@ export default function Inventory() {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditForm(prev => ({ ...prev, product_image: reader.result }));
-      };
+      reader.onloadend = () => setEditForm(prev => ({ ...prev, product_image: reader.result }));
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleOpenComplete = async (order) => {
+    setCompleteOrder(order);
+    try {
+      const res = await axios.get(`http://localhost:5000/api/work_order_materials/${order.work_order_id}`);
+      const orderMaterials = res.data || [];
+      const mapped = orderMaterials.map(m => {
+        const baseMat = materials.find(bm => bm.material_id === m.material_id);
+        return {
+          material_id: m.material_id,
+          material_name: baseMat?.material_name || m.material_name || 'Unknown',
+          expected_qty: Number(m.material_qty) || 0,
+          actual_qty: Number(m.material_qty) || 0,
+          cost: baseMat ? Number(baseMat.cost_per_unit) : 0
+        };
+      });
+      setCompleteActuals(mapped);
+    } catch {
+      setCompleteActuals([]);
+    }
+    setShowCompleteModal(true);
+  };
+
+  const handleCompleteSubmit = async (e) => {
+    e.preventDefault();
+    if (completeActuals.length === 0) {
+      alert('Please add at least one material entry.');
+      return;
+    }
+    try {
+      await axios.put(`http://localhost:5000/api/work_orders/${completeOrder.work_order_id}/complete`, {
+        actualMaterials: completeActuals.map(m => ({
+          material_id: m.material_id,
+          expected_qty: Number(m.expected_qty),
+          actual_qty: parseInt(m.actual_qty)
+        }))
+      });
+      setShowCompleteModal(false);
+      setCompleteOrder(null);
+      setCompleteActuals([]);
+      fetchData();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -80,46 +115,25 @@ export default function Inventory() {
         const qty = Number(m.material_qty) || 0;
         const baseMat = materials.find(bm => bm.material_id === m.material_id);
         const cost = baseMat ? Number(baseMat.cost_per_unit) : (Number(m.subtotal) / qty || 0);
-        return {
-          material_id: m.material_id,
-          qty,
-          cost,
-          total: Number(m.subtotal) || (qty * cost)
-        };
+        return { material_id: m.material_id, qty, cost, total: Number(m.subtotal) || (qty * cost) };
       });
       setEditForm({
-        sku: order.sku || '',
-        quantity: order.quantity_needed || '',
+        sku: order.sku || '', quantity: order.quantity_needed || '',
         category: getCategoryBySku(order.sku) || order.department || '',
         target_date: order.target_date?.split('T')[0] || '',
-        artisan_id: order.artisan_id || '',
-        status: order.status || 'In Production',
-        product_image: order.product_image || null,
-        selectedMaterials: mapped
+        artisan_id: order.artisan_id || '', status: order.status || 'In Production',
+        product_image: order.product_image || null, selectedMaterials: mapped
       });
-    } catch (err) {
+    } catch {
       setEditForm({
-        sku: order.sku || '',
-        quantity: order.quantity_needed || '',
+        sku: order.sku || '', quantity: order.quantity_needed || '',
         category: getCategoryBySku(order.sku) || order.department || '',
         target_date: order.target_date?.split('T')[0] || '',
-        artisan_id: order.artisan_id || '',
-        status: order.status || 'In Production',
-        product_image: order.product_image || null,
-        selectedMaterials: []
+        artisan_id: order.artisan_id || '', status: order.status || 'In Production',
+        product_image: order.product_image || null, selectedMaterials: []
       });
     }
     setShowEditModal(true);
-  };
-
-  const handleMarkComplete = async (order) => {
-    if (!window.confirm(`Mark WO-${order.work_order_id} as Complete?`)) return;
-    try {
-      await axios.put(`http://localhost:5000/api/work_orders/${order.work_order_id}/complete`);
-      fetchData();
-    } catch (err) {
-      alert('Error: ' + (err.response?.data || err.message || 'Failed to complete order.'));
-    }
   };
 
   const addMaterialRow = () => {
@@ -132,13 +146,13 @@ export default function Inventory() {
   const handleMaterialChange = (index, field, value) => {
     const updated = [...editForm.selectedMaterials];
     if (field === 'qty') {
-      updated[index].qty = Number(value) || 0;
+      updated[index].qty = parseInt(value) || 0;
     } else if (field === 'material_id') {
       updated[index].material_id = value;
       const mat = materials.find(m => m.material_id === parseInt(value));
       updated[index].cost = mat ? Number(mat.cost_per_unit) : 0;
     }
-    updated[index].total = (Number(updated[index].qty) || 0) * (Number(updated[index].cost) || 0);
+    updated[index].total = (parseInt(updated[index].qty) || 0) * (Number(updated[index].cost) || 0);
     setEditForm({ ...editForm, selectedMaterials: updated });
   };
 
@@ -149,7 +163,7 @@ export default function Inventory() {
     e.preventDefault();
     const validMaterials = editForm.selectedMaterials.filter(m => m.material_id !== '' && Number(m.qty) > 0);
     if (validMaterials.length === 0) {
-      alert('Please add at least one raw material.');
+      alert('Please add at least one raw material with a valid quantity.');
       return;
     }
     const payload = {
@@ -159,9 +173,9 @@ export default function Inventory() {
       total_cost: calculateSubtotal(),
       selectedMaterials: validMaterials.map(m => ({
         material_id: parseInt(m.material_id),
-        qty: Number(m.qty) || 0,
+        qty: parseInt(m.qty) || 0,
         cost: Number(m.cost) || 0,
-        total: (Number(m.qty) || 0) * (Number(m.cost) || 0)
+        total: (parseInt(m.qty) || 0) * (Number(m.cost) || 0)
       }))
     };
     try {
@@ -176,12 +190,13 @@ export default function Inventory() {
   const getStatusColor = (status) => {
     switch (status) {
       case 'Complete': return 'bg-[#002B5B]';
+      case 'Quality Control': return 'bg-black';
       case 'In Production': return 'bg-[#1D7A1D]';
-      default: return 'bg-orange-500';
+      default: return 'bg-slate-400';
     }
   };
 
-  const activeOrders = workOrders.filter(o => o.status !== 'Pending' && o.status !== 'Pending Request');
+  const activeOrders = workOrders.filter(o => o.status === 'In Production' || o.status === 'Complete');
 
   const filteredOrders = activeOrders.filter(order => {
     const cat = getCategoryBySku(order.sku) || order.department || '';
@@ -198,7 +213,7 @@ export default function Inventory() {
           <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input
             type="text"
-            placeholder="Search Active Work Orders..."
+            placeholder="Search SKU, Artisan, or Product..."
             className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-black/5 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -216,17 +231,20 @@ export default function Inventory() {
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col mb-10 text-left">
-        <div className="flex justify-between items-center mb-10 px-2">
+        <div className="flex justify-between items-center mb-8 px-2">
           <div>
-            <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Work Order Inventory</h1>
+            <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Production Orders</h1>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Active Work Orders</p>
           </div>
-          <div className="flex gap-2 text-[10px] font-black uppercase">
-            <span className="px-4 py-2 rounded-xl bg-[#1D7A1D] text-white shadow-sm">
-              {workOrders.filter(o => o.status === 'In Production').length} In Production
-            </span>
-            <span className="px-4 py-2 rounded-xl bg-[#002B5B] text-white shadow-sm">
-              {workOrders.filter(o => o.status === 'Complete').length} Completed
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2 text-[10px] font-black uppercase">
+              <span className="px-3 py-1.5 rounded-lg bg-[#1D7A1D] text-white">
+                {workOrders.filter(o => o.status === 'In Production').length} In Production
+              </span>
+              <span className="px-3 py-1.5 rounded-lg bg-[#002B5B] text-white">
+                {workOrders.filter(o => o.status === 'Complete').length} Complete
+              </span>
+            </div>
           </div>
         </div>
 
@@ -257,26 +275,22 @@ export default function Inventory() {
                           }
                         </div>
                         <div className="flex flex-col items-start min-w-0">
-                          <span className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate max-w-[220px]" title={getProductName(order.sku)}>
-                            {truncateText(getProductName(order.sku), 25)}
+                          <span className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate max-w-[200px]">
+                            {getProductName(order.sku)}
                           </span>
-                          <div className="flex items-center gap-1.5 overflow-hidden">
-                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider truncate max-w-[120px]" title={order.sku}>
-                              {truncateText(order.sku, 15)}
-                            </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">{order.sku}</span>
                             <span className="text-slate-300 text-[10px]">•</span>
-                            <span className="text-slate-400 text-[10px] font-bold uppercase whitespace-nowrap">{order.quantity_needed} Unit/s</span>
+                            <span className="text-slate-400 text-[10px] font-bold uppercase whitespace-nowrap">{order.quantity_needed} Units</span>
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 text-left text-slate-700 text-sm border-y border-transparent group-hover:border-slate-100">
-                      <p className="truncate max-w-[150px]">
-                        {order.first_name && order.last_name
-                          ? `${order.first_name} ${order.last_name}`
-                          : <span className="text-slate-300 italic text-xs">Unassigned</span>
-                        }
-                      </p>
+                      {order.first_name && order.last_name
+                        ? `${order.first_name} ${order.last_name}`
+                        : <span className="text-slate-300 italic text-xs">Unassigned</span>
+                      }
                     </td>
                     <td className="py-4 text-left text-slate-400 text-[10px] uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest">
                       {displayCategory}
@@ -293,7 +307,7 @@ export default function Inventory() {
                       <div className="flex justify-end gap-2">
                         {!isComplete && (
                           <button
-                            onClick={() => handleMarkComplete(order)}
+                            onClick={() => handleOpenComplete(order)}
                             title="Mark as Complete"
                             className="p-3 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-2xl transition-all border border-emerald-100"
                           >
@@ -312,10 +326,155 @@ export default function Inventory() {
                   </tr>
                 );
               })}
+              {filteredOrders.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
+                    No Work Orders Found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {showCompleteModal && completeOrder && (
+        <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 relative shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Complete Work Order</h2>
+                <p className="text-slate-400 font-bold mt-1 text-xs uppercase tracking-wider">
+                  WO-{completeOrder.work_order_id} · {completeOrder.sku} · {getProductName(completeOrder.sku)}
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowCompleteModal(false); setCompleteOrder(null); setCompleteActuals([]); }}
+                className="text-slate-300 hover:text-black bg-slate-50 p-2 rounded-full shadow-sm"
+              >
+                <HiXMark size={24} />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 mb-6 flex gap-6 flex-shrink-0">
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Product</p>
+                <p className="text-sm font-black text-slate-900">{getProductName(completeOrder.sku)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Artisan</p>
+                <p className="text-sm font-black text-slate-900">{completeOrder.first_name} {completeOrder.last_name}</p>
+              </div>
+              <div>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Qty to Add to Stock</p>
+                <p className="text-sm font-black text-emerald-600">+{completeOrder.quantity_needed} units</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCompleteSubmit} className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1">
+              <div className="mb-3">
+                <div className="flex justify-between items-center mb-2">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                      Enter actual quantities — variance will be logged for Finance
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
+                  <table className="w-full text-left text-xs border-separate border-spacing-0">
+                    <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black sticky top-0 z-10">
+                      <tr>
+                        <th className="p-3">Material</th>
+                        <th className="p-3 text-center w-24">Expected</th>
+                        <th className="p-3 text-center w-28">Actual Used</th>
+                        <th className="p-3 text-center w-24">Variance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {completeActuals.map((item, index) => {
+                        const variance = parseInt(item.actual_qty) - Number(item.expected_qty);
+                        const isOver = variance > 0;
+                        const isUnder = variance < 0;
+                        return (
+                          <tr key={index} className="text-slate-700 font-bold hover:bg-slate-50 transition-colors">
+                            <td className="p-3 font-black text-slate-900 text-[11px]">{item.material_name}</td>
+                            <td className="p-3 text-center text-slate-400 font-black text-[11px]">{item.expected_qty}</td>
+                            <td className="p-3 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                required
+                                className="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg py-1.5 outline-none font-black text-[11px] focus:border-black transition-colors"
+                                value={item.actual_qty}
+                                onChange={e => {
+                                  const updated = [...completeActuals];
+                                  updated[index].actual_qty = parseInt(e.target.value) || 0;
+                                  setCompleteActuals(updated);
+                                }}
+                              />
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`text-[11px] font-black ${isOver ? 'text-rose-500' : isUnder ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                {variance === 0 ? '—' : `${isOver ? '+' : ''}${variance}`}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {completeActuals.length === 0 && (
+                        <tr>
+                          <td colSpan="4" className="py-8 text-center text-slate-300 font-black text-[10px] uppercase tracking-widest">
+                            No materials found for this work order
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-3 flex gap-3">
+                  {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) > 0) && (
+                    <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-4 py-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-400 flex-shrink-0"></span>
+                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider">Overage detected — variance will be logged</span>
+                    </div>
+                  )}
+                  {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) < 0) && (
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Under usage — materials saved</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0">
+                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest max-w-[220px] leading-relaxed">
+                  Actual stock deduction & Sales inventory update will happen upon confirmation.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setShowCompleteModal(false); setCompleteOrder(null); setCompleteActuals([]); }}
+                    className="px-8 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-10 py-3 bg-[#002B5B] text-white rounded-xl uppercase text-[10px] font-black shadow-xl hover:bg-blue-900 transition-all tracking-widest"
+                  >
+                    Confirm & Complete
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showEditModal && (
         <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
@@ -332,19 +491,15 @@ export default function Inventory() {
                   onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
                 >
                   <option value="In Production">In Production</option>
-                  <option value="Complete">Complete</option>
                 </select>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"
-                >
+                <button onClick={() => setShowEditModal(false)} className="text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm">
                   <HiXMark size={24} />
                 </button>
               </div>
             </div>
 
             <form onSubmit={handleUpdate} className="flex-1 flex flex-col min-h-0">
-              <div className="grid grid-cols-2 gap-8 mb-6 overflow-y-auto pr-2 no-scrollbar text-left">
+              <div className="grid grid-cols-2 gap-8 mb-6 overflow-y-auto pr-2 no-scrollbar">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
@@ -368,6 +523,8 @@ export default function Inventory() {
                       <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Quantity</label>
                       <input
                         type="number"
+                        min="1"
+                        step="1"
                         required
                         className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
                         value={editForm.quantity}
@@ -411,13 +568,9 @@ export default function Inventory() {
                       onChange={e => setEditForm({ ...editForm, artisan_id: e.target.value })}
                     >
                       <option value="">Select Artisan...</option>
-                      {artisans
-                        .filter(a => a.status === 'Active')
-                        .map(a => (
-                          <option key={a.artisan_id} value={a.artisan_id}>
-                            {a.first_name} {a.last_name} — {a.department}
-                          </option>
-                        ))}
+                      {artisans.filter(a => a.status === 'Active').map(a => (
+                        <option key={a.artisan_id} value={a.artisan_id}>{a.first_name} {a.last_name} — {a.department}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -439,11 +592,7 @@ export default function Inventory() {
                   <div className="flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="text-base font-black text-slate-800 uppercase tracking-tighter">Raw Materials</h3>
-                      <button
-                        type="button"
-                        onClick={addMaterialRow}
-                        className="bg-black text-white p-1.5 rounded-lg hover:scale-110 transition-all shadow-lg"
-                      >
+                      <button type="button" onClick={addMaterialRow} className="bg-black text-white p-1.5 rounded-lg hover:scale-110 transition-all shadow-lg">
                         <HiPlusSmall size={20} />
                       </button>
                     </div>
@@ -475,6 +624,8 @@ export default function Inventory() {
                               <td className="p-2 text-center">
                                 <input
                                   type="number"
+                                  min="1"
+                                  step="1"
                                   className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[11px]"
                                   value={item.qty}
                                   onChange={e => handleMaterialChange(index, 'qty', e.target.value)}
@@ -486,16 +637,18 @@ export default function Inventory() {
                               <td className="p-2 text-center">
                                 <button
                                   type="button"
-                                  onClick={() => setEditForm({
-                                    ...editForm,
-                                    selectedMaterials: editForm.selectedMaterials.filter((_, i) => i !== index)
-                                  })}
+                                  onClick={() => setEditForm({ ...editForm, selectedMaterials: editForm.selectedMaterials.filter((_, i) => i !== index) })}
                                 >
                                   <HiTrash className="text-rose-400 hover:text-rose-600 transition-colors" size={14} />
                                 </button>
                               </td>
                             </tr>
                           ))}
+                          {editForm.selectedMaterials.length === 0 && (
+                            <tr>
+                              <td colSpan="4" className="py-6 text-center text-slate-300 font-black text-[10px] uppercase">No materials added</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -504,7 +657,7 @@ export default function Inventory() {
               </div>
 
               <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0">
-                <div className="flex items-center gap-6 text-left">
+                <div className="flex items-center gap-6">
                   <span className="text-slate-400 font-black uppercase text-[9px] tracking-[0.2em]">Estimated Cost</span>
                   <span className="text-3xl font-black text-emerald-600 tracking-tighter italic">
                     ₱{calculateSubtotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}

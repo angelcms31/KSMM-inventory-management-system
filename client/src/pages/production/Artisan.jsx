@@ -25,7 +25,7 @@ export default function Artisan() {
   const matsPerPage = 5;
 
   const [assignForm, setAssignForm] = useState({
-    artisan_id: '', target_date: '', selectedMaterials: []
+    artisan_id: '', target_date: '', quantity_needed: '', selectedMaterials: []
   });
 
   const [matForm, setMatForm] = useState({
@@ -83,7 +83,12 @@ export default function Artisan() {
 
   const handleOpenAssign = (order) => {
     setSelectedPendingOrder(order);
-    setAssignForm({ artisan_id: '', target_date: '', selectedMaterials: [] });
+    setAssignForm({
+      artisan_id: '',
+      target_date: '',
+      quantity_needed: order.quantity_needed,
+      selectedMaterials: []
+    });
     setShowAssignModal(true);
   };
 
@@ -125,7 +130,7 @@ export default function Artisan() {
     }
     const payload = {
       sku: selectedPendingOrder.sku,
-      quantity: selectedPendingOrder.quantity_needed,
+      quantity: parseInt(assignForm.quantity_needed) || selectedPendingOrder.quantity_needed,
       category: selectedPendingOrder.category || selectedPendingOrder.department || '',
       target_date: assignForm.target_date,
       artisan_id: parseInt(assignForm.artisan_id),
@@ -444,17 +449,13 @@ export default function Artisan() {
                 <p className="text-sm font-black text-slate-900">{selectedPendingOrder.sku}</p>
               </div>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Quantity Needed</p>
-                <p className="text-sm font-black text-slate-900">{selectedPendingOrder.quantity_needed} units</p>
-              </div>
-              <div>
                 <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Product</p>
                 <p className="text-sm font-black text-slate-900">{getProductName(selectedPendingOrder.sku)}</p>
               </div>
             </div>
 
             <form onSubmit={handleAssignOrder} className="flex-1 flex flex-col min-h-0 space-y-4 overflow-y-auto pr-1">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assign Artisan</label>
                   <select
@@ -481,6 +482,22 @@ export default function Artisan() {
                     className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
                     value={assignForm.target_date}
                     onChange={e => setAssignForm({ ...assignForm, target_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">
+                    Quantity Needed
+                    <span className="ml-1 text-amber-500 normal-case font-bold">(suggested: {selectedPendingOrder.quantity_needed})</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
+                    value={assignForm.quantity_needed}
+                    onChange={e => setAssignForm({ ...assignForm, quantity_needed: e.target.value })}
+                    placeholder={selectedPendingOrder.quantity_needed}
                   />
                 </div>
               </div>
@@ -527,6 +544,8 @@ export default function Artisan() {
                             <td className="p-2 text-center">
                               <input
                                 type="number"
+                                min="1"
+                                step="1"
                                 className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[11px]"
                                 value={item.qty}
                                 onChange={e => handleAssignMaterialChange(index, 'qty', e.target.value)}
@@ -650,6 +669,8 @@ export default function Artisan() {
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Current Stock</label>
                   <input
                     type="number"
+                    min="0"
+                    step="1"
                     required
                     className="w-full bg-[#F3F4F6] rounded-xl p-4 outline-none text-sm"
                     value={matForm.stock_quantity}
@@ -660,6 +681,8 @@ export default function Artisan() {
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Min Threshold</label>
                   <input
                     type="number"
+                    min="0"
+                    step="1"
                     required
                     className="w-full bg-[#F3F4F6] rounded-xl p-4 outline-none text-sm"
                     value={matForm.reorder_threshold}

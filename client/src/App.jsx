@@ -23,7 +23,6 @@ import FinanceDashboard from "./pages/finance/FinanceDashboard";
 import FinanceTransactions from "./pages/finance/FinanceTransaction";
 import ProductionDashboard from "./pages/production/ProductionDashboard";
 import Inventory from "./pages/production/Inventory";
-import Order from "./pages/production/Order";
 import Artisan from "./pages/production/Artisan";
 import SalesDashboard from "./pages/sales/SalesDashboard";
 import SalesInventory from "./pages/sales/SalesInventory";
@@ -100,7 +99,7 @@ function App() {
 
   useEffect(() => {
     const syncLogout = (event) => {
-      if (event.key === "user_id" && !event.newValue) {
+      if (event.key === "userId" && !event.newValue) {
         window.location.href = "/";
       }
     };
@@ -135,7 +134,6 @@ function App() {
           <Route path="" element={<ProductionDashboard />} /> 
           <Route path="artisan" element={<Artisan />} />
           <Route path="inventory" element={<Inventory />} />
-          <Route path="order" element={<Order />} />
         </Route>
 
         <Route path="/finance" element={<ProtectedRoute allowedRole="Finance"><FinanceLayout /></ProtectedRoute>}>
