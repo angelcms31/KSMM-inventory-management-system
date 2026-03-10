@@ -3,7 +3,7 @@ const nodemailer = require("nodemailer");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const os = require("os");
-const { getPool, initDB, dbQuery, invalidateCache } = require("./db");
+const { getPool, initDB, dbQuery } = require("./db");
 require("dotenv").config();
 
 const app = express();
@@ -337,7 +337,6 @@ app.patch("/api/suppliers/status/:id", async (req, res) => {
   const { status } = req.body;
   try {
     await getPool().query('UPDATE supplier SET status = $1 WHERE supplier_id = $2', [status, id]);
-    invalidateCache('suppliers');
     res.status(200).send("Status updated");
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -353,7 +352,6 @@ app.put("/api/suppliers/:id", async (req, res) => {
       [name, email, contact_no, id]
     );
     if (result.rows.length === 0) return res.status(404).send("Supplier not found");
-    invalidateCache('suppliers');
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).send(err.message);
@@ -364,7 +362,6 @@ app.post("/api/add_supplier", async (req, res) => {
   const { name, email, phone } = req.body;
   try {
     await getPool().query("INSERT INTO Supplier (name, contact_no, email) VALUES ($1, $2, $3)", [name, phone, email]);
-    invalidateCache('suppliers');
     res.status(201).send("Success");
   } catch (err) { res.status(500).send(err.message); }
 });
@@ -424,7 +421,6 @@ app.post("/api/create_order", async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
       [supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status || 'Pending']
     );
-    invalidateCache('all_orders');
     res.json(newOrder.rows[0]);
   } catch (err) {
     res.status(500).send(err.message);
@@ -441,7 +437,6 @@ app.put("/api/orders/:id", async (req, res) => {
        WHERE assignment_id = $7 RETURNING *`,
       [supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, status, id]
     );
-    invalidateCache('all_orders');
     res.json(result.rows[0]);
   } catch (err) {
     console.error("Update Order Error:", err.message);
@@ -462,8 +457,6 @@ app.patch("/api/orders/receive/:id", async (req, res) => {
       [order.rows[0].ordered_quantity, order.rows[0].material_id]
     );
     await client.query("COMMIT");
-    invalidateCache('all_orders');
-    invalidateCache('materials');
     res.send("Inventory updated successfully!");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -518,7 +511,6 @@ app.put("/api/products/:sku", async (req, res) => {
       }
     }
     await client.query("COMMIT");
-    invalidateCache('finishedgoods');
     res.status(200).send("Product updated and demand check complete");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -542,7 +534,6 @@ app.post("/api/work_orders/trigger", async (req, res) => {
       `INSERT INTO workorder (sku, quantity_needed, category, status, target_date) VALUES ($1, $2, $3, 'Pending', CURRENT_DATE + INTERVAL '7 days') RETURNING work_order_id`,
       [sku, quantity_needed || 10, category || null]
     );
-    invalidateCache('work_orders');
     res.status(201).json({ message: "Work order created successfully.", work_order_id: result.rows[0].work_order_id });
   } catch (err) {
     console.error("WO Trigger Error:", err.message);
@@ -572,7 +563,6 @@ app.post("/api/add_material", async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name]
     );
-    invalidateCache('materials');
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("Add Error:", err.message);
@@ -589,7 +579,6 @@ app.put("/api/materials/:id", async (req, res) => {
       [material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: "Material not found" });
-    invalidateCache('materials');
     res.json({ success: true, message: "Material updated!", data: result.rows[0] });
   } catch (err) {
     console.error("Update Error:", err.message);
@@ -617,7 +606,6 @@ app.post("/api/sales_Add_inventory", async (req, res) => {
       [warehouseId, sku, quantity || 0]
     );
     await client.query("COMMIT");
-    invalidateCache('finishedgoods');
     res.status(200).send("Success");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -644,7 +632,6 @@ app.post("/api/procurement/approve/:id", async (req, res) => {
       [requested_qty, material_id]
     );
     await client.query("COMMIT");
-    invalidateCache('materials');
     res.send("Material stock updated via Finance approval.");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -748,8 +735,6 @@ app.post("/api/work_orders", async (req, res) => {
       }
     }
     await client.query('COMMIT');
-    invalidateCache('work_orders');
-    invalidateCache('materials');
     res.status(201).json({ success: true, work_order_id: newOrderId });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -808,9 +793,6 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
       [quantity_needed, sku]
     );
     await client.query('COMMIT');
-    invalidateCache('work_orders');
-    invalidateCache('materials');
-    invalidateCache('finishedgoods');
     res.json({ message: 'Work order completed, variance logged, stock updated.' });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -857,8 +839,6 @@ app.put('/api/work_orders/:id', async (req, res) => {
       if (updateStock.rows[0].stock_quantity < 0) throw new Error(`Insufficient stock for material ID: ${m.material_id}`);
     }
     await client.query('COMMIT');
-    invalidateCache('work_orders');
-    invalidateCache('materials');
     res.status(200).json({ success: true, message: "Order and Stock Updated Successfully" });
   } catch (err) {
     await client.query('ROLLBACK');

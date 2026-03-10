@@ -4,9 +4,8 @@ const path = require('path');
 require('dotenv').config();
 
 const QUEUE_FILE = path.join(__dirname, 'write_queue.json');
-const CACHE_TTL_MS = 5 * 60 * 1000;
 
-const pool = new Pool({
+const cloudPool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
   options: '-c timezone=Asia/Manila',
@@ -15,71 +14,49 @@ const pool = new Pool({
   max: 10
 });
 
-let isOnline = false;
+const localPool = process.env.LOCAL_DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.LOCAL_DATABASE_URL,
+      options: '-c timezone=Asia/Manila',
+      connectionTimeoutMillis: 3000,
+      idleTimeoutMillis: 30000,
+      max: 10
+    })
+  : null;
+
+let activeSource = 'cloud';
 let isFlushing = false;
 
-pool.on('error', (err) => {
-  console.error('[DB] Pool error (handled):', err.message);
-  isOnline = false;
-});
+cloudPool.on('error', (err) => console.error('[DB] Cloud pool error:', err.message));
+if (localPool) localPool.on('error', (err) => console.error('[DB] Local pool error:', err.message));
 
 process.on('uncaughtException', (err) => {
-  const isNetErr = err.message && (
-    err.message.includes('ENOTFOUND') ||
-    err.message.includes('ECONNREFUSED') ||
-    err.message.includes('Connection terminated') ||
-    err.message.includes('timeout')
-  );
-  if (isNetErr) {
-    console.error('[DB] Network error caught (handled):', err.message);
-    isOnline = false;
-  } else {
-    console.error('[DB] Uncaught exception:', err.message);
-  }
+  if (isNetworkError(err)) console.error('[DB] Network error (handled):', err.message);
+  else console.error('[DB] Uncaught exception:', err.message);
 });
 
 process.on('unhandledRejection', (reason) => {
   const msg = reason?.message || String(reason);
-  const isNetErr = msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED') ||
-    msg.includes('Connection terminated') || msg.includes('timeout');
-  if (isNetErr) {
-    console.error('[DB] Network rejection (handled):', msg);
-    isOnline = false;
-  } else {
-    console.error('[DB] Unhandled rejection:', msg);
-  }
+  if (isNetworkError({ message: msg })) console.error('[DB] Network rejection (handled):', msg);
+  else console.error('[DB] Unhandled rejection:', msg);
 });
 
-const cache = {};
-
-const setCache = (key, data) => {
-  cache[key] = { data, ts: Date.now() };
+const isNetworkError = (err) => {
+  const msg = err?.message || '';
+  return (
+    msg.includes('ENOTFOUND') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('Connection terminated') ||
+    msg.includes('timeout') ||
+    msg.includes('ETIMEDOUT')
+  );
 };
 
-const getCache = (key) => {
-  const entry = cache[key];
-  if (!entry) return null;
-  if (Date.now() - entry.ts > CACHE_TTL_MS) {
-    delete cache[key];
-    return null;
-  }
-  return entry.data;
-};
-
-const invalidateCache = (key) => {
-  if (key) {
-    delete cache[key];
-  } else {
-    Object.keys(cache).forEach(k => delete cache[k]);
-  }
-};
+const activePool = () => activeSource === 'cloud' ? cloudPool : localPool;
 
 const loadQueue = () => {
   try {
-    if (fs.existsSync(QUEUE_FILE)) {
-      const raw = fs.readFileSync(QUEUE_FILE, 'utf8');
-      return JSON.parse(raw) || [];
-    }
+    if (fs.existsSync(QUEUE_FILE)) return JSON.parse(fs.readFileSync(QUEUE_FILE, 'utf8')) || [];
   } catch {
     console.error('[Queue] Failed to load write_queue.json, starting fresh.');
   }
@@ -99,30 +76,19 @@ let writeQueue = loadQueue();
 const enqueue = (operation) => {
   writeQueue.push({ ...operation, queuedAt: new Date().toISOString() });
   saveQueue(writeQueue);
-  console.log(`[Queue] Queued operation on — ${writeQueue.length} pending`);
+  console.log(`[Queue] Queued operation — ${writeQueue.length} pending`);
 };
 
 const flushQueue = async () => {
   if (isFlushing || writeQueue.length === 0) return;
   isFlushing = true;
-
-  console.log(`[Queue] Flushing ${writeQueue.length} queued operation(s) to Render...`);
-
+  console.log(`[Queue] Flushing ${writeQueue.length} operation(s) to Render...`);
   const remaining = [];
-
   for (const op of writeQueue) {
     try {
-      if (op.type === 'query') {
-        await pool.query(op.text, op.params);
-      }
+      if (op.type === 'query') await cloudPool.query(op.text, op.params);
     } catch (err) {
-      const isNetErr = err.message && (
-        err.message.includes('ENOTFOUND') ||
-        err.message.includes('ECONNREFUSED') ||
-        err.message.includes('Connection terminated') ||
-        err.message.includes('timeout')
-      );
-      if (isNetErr) {
+      if (isNetworkError(err)) {
         console.error('[Queue] Still offline, stopping flush.');
         remaining.push(...writeQueue.slice(writeQueue.indexOf(op)));
         break;
@@ -130,67 +96,49 @@ const flushQueue = async () => {
       console.error('[Queue] Permanent failure, dropping operation:', err.message);
     }
   }
-
   writeQueue = remaining;
   saveQueue(writeQueue);
-
-  if (remaining.length === 0) {
-    console.log('[Queue] All queued operations flushed successfully.');
-    invalidateCache();
-  } else {
-    console.log(`[Queue] ${remaining.length} operation(s) still pending.`);
-  }
-
+  console.log(remaining.length === 0
+    ? '[Queue] All operations flushed.'
+    : `[Queue] ${remaining.length} operation(s) still pending.`
+  );
   isFlushing = false;
 };
 
-const isNetworkError = (err) => err.message && (
-  err.message.includes('ENOTFOUND') ||
-  err.message.includes('ECONNREFUSED') ||
-  err.message.includes('Connection terminated') ||
-  err.message.includes('timeout')
-);
-
-const dbQuery = async (text, params = [], cacheKey = null) => {
-  if (cacheKey && !isOnline) {
-    const cached = getCache(cacheKey);
-    if (cached) {
-      console.log(`[Cache] Offline — serving from cache: ${cacheKey}`);
-      return { rows: cached, fromCache: true };
-    }
-  }
-
+const tryLocal = async (fn) => {
+  if (!localPool) return null;
   try {
-    const result = await pool.query(text, params);
-    isOnline = true;
-    if (cacheKey) setCache(cacheKey, result.rows);
-    return result;
+    return await fn(localPool);
   } catch (err) {
-    if (isNetworkError(err)) {
-      isOnline = false;
-      if (cacheKey) {
-        const cached = getCache(cacheKey);
-        if (cached) {
-          console.log(`[Cache] DB offline — serving from cache: ${cacheKey}`);
-          return { rows: cached, fromCache: true };
-        }
-      }
+    console.error('[DB] Local DB also failed:', err.message);
+    return null;
+  }
+};
+
+const dbQuery = async (text, params = []) => {
+  try {
+    return await activePool().query(text, params);
+  } catch (err) {
+    if (isNetworkError(err) && activeSource === 'cloud') {
+      console.log('[DB] Cloud unreachable — falling back to local DB.');
+      activeSource = 'local';
+      const result = await tryLocal(p => p.query(text, params));
+      if (result) return result;
     }
     throw err;
   }
 };
 
-const dbWrite = async (text, params = [], invalidateCacheKey = null) => {
+const dbWrite = async (text, params = []) => {
   try {
-    const result = await pool.query(text, params);
-    isOnline = true;
-    if (invalidateCacheKey) invalidateCache(invalidateCacheKey);
-    return result;
+    return await activePool().query(text, params);
   } catch (err) {
-    if (isNetworkError(err)) {
-      isOnline = false;
+    if (isNetworkError(err) && activeSource === 'cloud') {
+      console.log('[DB] Cloud unreachable on write — falling back to local DB.');
+      activeSource = 'local';
+      const result = await tryLocal(p => p.query(text, params));
+      if (result) return result;
       enqueue({ type: 'query', text, params });
-      if (invalidateCacheKey) invalidateCache(invalidateCacheKey);
       return { rows: [], queued: true };
     }
     throw err;
@@ -201,12 +149,12 @@ const getPool = () => ({
   query: (text, params) => dbQuery(text, params),
   connect: async () => {
     try {
-      const client = await pool.connect();
-      return client;
+      return await activePool().connect();
     } catch (err) {
-      if (isNetworkError(err)) {
-        isOnline = false;
-        console.error('[DB] Cannot connect — offline.');
+      if (isNetworkError(err) && activeSource === 'cloud' && localPool) {
+        console.log('[DB] Cloud connect failed — falling back to local DB.');
+        activeSource = 'local';
+        return await localPool.connect();
       }
       throw err;
     }
@@ -215,39 +163,53 @@ const getPool = () => ({
 
 const checkConnection = async () => {
   try {
-    await pool.query('SELECT 1');
-    if (!isOnline) {
-      isOnline = true;
-      console.log('[DB] Connection restored — flushing write queue...');
-      await flushQueue();
+    await cloudPool.query('SELECT 1');
+    if (activeSource !== 'cloud') {
+      console.log('[DB] Cloud restored — switching back from local DB.');
+      activeSource = 'cloud';
+      if (writeQueue.length > 0) await flushQueue();
     }
   } catch {
-    if (isOnline) {
-      isOnline = false;
-      console.log('[DB] Connection lost — switching to cache mode.');
+    if (activeSource === 'cloud') {
+      if (localPool) {
+        try {
+          await localPool.query('SELECT 1');
+          console.log('[DB] Cloud lost — switched to local DB fallback.');
+          activeSource = 'local';
+        } catch {
+          console.log('[DB] Both cloud and local unreachable.');
+        }
+      } else {
+        console.log('[DB] Cloud lost — no local DB configured.');
+      }
     }
   }
 };
 
 const initDB = async () => {
   try {
-    await pool.query('SELECT 1');
-    isOnline = true;
+    await cloudPool.query('SELECT 1');
+    activeSource = 'cloud';
     console.log('[DB] Connected to Render (cloud) database.');
-
     if (writeQueue.length > 0) {
-      console.log(`[Queue] Found ${writeQueue.length} queued operation(s) from previous session — flushing...`);
+      console.log(`[Queue] Found ${writeQueue.length} queued operation(s) — flushing...`);
       await flushQueue();
     }
   } catch {
-    isOnline = false;
-    console.log('[DB] Render unreachable — starting in cache/offline mode.');
-    if (writeQueue.length > 0) {
-      console.log(`[Queue] ${writeQueue.length} operation(s) waiting to be flushed when online.`);
+    console.log('[DB] Render unreachable — trying local DB...');
+    if (localPool) {
+      try {
+        await localPool.query('SELECT 1');
+        activeSource = 'local';
+        console.log('[DB] Connected to local database (fallback mode — no sync).');
+      } catch {
+        console.log('[DB] Local DB also unreachable.');
+      }
+    } else {
+      console.log('[DB] No LOCAL_DATABASE_URL configured.');
     }
   }
-
   setInterval(checkConnection, 15_000);
 };
 
-module.exports = { getPool, initDB, dbQuery, dbWrite, setCache, getCache, invalidateCache };
+module.exports = { getPool, initDB, dbQuery, dbWrite };

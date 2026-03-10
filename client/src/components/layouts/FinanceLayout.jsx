@@ -1,20 +1,25 @@
-import React from "react";
+import React, { useState } from "react";
 import { Outlet } from "react-router-dom";
-import FinanceSidebar from "../sidebars/FinanceSidebar"; 
+import FinanceSidebar from "../sidebars/FinanceSidebar";
 import FinanceRightSidebar from "../sidebars/FinanceRightSideBar";
 
 export default function FinanceLayout() {
+  const [pendingCompose, setPendingCompose] = useState(null);
+
   return (
     <div className="flex min-h-screen w-screen bg-gray-50">
-      <FinanceSidebar /> 
+      <FinanceSidebar />
 
       <div className="flex-1 flex flex-col">
-        
         <main className="p-8 lg:p-12">
-          <Outlet />
+          <Outlet context={{ onCompose: (data) => setPendingCompose(data) }} />
         </main>
       </div>
-            <FinanceRightSidebar />
+
+      <FinanceRightSidebar
+        pendingCompose={pendingCompose}
+        onComposeHandled={() => setPendingCompose(null)}
+      />
     </div>
   );
 }
