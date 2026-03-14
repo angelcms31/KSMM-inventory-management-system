@@ -32,7 +32,6 @@ const ManageArtisan = () => {
   };
 
   useEffect(() => { fetchArtisans(); }, []);
-
   useEffect(() => { setCurrentPage(0); }, [searchTerm]);
 
   const filteredArtisans = allArtisans.filter(a => {
@@ -40,13 +39,17 @@ const ManageArtisan = () => {
     const term = searchTerm.trim().toLowerCase();
     const firstName = (a.first_name || '').toLowerCase();
     const lastName = (a.last_name || '').toLowerCase();
+    const email = (a.email || '').toLowerCase();
+    const contactNo = (a.contact_no || '').toLowerCase();
     const dept = (a.department || '').toLowerCase();
     const arId = `ar-${a.artisan_id}`;
     return (
       firstName.startsWith(term) ||
       lastName.startsWith(term) ||
       arId.startsWith(term) ||
-      dept.startsWith(term)
+      dept.startsWith(term) ||
+      email.includes(term) ||
+      contactNo.includes(term)
     );
   });
 
@@ -74,8 +77,16 @@ const ManageArtisan = () => {
     else setFormData({ ...formData, [field]: value });
   };
 
+  const handlePhoneChange = (value, isEdit = false) => {
+    if (!/^\d*$/.test(value)) return;
+    if (value.length > 10) return;
+    if (isEdit) setSelectedArtisan({ ...selectedArtisan, contactNo: value });
+    else setFormData({ ...formData, contactNo: value });
+  };
+
   const handleAddArtisan = async (e) => {
     e.preventDefault();
+    if (formData.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
     try {
       await axios.post("http://localhost:5000/api/add_artisan", {
         first_name: formData.firstName,
@@ -90,7 +101,10 @@ const ManageArtisan = () => {
       setFormData(initialFormState);
       fetchArtisans();
       alert("Artisan added successfully!");
-    } catch (err) { alert("Error adding artisan"); }
+    } catch (err) {
+      const msg = err.response?.data?.message || "Error adding artisan";
+      alert(msg);
+    }
   };
 
   const handleEditClick = (artisan) => {
@@ -111,6 +125,7 @@ const ManageArtisan = () => {
 
   const handleUpdateArtisan = async (e) => {
     e.preventDefault();
+    if (selectedArtisan.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
     try {
       await axios.put(`http://localhost:5000/api/artisans/${selectedArtisan.artisan_id}`, {
         first_name: selectedArtisan.firstName,
@@ -125,7 +140,10 @@ const ManageArtisan = () => {
       setShowEditModal(false);
       fetchArtisans();
       alert("Artisan updated successfully!");
-    } catch (err) { alert("Update failed"); }
+    } catch (err) {
+      const msg = err.response?.data?.message || "Update failed";
+      alert(msg);
+    }
   };
 
   const toggleStatus = async (artisan) => {
@@ -152,7 +170,7 @@ const ManageArtisan = () => {
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
-            placeholder="Search by name, ID, or department..."
+            placeholder="Search by name, email, contact, ID, or department..."
             className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -203,7 +221,7 @@ const ManageArtisan = () => {
                   <p className="font-black text-black text-xs mb-3 pb-2 border-b border-gray-200">AR-{artisan.artisan_id}</p>
                   <div className="space-y-2">
                     <p className="flex items-center gap-2 text-black text-xs truncate"><HiOutlineMail size={18}/>{artisan.email}</p>
-                    <p className="flex items-center gap-2 text-black text-xs"><HiOutlinePhone size={18}/>{artisan.contact_no || 'No Contact'}</p>
+                    <p className="flex items-center gap-2 text-black text-xs"><HiOutlinePhone size={18}/>{artisan.contact_no ? `+63 ${artisan.contact_no}` : 'No Contact'}</p>
                   </div>
                 </div>
               </div>
@@ -242,8 +260,8 @@ const ManageArtisan = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Department</label>
-                    <select 
-                      required 
+                    <select
+                      required
                       className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200 appearance-none cursor-pointer"
                       value={showAddModal ? formData.department : selectedArtisan?.department}
                       onChange={e => showAddModal ? setFormData({...formData, department: e.target.value}) : setSelectedArtisan({...selectedArtisan, department: e.target.value})}
@@ -276,7 +294,20 @@ const ManageArtisan = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Contact No.</label>
-                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo} onChange={e => { if (/^\d*$/.test(e.target.value)) showAddModal ? setFormData({...formData, contactNo: e.target.value}) : setSelectedArtisan({...selectedArtisan, contactNo: e.target.value}) }} />
+                    <div className="flex items-center bg-[#F3F4F6] rounded-2xl overflow-hidden">
+                      <span className="px-3 text-sm font-black text-slate-500 border-r border-slate-300 py-4 flex-shrink-0">+63</span>
+                      <input
+                        required
+                        className="flex-1 bg-transparent p-4 outline-none font-bold text-sm"
+                        placeholder="9XXXXXXXXX"
+                        maxLength={10}
+                        value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo}
+                        onChange={e => handlePhoneChange(e.target.value, showEditModal)}
+                      />
+                      <span className="pr-3 text-[10px] font-black text-slate-400 flex-shrink-0">
+                        {(showAddModal ? formData.contactNo : selectedArtisan?.contactNo || '').length}/10
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

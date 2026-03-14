@@ -21,6 +21,7 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingRole, setPendingRole] = useState(null);
+  const [defaultPassword, setDefaultPassword] = useState("");
 
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
@@ -74,6 +75,7 @@ export default function Login() {
         if (is_default_password) {
           setPendingUserId(user_id);
           setPendingRole(role);
+          setDefaultPassword(localPassword);
           setShowChangePassword(true);
           return;
         }
@@ -89,6 +91,12 @@ export default function Login() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
+
+    if (newPassword === defaultPassword) {
+      setError(true);
+      setErrorMessage("Please enter a different password.");
+      return;
+    }
 
     if (newPassword.length < 8) {
       setError(true);

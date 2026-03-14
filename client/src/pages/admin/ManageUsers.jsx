@@ -44,12 +44,16 @@ const ManageUsers = () => {
     const firstName = (u.firstname || '').toLowerCase();
     const middleName = (u.middlename || '').toLowerCase();
     const lastName = (u.lastname || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const contactNo = (u.contact_no || '').toLowerCase();
     const idPrefix = (u.user_role || "US").substring(0, 2).toUpperCase();
     const displayId = `${idPrefix}-${u.permanent_id || '0'}`.toLowerCase();
     return (
       firstName.startsWith(term) ||
       middleName.startsWith(term) ||
       lastName.startsWith(term) ||
+      email.includes(term) ||
+      contactNo.includes(term) ||
       displayId.startsWith(term)
     );
   });
@@ -96,6 +100,7 @@ const ManageUsers = () => {
 
   const handlePhoneChange = (value, isEdit = false) => {
     if (!/^\d*$/.test(value)) return;
+    if (value.length > 10) return;
     if (isEdit) setSelectedUser({ ...selectedUser, contactNo: value });
     else setFormData({ ...formData, contactNo: value });
   };
@@ -103,13 +108,17 @@ const ManageUsers = () => {
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (!formData.email.includes('@')) { alert("Email must contain @"); return; }
+    if (formData.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
     try {
       await axios.post("http://localhost:5000/api/add_user", formData);
       setShowAddModal(false);
       setFormData(initialFormState);
       fetchUsers();
       alert("User added successfully!");
-    } catch (err) { alert("Error adding user"); }
+    } catch (err) {
+      const msg = err.response?.data?.message || "Error adding user";
+      alert(msg);
+    }
   };
 
   const handleEditClick = (user) => {
@@ -125,6 +134,7 @@ const ManageUsers = () => {
       role: user.user_role || '',
       gender: user.gender || 'Male',
       profileImage: user.profile_image || '',
+      originalEmail: user.email || '',
       displayId
     });
     setShowEditModal(true);
@@ -134,6 +144,7 @@ const ManageUsers = () => {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     if (!selectedUser.email.includes('@')) { alert("Email must contain @"); return; }
+    if (selectedUser.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
     try {
       await axios.put("http://localhost:5000/api/user/update", {
         firstName: selectedUser.firstName,
@@ -144,12 +155,15 @@ const ManageUsers = () => {
         role: selectedUser.role,
         gender: selectedUser.gender,
         profileImage: selectedUser.profileImage,
-        originalEmail: selectedUser.originalEmail || selectedUser.email
+        originalEmail: selectedUser.originalEmail
       });
       setShowEditModal(false);
       fetchUsers();
       alert("User updated successfully!");
-    } catch (err) { alert("Update failed"); }
+    } catch (err) {
+      const msg = err.response?.data?.message || "Update failed";
+      alert(msg);
+    }
   };
 
   const handleUnlock = async (user) => {
@@ -168,16 +182,24 @@ const ManageUsers = () => {
   const toggleStatus = async (user) => {
     const currentStatus = user.status || user.Status;
     const newStatus = currentStatus === 'Active' ? 'Deactivated' : 'Active';
+    const currentUserId = localStorage.getItem("user_id");
+    if (newStatus === 'Deactivated' && String(user.user_id) === String(currentUserId)) {
+      alert("You cannot deactivate your own account.");
+      return;
+    }
     try {
       await axios.put("http://localhost:5000/api/user/status", { 
         userId: user.user_id, 
         status: newStatus,
-        adminId: localStorage.getItem("user_id"),
+        adminId: currentUserId,
         adminRole: localStorage.getItem("role")
       });
       fetchUsers();
       setActiveMenu(null);
-    } catch (err) { alert("Error updating status"); }
+    } catch (err) {
+      const msg = err.response?.data?.message || "Error updating status";
+      alert(msg);
+    }
   };
 
   if (loading) return <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">Loading...</div>;
@@ -189,7 +211,7 @@ const ManageUsers = () => {
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             type="text" 
-            placeholder="Search by name or ID..." 
+            placeholder="Search by name, email, contact, or ID..." 
             className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -284,7 +306,7 @@ const ManageUsers = () => {
                         </p>
                         <p className="flex items-center gap-2 text-black text-xs font-normal">
                           <HiOutlinePhone size={18} className="text-black flex-shrink-0"/> 
-                          {user.contact_no || 'No Contact'}
+                          {user.contact_no ? `+63 ${user.contact_no}` : 'No Contact'}
                         </p>
                       </div>
                     </div>
@@ -320,7 +342,17 @@ const ManageUsers = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.contactNo : selectedUser?.contactNo} onChange={e => handlePhoneChange(e.target.value, showEditModal)} />
+                  <div className="flex items-center bg-[#F3F4F6] rounded-xl overflow-hidden">
+                    <span className="px-3 text-sm font-black text-slate-500 border-r border-slate-300 py-3 flex-shrink-0">+63</span>
+                    <input
+                      required
+                      className="flex-1 bg-transparent p-3 outline-none font-bold text-sm"
+                      placeholder="9XXXXXXXXX"
+                      maxLength={10}
+                      value={showAddModal ? formData.contactNo : selectedUser?.contactNo}
+                      onChange={e => handlePhoneChange(e.target.value, showEditModal)}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>

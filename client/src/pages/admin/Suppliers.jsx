@@ -51,9 +51,10 @@ const Suppliers = () => {
 
   const sortedAndFilteredSuppliers = useMemo(() => {
     return [...suppliers]
-      .filter(sup => 
+      .filter(sup =>
         sup.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sup.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sup.contact_no?.includes(searchTerm) ||
         sup.supplier_id?.toString().includes(searchTerm)
       )
       .sort((a, b) => {
@@ -75,19 +76,20 @@ const Suppliers = () => {
 
   const getStatusStyle = (status) => {
     switch (status) {
-      case "Active": 
-      case "Received": 
-      case "Delivered": return "bg-emerald-500"; 
-      case "Deactivated": 
+      case "Active":
+      case "Received":
+      case "Delivered": return "bg-emerald-500";
+      case "Deactivated":
       case "Cancelled": return "bg-rose-500";
-      case "Pending": return "bg-amber-500"; 
-      case "Approved": return "bg-blue-600"; 
+      case "Pending": return "bg-amber-500";
+      case "Approved": return "bg-blue-600";
       default: return "bg-slate-400";
     }
   };
 
   const handleContactInput = (val, isUpdate = false) => {
     const cleanVal = val.replace(/[^0-9]/g, '');
+    if (cleanVal.length > 10) return;
     if (isUpdate) setUpdateFormData({ ...updateFormData, contact_no: cleanVal });
     else setAddFormData({ ...addFormData, contact_no: cleanVal });
   };
@@ -112,24 +114,32 @@ const Suppliers = () => {
 
   const handleAddSupplier = async (e) => {
     e.preventDefault();
+    if (addFormData.contact_no.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
     try {
-      await axios.post("http://localhost:5000/api/add_supplier", addFormData);
+      await axios.post("http://localhost:5000/api/add_supplier", {
+        name: addFormData.name,
+        email: addFormData.email,
+        phone: addFormData.contact_no
+      });
       setShowAddModal(false);
       setAddFormData({ name: '', email: '', contact_no: '' });
       fetchData();
     } catch (err) {
-      alert("Error adding supplier");
+      const msg = err.response?.data?.message || "Error adding supplier";
+      alert(msg);
     }
   };
 
   const handleUpdateSupplier = async (e) => {
     e.preventDefault();
+    if (updateFormData.contact_no.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
     try {
       await axios.put(`http://localhost:5000/api/suppliers/${selectedSupplier.supplier_id}`, updateFormData);
       setShowUpdateModal(false);
       fetchData();
     } catch (err) {
-      alert("Error updating supplier");
+      const msg = err.response?.data?.message || "Error updating supplier";
+      alert(msg);
     }
   };
 
@@ -140,7 +150,7 @@ const Suppliers = () => {
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input type="text" placeholder="Search..." className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs" value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(0);}} />
+          <input type="text" placeholder="Search by name, email or contact..." className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs" value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(0);}} />
         </div>
       </div>
 
@@ -200,7 +210,7 @@ const Suppliers = () => {
                   </div>
                   <div className="space-y-1 mb-5">
                     <p className="flex items-center gap-2 text-[9px] font-bold text-slate-500 truncate" title={sup.email}><HiOutlineMail size={12} className="text-slate-300 flex-shrink-0"/> {sup.email}</p>
-                    <p className="flex items-center gap-2 text-[9px] font-bold text-slate-500"><HiOutlinePhone size={12} className="text-slate-300 flex-shrink-0"/> {sup.contact_no}</p>
+                    <p className="flex items-center gap-2 text-[9px] font-bold text-slate-500"><HiOutlinePhone size={12} className="text-slate-300 flex-shrink-0"/> {sup.contact_no ? `+63 ${sup.contact_no}` : 'No Contact'}</p>
                   </div>
                   <div className="flex gap-2 mt-auto">
                     <button disabled={sup.status === 'Deactivated'} onClick={() => { setSelectedSupplier(sup); setShowHistoryModal(true); }} className="flex-1 text-[8px] font-black py-2 rounded-xl border border-slate-100 bg-slate-50 text-slate-400 uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50">History</button>
@@ -299,12 +309,28 @@ const Suppliers = () => {
             <button onClick={() => { setShowAddModal(false); setShowUpdateModal(false); }} className="absolute top-10 right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"><HiX size={28}/></button>
             <h2 className="text-4xl font-black text-slate-900 uppercase mb-8 tracking-tighter leading-none">{showAddModal ? "Add Supplier" : "Update Supplier"}</h2>
             <form onSubmit={showAddModal ? handleAddSupplier : handleUpdateSupplier} className="space-y-6">
-              <div className="space-y-1"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Name</label>
-              <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? addFormData.name : updateFormData.name} onChange={e => handleNameInput(e.target.value, !showAddModal)} /></div>
-              <div className="space-y-1"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>
-              <input required type="email" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? addFormData.email : updateFormData.email} onChange={e => showAddModal ? setAddFormData({...addFormData, email: e.target.value}) : setUpdateFormData({...updateFormData, email: e.target.value})} /></div>
-              <div className="space-y-1"><label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
-              <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? addFormData.contact_no : updateFormData.contact_no} onChange={e => handleContactInput(e.target.value, !showAddModal)} /></div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Name</label>
+                <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? addFormData.name : updateFormData.name} onChange={e => handleNameInput(e.target.value, !showAddModal)} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>
+                <input required type="email" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? addFormData.email : updateFormData.email} onChange={e => showAddModal ? setAddFormData({...addFormData, email: e.target.value}) : setUpdateFormData({...updateFormData, email: e.target.value})} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
+                <div className="flex items-center bg-[#F3F4F6] rounded-2xl overflow-hidden">
+                  <span className="px-3 text-sm font-black text-slate-500 border-r border-slate-300 py-4 flex-shrink-0">+63</span>
+                  <input
+                    required
+                    className="flex-1 bg-transparent p-4 outline-none font-bold text-sm"
+                    placeholder="9XXXXXXXXX"
+                    maxLength={10}
+                    value={showAddModal ? addFormData.contact_no : updateFormData.contact_no}
+                    onChange={e => handleContactInput(e.target.value, !showAddModal)}
+                  />
+                </div>
+              </div>
               <div className="flex gap-4 pt-4 justify-end">
                 <button type="button" onClick={() => { setShowAddModal(false); setShowUpdateModal(false); }} className="px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button>
                 <button type="submit" className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm</button>
