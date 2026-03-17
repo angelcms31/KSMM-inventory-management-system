@@ -16,6 +16,7 @@ export default function Inventory() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [completeOrder, setCompleteOrder] = useState(null);
   const [completeActuals, setCompleteActuals] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const [editForm, setEditForm] = useState({
     sku: '', quantity: '', category: '', target_date: '',
@@ -84,10 +85,17 @@ export default function Inventory() {
 
   const handleCompleteSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     if (completeActuals.length === 0) {
-      alert('Please add at least one material entry.');
+      alert('No materials found for this work order.');
       return;
     }
+    const hasInvalid = completeActuals.some(m => !m.actual_qty || parseInt(m.actual_qty) < 1);
+    if (hasInvalid) {
+      alert('All actual quantities must be at least 1.');
+      return;
+    }
+    setSubmitting(true);
     try {
       await axios.put(`http://localhost:5000/api/work_orders/${completeOrder.work_order_id}/complete`, {
         actualMaterials: completeActuals.map(m => ({
@@ -102,6 +110,8 @@ export default function Inventory() {
       fetchData();
     } catch (err) {
       alert('Error: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -196,7 +206,9 @@ export default function Inventory() {
     }
   };
 
-  const activeOrders = workOrders.filter(o => o.status === 'In Production' || o.status === 'Complete');
+  const activeOrders = workOrders.filter(o =>
+    o.status === 'In Production' || o.status === 'Quality Control' || o.status === 'Complete'
+  );
 
   const filteredOrders = activeOrders.filter(order => {
     const cat = getCategoryBySku(order.sku) || order.department || '';
@@ -207,8 +219,8 @@ export default function Inventory() {
   });
 
   return (
-    <div className="w-full flex flex-col font-sans antialiased text-slate-900">
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
+    <div className="w-full h-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden">
+      <div className="flex-shrink-0 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input
@@ -226,126 +238,131 @@ export default function Inventory() {
         >
           <option value="All Status">All Status</option>
           <option value="In Production">In Production</option>
+          <option value="Quality Control">Quality Control</option>
           <option value="Complete">Complete</option>
         </select>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col mb-10 text-left">
-        <div className="flex justify-between items-center mb-8 px-2">
-          <div>
-            <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Production Orders</h1>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Active Work Orders</p>
-          </div>
-          <div className="flex items-center gap-3">
+      <div className="flex-1 overflow-y-auto pb-10 min-h-0">
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col text-left">
+          <div className="flex justify-between items-center mb-8 px-2 flex-shrink-0">
+            <div>
+              <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Production Orders</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Active Work Orders</p>
+            </div>
             <div className="flex gap-2 text-[10px] font-black uppercase">
               <span className="px-3 py-1.5 rounded-lg bg-[#1D7A1D] text-white">
                 {workOrders.filter(o => o.status === 'In Production').length} In Production
+              </span>
+              <span className="px-3 py-1.5 rounded-lg bg-black text-white">
+                {workOrders.filter(o => o.status === 'Quality Control').length} QC
               </span>
               <span className="px-3 py-1.5 rounded-lg bg-[#002B5B] text-white">
                 {workOrders.filter(o => o.status === 'Complete').length} Complete
               </span>
             </div>
           </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-separate border-spacing-y-4">
-            <thead>
-              <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
-                <th className="pb-2 text-left pl-6 w-[30%]">Product Details</th>
-                <th className="pb-2 text-left w-[18%]">Artisan</th>
-                <th className="pb-2 text-left w-[12%]">Category</th>
-                <th className="pb-2 text-center w-[15%]">Status</th>
-                <th className="pb-2 text-center w-[12%]">Total Cost</th>
-                <th className="pb-2 text-right pr-8">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="font-bold text-slate-700">
-              {filteredOrders.map((order) => {
-                const isComplete = order.status === 'Complete';
-                const displayCategory = getCategoryBySku(order.sku) || order.department || 'N/A';
-                return (
-                  <tr key={order.work_order_id} className="group hover:bg-slate-50/80 transition-all">
-                    <td className="py-4 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
-                          {order.product_image
-                            ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" />
-                            : <HiPhoto size={24} className="text-slate-200" />
-                          }
-                        </div>
-                        <div className="flex flex-col items-start min-w-0">
-                          <span className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate max-w-[200px]">
-                            {getProductName(order.sku)}
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider">{order.sku}</span>
-                            <span className="text-slate-300 text-[10px]">•</span>
-                            <span className="text-slate-400 text-[10px] font-bold uppercase whitespace-nowrap">{order.quantity_needed} Units</span>
+          <div className="overflow-x-auto">
+            <table className="w-full border-separate border-spacing-y-4">
+              <thead>
+                <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                  <th className="pb-2 text-left pl-6 w-[28%]">Product Details</th>
+                  <th className="pb-2 text-left w-[16%]">Artisan</th>
+                  <th className="pb-2 text-left w-[10%]">Category</th>
+                  <th className="pb-2 text-center w-[13%]">Status</th>
+                  <th className="pb-2 text-center w-[11%]">Total Cost</th>
+                  <th className="pb-2 text-right pr-8">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="font-bold text-slate-700">
+                {filteredOrders.map((order) => {
+                  const isComplete = order.status === 'Complete';
+                  const isQC = order.status === 'Quality Control';
+                  const displayCategory = getCategoryBySku(order.sku) || order.department || 'N/A';
+                  return (
+                    <tr key={order.work_order_id} className="group hover:bg-slate-50/80 transition-all">
+                      <td className="py-4 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
+                            {order.product_image
+                              ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" />
+                              : <HiPhoto size={24} className="text-slate-200" />
+                            }
+                          </div>
+                          <div className="flex flex-col items-start min-w-0">
+                            <span className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate max-w-[200px]">
+                              {getProductName(order.sku)}
+                            </span>
+                            <div className="flex items-center gap-1.5 max-w-[200px]">
+                              <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider truncate max-w-[120px]">{order.sku}</span>
+                              <span className="text-slate-300 text-[10px] flex-shrink-0">•</span>
+                              <span className="text-slate-400 text-[10px] font-bold uppercase whitespace-nowrap flex-shrink-0">{order.quantity_needed} Units</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-4 text-left text-slate-700 text-sm border-y border-transparent group-hover:border-slate-100">
-                      {order.first_name && order.last_name
-                        ? `${order.first_name} ${order.last_name}`
-                        : <span className="text-slate-300 italic text-xs">Unassigned</span>
-                      }
-                    </td>
-                    <td className="py-4 text-left text-slate-400 text-[10px] uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest">
-                      {displayCategory}
-                    </td>
-                    <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100">
-                      <span className={`px-4 py-1.5 rounded-xl text-[10px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="py-4 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100">
-                      ₱{Number(order.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-4 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
-                      <div className="flex justify-end gap-2">
-                        {!isComplete && (
+                      </td>
+                      <td className="py-4 text-left text-slate-700 text-sm border-y border-transparent group-hover:border-slate-100">
+                        {order.first_name && order.last_name
+                          ? `${order.first_name} ${order.last_name}`
+                          : <span className="text-slate-300 italic text-xs">Unassigned</span>
+                        }
+                      </td>
+                      <td className="py-4 text-left text-slate-400 text-[10px] uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest">
+                        {displayCategory}
+                      </td>
+                      <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100">
+                        <span className={`px-4 py-1.5 rounded-xl text-[10px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="py-4 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100">
+                        ₱{Number(order.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-4 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
+                        <div className="flex justify-end gap-2">
+                          {isQC && (
+                            <button
+                              onClick={() => handleOpenComplete(order)}
+                              title="Mark as Complete"
+                              className="p-3 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-2xl transition-all border border-emerald-100"
+                            >
+                              <HiCheckCircle size={18} />
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleOpenComplete(order)}
-                            title="Mark as Complete"
-                            className="p-3 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-2xl transition-all border border-emerald-100"
+                            onClick={() => handleOpenEdit(order)}
+                            disabled={isComplete}
+                            className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isComplete ? 'opacity-30 cursor-not-allowed' : ''}`}
                           >
-                            <HiCheckCircle size={18} />
+                            <HiPencil size={18} />
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleOpenEdit(order)}
-                          disabled={isComplete}
-                          className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isComplete ? 'opacity-30 cursor-not-allowed' : ''}`}
-                        >
-                          <HiPencil size={18} />
-                        </button>
-                      </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredOrders.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
+                      No Work Orders Found
                     </td>
                   </tr>
-                );
-              })}
-              {filteredOrders.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
-                    No Work Orders Found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {showCompleteModal && completeOrder && (
         <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
           <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 relative shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex justify-between items-start mb-6">
+            <div className="flex justify-between items-start mb-6 flex-shrink-0">
               <div>
                 <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Complete Work Order</h2>
-                <p className="text-slate-400 font-bold mt-1 text-xs uppercase tracking-wider">
-                  WO-{completeOrder.work_order_id} · {completeOrder.sku} · {getProductName(completeOrder.sku)}
+                <p className="text-slate-400 font-bold mt-1 text-xs uppercase tracking-wider truncate max-w-[420px]">
+                  WO-{completeOrder.work_order_id} · {completeOrder.sku.length > 20 ? completeOrder.sku.slice(0, 20) + '...' : completeOrder.sku} · {getProductName(completeOrder.sku).length > 25 ? getProductName(completeOrder.sku).slice(0, 25) + '...' : getProductName(completeOrder.sku)}
                 </p>
               </div>
               <button
@@ -359,7 +376,7 @@ export default function Inventory() {
             <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 mb-6 flex gap-6 flex-shrink-0">
               <div>
                 <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Product</p>
-                <p className="text-sm font-black text-slate-900">{getProductName(completeOrder.sku)}</p>
+                <p className="text-sm font-black text-slate-900 truncate max-w-[160px]">{getProductName(completeOrder.sku)}</p>
               </div>
               <div>
                 <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Artisan</p>
@@ -373,15 +390,12 @@ export default function Inventory() {
 
             <form onSubmit={handleCompleteSubmit} className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1">
               <div className="mb-3">
-                <div className="flex justify-between items-center mb-2">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
-                      Enter actual quantities — variance will be logged for Finance
-                    </p>
-                  </div>
+                <div className="mb-2">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                    Enter actual quantities — variance will be logged for Finance
+                  </p>
                 </div>
-
                 <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
                   <table className="w-full text-left text-xs border-separate border-spacing-0">
                     <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black sticky top-0 z-10">
@@ -404,14 +418,15 @@ export default function Inventory() {
                             <td className="p-3 text-center">
                               <input
                                 type="number"
-                                min="0"
+                                min="1"
                                 step="1"
                                 required
                                 className="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg py-1.5 outline-none font-black text-[11px] focus:border-black transition-colors"
                                 value={item.actual_qty}
                                 onChange={e => {
+                                  const val = parseInt(e.target.value);
                                   const updated = [...completeActuals];
-                                  updated[index].actual_qty = parseInt(e.target.value) || 0;
+                                  updated[index].actual_qty = isNaN(val) ? '' : Math.max(1, val);
                                   setCompleteActuals(updated);
                                 }}
                               />
@@ -434,7 +449,6 @@ export default function Inventory() {
                     </tbody>
                   </table>
                 </div>
-
                 <div className="mt-3 flex gap-3">
                   {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) > 0) && (
                     <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-4 py-2">
@@ -465,9 +479,10 @@ export default function Inventory() {
                   </button>
                   <button
                     type="submit"
-                    className="px-10 py-3 bg-[#002B5B] text-white rounded-xl uppercase text-[10px] font-black shadow-xl hover:bg-blue-900 transition-all tracking-widest"
+                    disabled={submitting}
+                    className="px-10 py-3 bg-[#002B5B] text-white rounded-xl uppercase text-[10px] font-black shadow-xl hover:bg-blue-900 transition-all tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Confirm & Complete
+                    {submitting ? 'Completing...' : 'Confirm & Complete'}
                   </button>
                 </div>
               </div>
@@ -479,10 +494,10 @@ export default function Inventory() {
       {showEditModal && (
         <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
           <div className="bg-white rounded-[3rem] w-full max-w-4xl p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-100">
-            <div className="flex justify-between items-start mb-6">
+            <div className="flex justify-between items-start mb-6 flex-shrink-0">
               <div>
                 <h2 className="text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Update Record</h2>
-                <p className="text-slate-400 font-bold mt-1 tracking-tight text-xs uppercase">WO-{selectedOrder?.work_order_id} · {selectedOrder?.sku}</p>
+                <p className="text-slate-400 font-bold mt-1 tracking-tight text-xs uppercase truncate max-w-[400px]">WO-{selectedOrder?.work_order_id} · {selectedOrder?.sku?.length > 25 ? selectedOrder.sku.slice(0, 25) + '...' : selectedOrder?.sku}</p>
               </div>
               <div className="flex items-center gap-4">
                 <select
@@ -499,7 +514,7 @@ export default function Inventory() {
             </div>
 
             <form onSubmit={handleUpdate} className="flex-1 flex flex-col min-h-0">
-              <div className="grid grid-cols-2 gap-8 mb-6 overflow-y-auto pr-2 no-scrollbar">
+              <div className="grid grid-cols-2 gap-8 mb-6 overflow-y-auto pr-2 no-scrollbar flex-1">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
@@ -522,17 +537,13 @@ export default function Inventory() {
                     <div className="space-y-1 text-left">
                       <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Quantity</label>
                       <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        required
+                        type="number" min="1" step="1" required
                         className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
                         value={editForm.quantity}
                         onChange={e => setEditForm({ ...editForm, quantity: e.target.value })}
                       />
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
                       <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Category</label>
@@ -559,7 +570,6 @@ export default function Inventory() {
                       />
                     </div>
                   </div>
-
                   <div className="space-y-1 text-left">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assigned Artisan</label>
                     <select
@@ -588,8 +598,7 @@ export default function Inventory() {
                       <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                     </div>
                   </div>
-
-                  <div className="flex-1 flex flex-col">
+                  <div className="flex-1 flex flex-col min-h-0">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="text-base font-black text-slate-800 uppercase tracking-tighter">Raw Materials</h3>
                       <button type="button" onClick={addMaterialRow} className="bg-black text-white p-1.5 rounded-lg hover:scale-110 transition-all shadow-lg">
@@ -623,9 +632,7 @@ export default function Inventory() {
                               </td>
                               <td className="p-2 text-center">
                                 <input
-                                  type="number"
-                                  min="1"
-                                  step="1"
+                                  type="number" min="1" step="1"
                                   className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[11px]"
                                   value={item.qty}
                                   onChange={e => handleMaterialChange(index, 'qty', e.target.value)}
@@ -656,7 +663,7 @@ export default function Inventory() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0">
+              <div className="flex justify-between items-center pt-4 border-t border-slate-100 flex-shrink-0">
                 <div className="flex items-center gap-6">
                   <span className="text-slate-400 font-black uppercase text-[9px] tracking-[0.2em]">Estimated Cost</span>
                   <span className="text-3xl font-black text-emerald-600 tracking-tighter italic">

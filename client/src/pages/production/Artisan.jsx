@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
   HiMagnifyingGlass, HiPlusSmall, HiXMark, HiPhoto, HiPencil,
-  HiChevronLeft, HiChevronRight, HiTrash
+  HiChevronLeft, HiChevronRight, HiTrash, HiShieldCheck
 } from 'react-icons/hi2';
 
 export default function Artisan() {
@@ -18,10 +18,14 @@ export default function Artisan() {
   const [selectedMatId, setSelectedMatId] = useState(null);
   const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [currentWOPage, setCurrentWOPage] = useState(0);
   const [currentMatPage, setCurrentMatPage] = useState(0);
-  const wosPerPage = 4;
+  const [movingToQC, setMovingToQC] = useState(null);
   const matsPerPage = 5;
+  const cardWidth = 240;
+  const gap = 16;
+
+  const woScrollRef = useRef(null);
+  const ipScrollRef = useRef(null);
 
   const [assignForm, setAssignForm] = useState({
     artisan_id: '', target_date: '', quantity_needed: '', selectedMaterials: []
@@ -63,7 +67,8 @@ export default function Artisan() {
     }
   }, [showMatModal, isUpdateMat]);
 
-  const pendingOrders = workOrders.filter(wo => wo.status === 'Pending');
+  const pendingOrders = workOrders.filter(wo => wo.status === 'Pending' || wo.status === 'pending');
+  const inProductionOrders = workOrders.filter(wo => wo.status === 'In Production');
 
   const filteredPendingOrders = pendingOrders.filter(order => {
     const s = searchTerm.toLowerCase();
@@ -73,10 +78,41 @@ export default function Artisan() {
     );
   });
 
-  const currentWOs = filteredPendingOrders.slice(
-    currentWOPage * wosPerPage,
-    (currentWOPage + 1) * wosPerPage
-  );
+  const filteredIPOrders = inProductionOrders.filter(order => {
+    const s = searchTerm.toLowerCase();
+    return (
+      (order.sku || '').toLowerCase().includes(s) ||
+      getProductName(order.sku).toLowerCase().includes(s) ||
+      (order.first_name || '').toLowerCase().includes(s) ||
+      (order.last_name || '').toLowerCase().includes(s)
+    );
+  });
+
+  const scroll = (ref, direction) => {
+    if (ref.current) {
+      ref.current.scrollBy({ left: direction * (cardWidth + gap) * 2, behavior: 'smooth' });
+    }
+  };
+
+  const handleMoveToQC = async (order) => {
+    setMovingToQC(order.work_order_id);
+    try {
+      await axios.put(`http://localhost:5000/api/work_orders/${order.work_order_id}`, {
+        status: 'Quality Control',
+        artisan_id: order.artisan_id,
+        quantity: order.quantity_needed,
+        sku: order.sku,
+        target_date: order.target_date?.split('T')[0] || '',
+        product_image: order.product_image || null,
+        selectedMaterials: [],
+      });
+      await fetchData();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to move to QC.');
+    } finally {
+      setMovingToQC(null);
+    }
+  };
 
   const handleOpenAssign = (order) => {
     setSelectedPendingOrder(order);
@@ -174,9 +210,76 @@ export default function Artisan() {
 
   const currentMaterials = filteredMaterials.slice(currentMatPage * matsPerPage, (currentMatPage + 1) * matsPerPage);
 
+  const PendingCard = ({ order }) => (
+    <div
+      className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all text-left flex-shrink-0"
+      style={{ width: `${cardWidth}px` }}
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <span className="text-amber-600 text-[8px] font-black uppercase">New</span>
+        </div>
+        <div className="w-12 h-12 rounded-2xl overflow-hidden border bg-slate-50 flex-shrink-0 flex items-center justify-center">
+          {order.product_image ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" /> : <HiPhoto size={18} className="text-slate-200" />}
+        </div>
+      </div>
+      <div className="mb-1 w-full overflow-hidden">
+        <p className="font-black text-xs text-slate-900 leading-tight truncate" title={getProductName(order.sku)}>{getProductName(order.sku)}</p>
+        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 truncate">{order.sku}</p>
+      </div>
+      <div className="w-fit px-2.5 py-0.5 rounded-lg text-[8px] font-bold text-white mb-2 bg-amber-500">Pending</div>
+      <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 mb-3 text-[10px]">
+        <p className="text-slate-700 font-semibold">Qty: <span className="font-black text-slate-900">{order.quantity_needed} units</span></p>
+        <p className="text-slate-400 text-[9px] uppercase font-bold mt-0.5">WO-{order.work_order_id}</p>
+      </div>
+      <button
+        onClick={() => handleOpenAssign(order)}
+        className="w-full py-2 rounded-xl bg-black text-white text-[8px] font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto"
+      >
+        Assign Artisan & Materials
+      </button>
+    </div>
+  );
+
+  const ProductionCard = ({ order }) => (
+    <div
+      className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all text-left flex-shrink-0"
+      style={{ width: `${cardWidth}px` }}
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+          <span className="text-emerald-600 text-[8px] font-black uppercase">Prod</span>
+        </div>
+        <div className="w-12 h-12 rounded-2xl overflow-hidden border bg-slate-50 flex-shrink-0 flex items-center justify-center">
+          {order.product_image ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" /> : <HiPhoto size={18} className="text-slate-200" />}
+        </div>
+      </div>
+      <div className="mb-1 w-full overflow-hidden">
+        <p className="font-black text-xs text-slate-900 leading-tight truncate" title={getProductName(order.sku)}>{getProductName(order.sku)}</p>
+        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 truncate">{order.sku}</p>
+      </div>
+      <div className="w-fit px-2.5 py-0.5 rounded-lg text-[8px] font-bold text-white mb-2 bg-[#1D7A1D]">In Production</div>
+      <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 mb-3 text-[10px]">
+        <p className="text-slate-700 font-semibold">Qty: <span className="font-black text-slate-900">{order.quantity_needed} units</span></p>
+        {order.first_name && (
+          <p className="text-slate-500 text-[9px] font-bold truncate mt-0.5">{order.first_name} {order.last_name}</p>
+        )}
+        <p className="text-slate-400 text-[9px] uppercase font-bold mt-0.5">WO-{order.work_order_id}</p>
+      </div>
+      <button
+        onClick={() => handleMoveToQC(order)}
+        disabled={movingToQC === order.work_order_id}
+        className="w-full py-2 rounded-xl bg-black text-white text-[8px] font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto flex items-center justify-center gap-1.5 disabled:opacity-50"
+      >
+        <HiShieldCheck size={12} />
+        {movingToQC === order.work_order_id ? 'Moving...' : 'Move to Quality Control'}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="w-full flex flex-col font-sans antialiased text-slate-900">
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
+    <div className="w-full h-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden">
+      <div className="flex-shrink-0 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-6 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input
@@ -184,73 +287,103 @@ export default function Artisan() {
             placeholder="Search..."
             className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700"
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentWOPage(0); setCurrentMatPage(0); }}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentMatPage(0); }}
           />
         </div>
       </div>
 
-      <div className="space-y-10 pb-10">
-        <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 h-fit">
-          <div className="flex justify-between items-center mb-8 px-2">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Work Order Requests</h1>
-                {pendingOrders.length > 0 && (
-                  <span className="bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                    {pendingOrders.length} Pending
-                  </span>
-                )}
+      <div className="flex-1 overflow-y-auto space-y-6 pb-10 min-h-0">
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-6 flex flex-col min-h-0">
+            <div className="flex justify-between items-center mb-5 flex-shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-black uppercase text-slate-900 leading-none tracking-tighter">Work Order Requests</h2>
+                  {pendingOrders.length > 0 && (
+                    <span className="bg-amber-500 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      {pendingOrders.length} Pending
+                    </span>
+                  )}
+                </div>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Assign Artisan & Materials</p>
               </div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2 text-left">Assign Artisan & Materials</p>
+              <div className="flex gap-1.5">
+                <button onClick={() => scroll(woScrollRef, -1)} className="p-1.5 rounded-full border border-slate-200 hover:bg-slate-100 transition-all">
+                  <HiChevronLeft size={16} />
+                </button>
+                <button onClick={() => scroll(woScrollRef, 1)} className="p-1.5 rounded-full border border-slate-200 hover:bg-slate-100 transition-all">
+                  <HiChevronRight size={16} />
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => setCurrentWOPage(p => Math.max(p - 1, 0))} disabled={currentWOPage === 0} className="p-2 rounded-full border disabled:opacity-30 transition-all hover:bg-slate-100"><HiChevronLeft size={20} /></button>
-              <button onClick={() => setCurrentWOPage(p => p + 1)} disabled={currentWOPage >= Math.ceil(filteredPendingOrders.length / wosPerPage) - 1} className="p-2 rounded-full border disabled:opacity-30 transition-all hover:bg-slate-100"><HiChevronRight size={20} /></button>
-            </div>
+
+            {filteredPendingOrders.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center py-10 text-slate-300 font-black uppercase text-[9px] tracking-widest">
+                No Pending Work Order Requests
+              </div>
+            ) : (
+              <div
+                ref={woScrollRef}
+                className="flex gap-4 overflow-x-auto pb-1"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {filteredPendingOrders.map(order => <PendingCard key={order.work_order_id} order={order} />)}
+              </div>
+            )}
           </div>
 
-          {filteredPendingOrders.length === 0 ? (
-            <div className="py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">No Pending Work Order Requests</div>
-          ) : (
-            <div className="grid grid-cols-4 gap-6">
-              {currentWOs.map((order) => (
-                <div key={order.work_order_id} className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all text-left">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-amber-600 text-[9px] font-black uppercase">New</span>
-                    </div>
-                    <div className="w-14 h-14 rounded-2xl overflow-hidden border bg-slate-50 flex-shrink-0 flex items-center justify-center">
-                      {order.product_image ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" /> : <HiPhoto size={20} className="text-slate-200" />}
-                    </div>
-                  </div>
-                  <div className="mb-1 w-full">
-                    <p className="font-black text-sm text-slate-900 leading-tight truncate">{getProductName(order.sku)}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{order.sku}</p>
-                  </div>
-                  <div className="w-fit px-3 py-1 rounded-lg text-[9px] font-bold text-white mb-3 bg-amber-500">Pending</div>
-                  <div className="bg-slate-50 border border-slate-100 rounded-[1.5rem] p-3 mb-3 text-[11px]">
-                    <div className="font-semibold space-y-1">
-                      <p className="text-slate-700">Qty Needed: <span className="font-black text-slate-900">{order.quantity_needed} units</span></p>
-                      <p className="text-slate-400 text-[10px] uppercase font-bold">WO-{order.work_order_id}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => handleOpenAssign(order)} className="w-full py-2.5 rounded-xl bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto">
-                    Assign Artisan & Materials
-                  </button>
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-6 flex flex-col min-h-0">
+            <div className="flex justify-between items-center mb-5 flex-shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-black uppercase text-slate-900 leading-none tracking-tighter">In Production</h2>
+                  {inProductionOrders.length > 0 && (
+                    <span className="bg-[#1D7A1D] text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      {inProductionOrders.length} Active
+                    </span>
+                  )}
                 </div>
-              ))}
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Move to Quality Control when ready</p>
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={() => scroll(ipScrollRef, -1)} className="p-1.5 rounded-full border border-slate-200 hover:bg-slate-100 transition-all">
+                  <HiChevronLeft size={16} />
+                </button>
+                <button onClick={() => scroll(ipScrollRef, 1)} className="p-1.5 rounded-full border border-slate-200 hover:bg-slate-100 transition-all">
+                  <HiChevronRight size={16} />
+                </button>
+              </div>
             </div>
-          )}
-        </section>
 
-        <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-10 h-fit">
+            {filteredIPOrders.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center py-10 text-slate-300 font-black uppercase text-[9px] tracking-widest">
+                No Orders In Production
+              </div>
+            ) : (
+              <div
+                ref={ipScrollRef}
+                className="flex gap-4 overflow-x-auto pb-1"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {filteredIPOrders.map(order => <ProductionCard key={order.work_order_id} order={order} />)}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-10">
           <div className="flex justify-between items-center mb-10 text-slate-900 px-2">
             <div>
               <h1 className="text-3xl font-black uppercase tracking-tighter leading-none text-left">Raw Materials</h1>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2 text-left">Inventory Management</p>
             </div>
             <div className="flex items-center gap-4">
-              <select className="bg-[#F8F9FA] border-none rounded-xl py-2 px-3 font-bold text-slate-500 outline-none text-xs cursor-pointer" value={filterInvStatus} onChange={(e) => setFilterInvStatus(e.target.value)}>
+              <select
+                className="bg-[#F8F9FA] border-none rounded-xl py-2 px-3 font-bold text-slate-500 outline-none text-xs cursor-pointer"
+                value={filterInvStatus}
+                onChange={(e) => setFilterInvStatus(e.target.value)}
+              >
                 <option>All Inventory</option>
                 <option>In Stock</option>
                 <option>Low Stock</option>
@@ -318,15 +451,14 @@ export default function Artisan() {
       {showAssignModal && selectedPendingOrder && (
         <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
           <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 relative shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex justify-between items-start mb-6">
+            <div className="flex justify-between items-start mb-6 flex-shrink-0">
               <div>
                 <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Assign Work Order</h2>
                 <p className="text-slate-400 font-bold mt-1 text-xs uppercase tracking-wider">WO-{selectedPendingOrder.work_order_id} · {selectedPendingOrder.sku} · {getProductName(selectedPendingOrder.sku)}</p>
               </div>
               <button onClick={() => setShowAssignModal(false)} className="text-slate-300 hover:text-black bg-slate-50 p-2 rounded-full shadow-sm"><HiXMark size={24} /></button>
             </div>
-
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 mb-6 flex gap-6">
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 mb-6 flex gap-6 flex-shrink-0">
               <div>
                 <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">SKU</p>
                 <p className="text-sm font-black text-slate-900">{selectedPendingOrder.sku}</p>
@@ -336,7 +468,6 @@ export default function Artisan() {
                 <p className="text-sm font-black text-slate-900">{getProductName(selectedPendingOrder.sku)}</p>
               </div>
             </div>
-
             <form onSubmit={handleAssignOrder} className="flex-1 flex flex-col min-h-0 space-y-4 overflow-y-auto pr-1">
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
@@ -360,7 +491,6 @@ export default function Artisan() {
                   <input type="number" min="1" step="1" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs" value={assignForm.quantity_needed} onChange={e => setAssignForm({ ...assignForm, quantity_needed: e.target.value })} />
                 </div>
               </div>
-
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Raw Materials</h3>
@@ -414,7 +544,6 @@ export default function Artisan() {
                   </table>
                 </div>
               </div>
-
               <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0">
                 <div className="flex items-center gap-4">
                   <span className="text-slate-400 font-black uppercase text-[9px] tracking-[0.2em]">Total Cost</span>

@@ -84,7 +84,7 @@ const ProdSalesRightSidebar = () => {
           </div>
           <div className="min-w-0">
             <h4 className="text-[13px] font-bold leading-none truncate w-32" title={userName}>{userName}</h4>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-tighter">{userRole}</p>
+            <p className="text-[10px] text-gray-500 mt-1 tracking-tighter">{userRole}</p>
           </div>
         </div>
         
@@ -122,7 +122,8 @@ const ProdSalesRightSidebar = () => {
         </div>
       </div>
 
-      <div className="px-6 flex-grow pb-6 overflow-hidden">
+   {/*   Gmail inbox
+   <div className="px-6 flex-grow pb-6 overflow-hidden">
         <div className="bg-[#1e1b1a] h-full rounded-xl p-4 border border-white/5 flex flex-col">
           <h5 className="text-[12px] font-bold uppercase tracking-widest text-gray-400 mb-5">Inbox</h5>
           <div className="text-gray-600 text-[11px] italic text-center mt-10">
@@ -130,7 +131,9 @@ const ProdSalesRightSidebar = () => {
           </div>
         </div>
       </div>
+       */}
     </div>
+  
   );
 };
 

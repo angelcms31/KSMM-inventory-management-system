@@ -83,31 +83,18 @@ export default function AddProductModal({ product, products = [], fetchProducts,
 
   const handleGenerateQR = () => {
     setFormError("");
-    if (!form.name.trim()) {
-      setNameError("Product Name is required.");
-      return;
-    }
-    if (isDuplicateName(form.name)) {
-      setNameError("A product with this name already exists.");
-      return;
-    }
-    if (!form.location) {
-      setFormError("Please select a Storage Location before generating QR.");
-      return;
-    }
+    if (!form.name.trim()) { setNameError("Product Name is required."); return; }
+    if (isDuplicateName(form.name)) { setNameError("A product with this name already exists."); return; }
+    if (!form.location) { setFormError("Please select a Storage Location before generating QR."); return; }
+    if (form.min_stocks === "" || form.min_stocks === null) { setFormError("Min Threshold is required."); return; }
     setView("qr");
   };
 
   const handleSaveRecord = async () => {
     const sku = skuRef.current;
-    if (!sku) {
-      setFormError("SKU is missing. Please close and try again.");
-      return;
-    }
-    if (!form.location) {
-      setFormError("Storage Location is required.");
-      return;
-    }
+    if (!sku) { setFormError("SKU is missing. Please close and try again."); return; }
+    if (!form.location) { setFormError("Storage Location is required."); return; }
+    if (form.min_stocks === "" || form.min_stocks === null) { setFormError("Min Threshold is required."); return; }
 
     setSubmitting(true);
     setFormError("");
@@ -137,7 +124,6 @@ export default function AddProductModal({ product, products = [], fetchProducts,
     } catch (err) {
       const msg = err.response?.data || err.message;
       setFormError("Save failed: " + msg);
-      console.error("Save error:", msg);
     } finally {
       setSubmitting(false);
     }
@@ -152,7 +138,7 @@ export default function AddProductModal({ product, products = [], fetchProducts,
         </button>
 
         {view === "info" ? (
-          <div className="animate-in slide-in-from-bottom-4 duration-500">
+          <div className="animate-in slide-in-from-bottom-4 duration-500 overflow-y-auto no-scrollbar">
             <div className="mb-8 text-center">
               <h2 className="text-4xl font-black uppercase tracking-tighter leading-none mb-2">
                 {isEdit ? "Edit Product Information" : "Add Product"}
@@ -234,20 +220,41 @@ export default function AddProductModal({ product, products = [], fetchProducts,
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-black text-slate-400 ml-2 tracking-widest">Stock Quantity</label>
                   <input
                     type="number"
+                    min="0"
+                    step="1"
                     className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 outline-none font-bold text-sm"
                     value={form.quantity}
                     onChange={(e) => setForm({ ...form, quantity: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-black text-slate-400 ml-2 tracking-widest">
+                    Min Threshold <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    placeholder="0"
+                    className={`w-full bg-slate-50 border rounded-2xl p-4 outline-none font-bold text-sm ${
+                      formError && (form.min_stocks === "" || form.min_stocks === null) ? "border-red-300" : "border-slate-100"
+                    }`}
+                    value={form.min_stocks}
+                    onChange={(e) => { setForm({ ...form, min_stocks: e.target.value }); setFormError(""); }}
+                  />
+                </div>
+                <div className="space-y-1">
                   <label className="text-[10px] uppercase font-black text-slate-400 ml-2 tracking-widest">Selling Price (₱)</label>
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 outline-none font-bold text-sm"
                     value={form.selling_price}
                     onChange={(e) => setForm({ ...form, selling_price: e.target.value })}
@@ -302,7 +309,7 @@ export default function AddProductModal({ product, products = [], fetchProducts,
                 </div>
               </div>
 
-              <div className="flex-1 space-y-8 pt-4">
+              <div className="flex-1 space-y-6 pt-4">
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-slate-300 tracking-[0.2em] ml-1">Verified Product Name</label>
                   <div className="w-full bg-slate-50/80 p-4 rounded-2xl font-black text-slate-900 text-sm truncate uppercase tracking-tight border border-slate-100">{form.name}</div>
@@ -317,9 +324,15 @@ export default function AddProductModal({ product, products = [], fetchProducts,
                     <div className="w-full bg-slate-50/80 p-4 rounded-2xl font-black text-slate-900 text-sm border border-slate-100 uppercase">{form.category || "---"}</div>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black uppercase text-slate-300 tracking-[0.2em] ml-1">Assigned Storage</label>
-                  <div className="w-full bg-slate-50/80 p-4 rounded-2xl font-black text-slate-900 text-sm border border-slate-100 uppercase">{form.location}</div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-300 tracking-[0.2em] ml-1">Assigned Storage</label>
+                    <div className="w-full bg-slate-50/80 p-4 rounded-2xl font-black text-slate-900 text-sm border border-slate-100 uppercase">{form.location}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black uppercase text-slate-300 tracking-[0.2em] ml-1">Min Threshold</label>
+                    <div className="w-full bg-slate-50/80 p-4 rounded-2xl font-black text-slate-900 text-sm border border-slate-100">{form.min_stocks || 0}</div>
+                  </div>
                 </div>
               </div>
             </div>

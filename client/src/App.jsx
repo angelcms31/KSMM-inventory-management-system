@@ -25,6 +25,7 @@ import Inventory from "./pages/production/Inventory";
 import Artisan from "./pages/production/Artisan";
 import SalesDashboard from "./pages/sales/SalesDashboard";
 import SalesInventory from "./pages/sales/SalesInventory";
+import Warehouse from "./pages/sales/Warehouse";
 import Statistics from "./pages/sales/Statistics";
 import FinanceLogs from "./pages/finance/FinanceLogs";
 import PurchaseOrder from "./pages/finance/PurchaseOrder";
@@ -138,6 +139,7 @@ function App() {
         <Route path="/sales" element={<ProtectedRoute allowedRole="Sales"><SalesLayout /></ProtectedRoute>}>
           <Route path="" element={<SalesDashboard />} />
           <Route path="inventory" element={<SalesInventory />} />
+          <Route path="warehouse" element={<Warehouse />} />
           <Route path="statistics" element={<Statistics />} />
         </Route>
 
