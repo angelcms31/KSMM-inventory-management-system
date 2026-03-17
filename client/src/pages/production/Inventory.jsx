@@ -393,7 +393,7 @@ export default function Inventory() {
                 <div className="mb-2">
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
-                    Enter actual quantities — variance will be logged for Finance
+                    Variance = Actual − Expected. Positive means over-used, negative means saved.
                   </p>
                 </div>
                 <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
@@ -403,18 +403,20 @@ export default function Inventory() {
                         <th className="p-3">Material</th>
                         <th className="p-3 text-center w-24">Expected</th>
                         <th className="p-3 text-center w-28">Actual Used</th>
-                        <th className="p-3 text-center w-24">Variance</th>
+                        <th className="p-3 text-center w-28">Variance</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {completeActuals.map((item, index) => {
-                        const variance = parseInt(item.actual_qty) - Number(item.expected_qty);
+                        const actualQty = parseInt(item.actual_qty) || 0;
+                        const expectedQty = Number(item.expected_qty) || 0;
+                        const variance = actualQty - expectedQty;
                         const isOver = variance > 0;
                         const isUnder = variance < 0;
                         return (
                           <tr key={index} className="text-slate-700 font-bold hover:bg-slate-50 transition-colors">
                             <td className="p-3 font-black text-slate-900 text-[11px]">{item.material_name}</td>
-                            <td className="p-3 text-center text-slate-400 font-black text-[11px]">{item.expected_qty}</td>
+                            <td className="p-3 text-center text-slate-400 font-black text-[11px]">{expectedQty}</td>
                             <td className="p-3 text-center">
                               <input
                                 type="number"
@@ -432,9 +434,13 @@ export default function Inventory() {
                               />
                             </td>
                             <td className="p-3 text-center">
-                              <span className={`text-[11px] font-black ${isOver ? 'text-rose-500' : isUnder ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                {variance === 0 ? '—' : `${isOver ? '+' : ''}${variance}`}
-                              </span>
+                              {variance === 0 ? (
+                                <span className="text-[11px] font-black text-slate-400">—</span>
+                              ) : (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black ${isOver ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                  {isOver ? `+${variance} over` : `${variance} saved`}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
@@ -449,17 +455,18 @@ export default function Inventory() {
                     </tbody>
                   </table>
                 </div>
-                <div className="mt-3 flex gap-3">
+
+                <div className="mt-3 flex gap-3 flex-wrap">
                   {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) > 0) && (
                     <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-4 py-2">
                       <span className="w-2 h-2 rounded-full bg-rose-400 flex-shrink-0"></span>
-                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider">Overage detected — variance will be logged</span>
+                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider">Overage detected — extra stock will be deducted</span>
                     </div>
                   )}
                   {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) < 0) && (
                     <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Under usage — materials saved</span>
+                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Under usage — unused materials returned to stock</span>
                     </div>
                   )}
                 </div>
@@ -467,7 +474,7 @@ export default function Inventory() {
 
               <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0">
                 <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest max-w-[220px] leading-relaxed">
-                  Actual stock deduction & Sales inventory update will happen upon confirmation.
+                  Only the variance is applied to stock. Expected qty was already deducted on assignment.
                 </p>
                 <div className="flex gap-3">
                   <button

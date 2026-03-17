@@ -53,9 +53,7 @@ export default function SalesInventory() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const getStockStatus = (current, min) => {
     const stock = Number(current) || 0;
@@ -165,11 +163,12 @@ export default function SalesInventory() {
                 <table className="w-full border-separate border-spacing-y-4">
                   <thead>
                     <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
-                      <th className="pb-2 text-left pl-6 w-[30%]">Product Details</th>
-                      <th className="pb-2 text-center w-[15%]">Category</th>
-                      <th className="pb-2 text-center w-[15%]">Stocks</th>
-                      <th className="pb-2 text-center w-[15%]">Status</th>
-                      <th className="pb-2 text-center w-[15%]">Price</th>
+                      <th className="pb-2 text-left pl-6 w-[28%]">Product Details</th>
+                      <th className="pb-2 text-center w-[12%]">Category</th>
+                      <th className="pb-2 text-center w-[13%]">Stocks</th>
+                      <th className="pb-2 text-center w-[10%]">Unit</th>
+                      <th className="pb-2 text-center w-[13%]">Status</th>
+                      <th className="pb-2 text-center w-[12%]">Price</th>
                       <th className="pb-2 text-right pr-8">Actions</th>
                     </tr>
                   </thead>
@@ -211,6 +210,11 @@ export default function SalesInventory() {
                               <span className="text-[14px] text-slate-900 font-black leading-none">{p.current_stock || 0}</span>
                               <span className="text-[8px] text-slate-400 uppercase font-black mt-1 tracking-tight">Min: {p.min_stocks || 0}</span>
                             </div>
+                          </td>
+                          <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100 min-w-[80px]">
+                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-wide">
+                              {p.stock_unit || "---"}
+                            </span>
                           </td>
                           <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100 min-w-[120px]">
                             <span className={`px-4 py-1.5 rounded-full text-[10px] font-black shadow-sm tracking-tight inline-block whitespace-nowrap ${status.color}`}>

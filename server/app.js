@@ -413,13 +413,13 @@ app.get("/api/products/unique-list", async (req, res) => {
 
 app.put("/api/products/:sku", async (req, res) => {
   const { sku } = req.params;
-  const { name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks } = req.body;
+  const { name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks, stock_unit } = req.body;
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
     await client.query(
-      `UPDATE FinishedGoods SET name=$1, collection=$2, brand=$3, selling_price=$4, product_image=$5, warehouse_location=$6, category=$7, current_stock=$8, min_stocks=$9 WHERE sku=$10`,
-      [name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks || 0, sku]
+      `UPDATE FinishedGoods SET name=$1, collection=$2, brand=$3, selling_price=$4, product_image=$5, warehouse_location=$6, category=$7, current_stock=$8, min_stocks=$9, stock_unit=$10 WHERE sku=$11`,
+      [name, collection, brand, selling_price, product_image, location, category, quantity, min_stocks || 0, stock_unit || null, sku]
     );
     if (parseInt(quantity) <= parseInt(min_stocks || 0)) {
       const existingRequest = await client.query(
@@ -441,15 +441,20 @@ app.put("/api/products/:sku", async (req, res) => {
 });
 
 app.post("/api/sales_Add_inventory", async (req, res) => {
-  const { sku, name, location, quantity, selling_price, product_image, collection, brand, category, min_stocks } = req.body;
+  const { sku, name, location, quantity, selling_price, product_image, collection, brand, category, min_stocks, stock_unit } = req.body;
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
     await client.query(
-      `INSERT INTO FinishedGoods (sku, name, collection, brand, selling_price, product_image, current_stock, warehouse_location, category, min_stocks)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (sku) DO UPDATE SET name=EXCLUDED.name, category=EXCLUDED.category, min_stocks=EXCLUDED.min_stocks, current_stock=FinishedGoods.current_stock+EXCLUDED.current_stock`,
-      [sku, name, collection, brand || '', selling_price || 0, product_image, quantity || 0, location, category, min_stocks || 0]
+      `INSERT INTO FinishedGoods (sku, name, collection, brand, selling_price, product_image, current_stock, warehouse_location, category, min_stocks, stock_unit)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (sku) DO UPDATE SET
+         name=EXCLUDED.name,
+         category=EXCLUDED.category,
+         min_stocks=EXCLUDED.min_stocks,
+         current_stock=FinishedGoods.current_stock+EXCLUDED.current_stock,
+         stock_unit=EXCLUDED.stock_unit`,
+      [sku, name, collection, brand || '', selling_price || 0, product_image, quantity || 0, location, category, min_stocks || 0, stock_unit || null]
     );
     const warehouseRes = await client.query("SELECT warehouse_id FROM Warehouse WHERE name = $1 LIMIT 1", [location]);
     if (warehouseRes.rows.length === 0) throw new Error(`Warehouse location '${location}' not found.`);
@@ -530,7 +535,8 @@ app.get("/api/all_orders", async (req, res) => {
       SELECT po.*, po.assignment_id AS purchase_order_id,
         COALESCE(s.name, 'Unknown Supplier') AS supplier_name,
         COALESCE(m.material_name, 'Unknown Material') AS material_name,
-        COALESCE(CONCAT(p.firstname, ' ', p.lastname), 'Unknown Requisitioner') AS requisitioner_name
+        COALESCE(CONCAT(p.firstname, ' ', p.lastname), 'Unknown Requisitioner') AS requisitioner_name,
+        COALESCE(po.total_amount, po.ordered_quantity * m.cost_per_unit) AS total_amount
       FROM purchaseorder po
       LEFT JOIN supplier s ON po.supplier_id = s.supplier_id
       LEFT JOIN material m ON po.material_id = m.material_id
@@ -541,11 +547,14 @@ app.get("/api/all_orders", async (req, res) => {
 });
 
 app.post("/api/create_order", async (req, res) => {
-  const { supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status } = req.body;
+  const { supplier_id, material_id, ordered_quantity, expected_delivery, user_id, status } = req.body;
   try {
+    const matRes = await getPool().query('SELECT cost_per_unit FROM material WHERE material_id = $1', [material_id]);
+    const costPerUnit = matRes.rows.length > 0 ? Number(matRes.rows[0].cost_per_unit) : 0;
+    const computedTotal = costPerUnit * parseInt(ordered_quantity || 0);
     const newOrder = await getPool().query(
       `INSERT INTO purchaseorder (supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status, order_date) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,
-      [supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status || 'Pending']
+      [supplier_id, material_id, ordered_quantity, computedTotal, expected_delivery, user_id, status || 'Pending']
     );
     res.json(newOrder.rows[0]);
   } catch (err) { res.status(500).send(err.message); }
@@ -553,11 +562,14 @@ app.post("/api/create_order", async (req, res) => {
 
 app.put("/api/orders/:id", async (req, res) => {
   const { id } = req.params;
-  const { supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, status } = req.body;
+  const { supplier_id, material_id, ordered_quantity, expected_delivery, status } = req.body;
   try {
+    const matRes = await getPool().query('SELECT cost_per_unit FROM material WHERE material_id = $1', [material_id]);
+    const costPerUnit = matRes.rows.length > 0 ? Number(matRes.rows[0].cost_per_unit) : 0;
+    const computedTotal = costPerUnit * parseInt(ordered_quantity || 0);
     const result = await getPool().query(
       `UPDATE purchaseorder SET supplier_id=$1, material_id=$2, ordered_quantity=$3, total_amount=$4, expected_delivery=$5, status=$6 WHERE assignment_id=$7 RETURNING *`,
-      [supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, status, id]
+      [supplier_id, material_id, ordered_quantity, computedTotal, expected_delivery, status, id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).send(err.message); }
@@ -606,18 +618,11 @@ app.post("/api/procurement/approve/:id", async (req, res) => {
 app.get("/api/variance_logs", async (req, res) => {
   try {
     const result = await getPool().query(`
-      SELECT 
-        mvl.varlog_id AS log_id,          
-        mvl.work_order_id, 
-        mvl.material_id, 
-        mvl.artisan_id,
-        mvl.expected_qty, 
-        mvl.actual_qty, 
-        mvl.variance, 
-        mvl.recorded_at AS timestamp,    
-        m.material_name, 
-        m.stock_quantity AS current_stock, 
-        m.reorder_threshold,
+      SELECT
+        mvl.varlog_id AS log_id,
+        mvl.work_order_id, mvl.material_id, mvl.artisan_id,
+        mvl.expected_qty, mvl.actual_qty, mvl.variance, mvl.recorded_at AS timestamp,
+        m.material_name, m.stock_quantity AS current_stock, m.reorder_threshold,
         COALESCE(
           (SELECT CONCAT(firstname, ' ', middlename, ' ', lastname) FROM personaldata WHERE user_id = mvl.artisan_id),
           (SELECT CONCAT(first_name, ' ', middle_name, ' ', last_name) FROM artisan WHERE artisan_id = mvl.artisan_id)
@@ -625,11 +630,11 @@ app.get("/api/variance_logs", async (req, res) => {
         CASE WHEN m.stock_quantity <= m.reorder_threshold THEN true ELSE false END AS is_low_stock
       FROM material_variance_logs mvl
       LEFT JOIN material m ON mvl.material_id = m.material_id
-      ORDER BY mvl.recorded_at ASC`); 
+      ORDER BY mvl.recorded_at DESC`);
     res.json(result.rows);
-  } catch (err) { 
+  } catch (err) {
     console.error(err);
-    res.status(500).send(err.message); 
+    res.status(500).send(err.message);
   }
 });
 
@@ -664,11 +669,11 @@ app.get("/api/materials", async (req, res) => {
 });
 
 app.post("/api/add_material", async (req, res) => {
-  const { unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name } = req.body;
+  const { unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name, stock_unit } = req.body;
   try {
     const result = await getPool().query(
-      `INSERT INTO material (unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name]
+      `INSERT INTO material (unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name, stock_unit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name, stock_unit || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: "Database error: " + err.message }); }
@@ -676,11 +681,11 @@ app.post("/api/add_material", async (req, res) => {
 
 app.put("/api/materials/:id", async (req, res) => {
   const { id } = req.params;
-  const { material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image } = req.body;
+  const { material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, stock_unit } = req.body;
   try {
     const result = await getPool().query(
-      `UPDATE material SET material_name=$1, supplier_id=$2, cost_per_unit=$3, stock_quantity=$4, reorder_threshold=$5, material_image=$6 WHERE material_id=$7 RETURNING *`,
-      [material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, id]
+      `UPDATE material SET material_name=$1, supplier_id=$2, cost_per_unit=$3, stock_quantity=$4, reorder_threshold=$5, material_image=$6, stock_unit=$7 WHERE material_id=$8 RETURNING *`,
+      [material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, stock_unit || null, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: "Material not found" });
     res.json({ success: true, message: "Material updated!", data: result.rows[0] });
@@ -695,7 +700,7 @@ app.get("/api/finished_goods", async (req, res) => {
   try {
     const result = await dbQuery(
       `SELECT sku, name, collection, brand, work_order_id, product_image,
-              current_stock, min_stocks, selling_price, category, warehouse_location
+              current_stock, min_stocks, selling_price, category, warehouse_location, stock_unit
        FROM finishedgoods ORDER BY sku ASC`,
       [], 'finishedgoods_full'
     );
@@ -803,46 +808,34 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
   const { id } = req.params;
   const { actualMaterials = [] } = req.body;
   const client = await getPool().connect();
-
   try {
     await client.query('BEGIN');
-
     const woResult = await client.query(
-      'SELECT sku, quantity_needed, artisan_id, status FROM workorder WHERE work_order_id = $1',
-      [id]
+      'SELECT sku, quantity_needed, artisan_id, status FROM workorder WHERE work_order_id = $1', [id]
     );
-
     if (woResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Work order not found.' });
     }
-
     if (woResult.rows[0].status === 'Complete') {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Work order is already completed.' });
     }
-
     const { sku, quantity_needed, artisan_id } = woResult.rows[0];
-
-    await client.query(
-      `UPDATE workorder SET status = 'Complete' WHERE work_order_id = $1`,
-      [id]
-    );
-
+    await client.query(`UPDATE workorder SET status = 'Complete' WHERE work_order_id = $1`, [id]);
     for (const mat of actualMaterials) {
       const { material_id, expected_qty, actual_qty } = mat;
       const variance = Number(actual_qty) - Number(expected_qty);
-
       await client.query(
         `UPDATE work_order_materials SET actual_qty_used=$1, variance_qty=$2 WHERE work_order_id=$3 AND material_id=$4`,
         [actual_qty, variance, id, material_id]
       );
-
-      await client.query(
-        `UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2`,
-        [actual_qty, material_id]
-      );
-
+      if (variance !== 0) {
+        await client.query(
+          `UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2`,
+          [variance, material_id]
+        );
+      }
       await client.query(
         `INSERT INTO material_variance_logs (work_order_id, material_id, artisan_id, expected_qty, actual_qty, variance, recorded_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -853,21 +846,13 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
         [id, material_id, artisan_id, expected_qty, actual_qty, variance]
       );
     }
-
-    await client.query(
-      `UPDATE finishedgoods SET current_stock = current_stock + $1 WHERE sku = $2`,
-      [quantity_needed, sku]
-    );
-
+    await client.query(`UPDATE finishedgoods SET current_stock = current_stock + $1 WHERE sku = $2`, [quantity_needed, sku]);
     await client.query('COMMIT');
     res.json({ message: 'Work order completed, variance logged, stock updated.' });
-
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
-  } finally {
-    client.release();
-  }
+  } finally { client.release(); }
 });
 
 app.put('/api/work_orders/:id', async (req, res) => {

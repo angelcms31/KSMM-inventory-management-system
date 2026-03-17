@@ -5,6 +5,23 @@ import {
   HiChevronLeft, HiChevronRight, HiTrash, HiShieldCheck
 } from 'react-icons/hi2';
 
+const UNIT_OPTIONS = [
+  { value: '', label: '---' },
+  { value: 'pcs', label: 'Pieces (pcs)' },
+  { value: 'cm', label: 'Centimeters (cm)' },
+  { value: 'inches', label: 'Inches (in)' },
+  { value: 'meters', label: 'Meters (m)' },
+  { value: 'mm', label: 'Millimeters (mm)' },
+  { value: 'yards', label: 'Yards (yd)' },
+  { value: 'grams', label: 'Grams (g)' },
+  { value: 'kg', label: 'Kilograms (kg)' },
+  { value: 'liters', label: 'Liters (L)' },
+  { value: 'ml', label: 'Milliliters (mL)' },
+  { value: 'rolls', label: 'Rolls' },
+  { value: 'sheets', label: 'Sheets' },
+  { value: 'pairs', label: 'Pairs' },
+];
+
 export default function Artisan() {
   const [artisans, setArtisans] = useState([]);
   const [materials, setMaterials] = useState([]);
@@ -33,7 +50,7 @@ export default function Artisan() {
 
   const [matForm, setMatForm] = useState({
     unique_code: '', cost_per_unit: '', stock_quantity: '',
-    reorder_threshold: '', material_image: null, material_name: '', category: ''
+    reorder_threshold: '', material_image: null, material_name: '', category: '', stock_unit: ''
   });
 
   const fetchData = async () => {
@@ -173,6 +190,7 @@ export default function Artisan() {
       stock_quantity: parseInt(matForm.stock_quantity),
       reorder_threshold: parseInt(matForm.reorder_threshold),
       cost_per_unit: parseFloat(matForm.cost_per_unit),
+      stock_unit: matForm.stock_unit || null,
     };
     try {
       if (isUpdateMat) {
@@ -182,7 +200,7 @@ export default function Artisan() {
       }
       setShowMatModal(false);
       setImagePreview(null);
-      setMatForm({ unique_code: '', cost_per_unit: '', stock_quantity: '', reorder_threshold: '', material_image: null, material_name: '', category: '' });
+      setMatForm({ unique_code: '', cost_per_unit: '', stock_quantity: '', reorder_threshold: '', material_image: null, material_name: '', category: '', stock_unit: '' });
       fetchData();
     } catch (err) {
       console.error(err);
@@ -405,6 +423,7 @@ export default function Artisan() {
                   <th className="pb-4">Material</th>
                   <th className="pb-4">Code</th>
                   <th className="pb-4">Stock</th>
+                  <th className="pb-4">Unit</th>
                   <th className="pb-4">Cost</th>
                   <th className="pb-4">Status</th>
                   <th className="pb-4 text-right pr-4">Actions</th>
@@ -426,6 +445,11 @@ export default function Artisan() {
                         <span className="text-[8px] text-slate-400 uppercase font-bold mt-1 tracking-tighter">Min: {m.reorder_threshold}</span>
                       </div>
                     </td>
+                    <td className="py-4 border-y border-transparent group-hover:border-slate-100">
+                      <span className="text-[10px] text-slate-500 font-black uppercase tracking-wide">
+                        {m.stock_unit || '---'}
+                      </span>
+                    </td>
                     <td className="py-4 text-slate-900 font-black border-y border-transparent group-hover:border-slate-100">₱{Number(m.cost_per_unit).toFixed(2)}</td>
                     <td className="py-4 border-y border-transparent group-hover:border-slate-100">
                       <span className={`px-4 py-1 rounded-lg text-[8px] uppercase font-black ${getStatusStyle(m.stock_quantity, m.reorder_threshold)}`}>
@@ -434,7 +458,12 @@ export default function Artisan() {
                     </td>
                     <td className="py-4 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
                       <button
-                        onClick={() => { setSelectedMatId(m.material_id); setMatForm({ ...m }); setIsUpdateMat(true); setShowMatModal(true); }}
+                        onClick={() => {
+                          setSelectedMatId(m.material_id);
+                          setMatForm({ ...m, stock_unit: m.stock_unit || '' });
+                          setIsUpdateMat(true);
+                          setShowMatModal(true);
+                        }}
                         className="p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100"
                       >
                         <HiPencil size={18} />
@@ -502,6 +531,7 @@ export default function Artisan() {
                       <tr>
                         <th className="p-2">Material</th>
                         <th className="p-2 text-center w-16">Qty</th>
+                        <th className="p-2 text-center w-16">Unit</th>
                         <th className="p-2 text-center w-20">Cost/Unit</th>
                         <th className="p-2 text-center w-16">Stock</th>
                         <th className="p-2 w-8"></th>
@@ -521,6 +551,9 @@ export default function Artisan() {
                             <td className="p-2 text-center">
                               <input type="number" min="1" step="1" className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[11px]" value={item.qty} onChange={e => handleAssignMaterialChange(index, 'qty', e.target.value)} />
                             </td>
+                            <td className="p-2 text-center text-[10px] font-black text-slate-400 uppercase">
+                              {mat?.stock_unit || '---'}
+                            </td>
                             <td className="p-2 text-center text-slate-400 font-black text-[10px]">₱{(Number(item.cost) || 0).toFixed(2)}</td>
                             <td className="p-2 text-center text-[10px] font-black">
                               {mat ? (
@@ -538,7 +571,7 @@ export default function Artisan() {
                         );
                       })}
                       {assignForm.selectedMaterials.length === 0 && (
-                        <tr><td colSpan="5" className="py-6 text-center text-slate-300 font-black text-[10px] uppercase">Add materials to proceed</td></tr>
+                        <tr><td colSpan="6" className="py-6 text-center text-slate-300 font-black text-[10px] uppercase">Add materials to proceed</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -593,10 +626,18 @@ export default function Artisan() {
                   <input disabled className="w-full bg-[#F3F4F6] rounded-2xl p-4 opacity-50 outline-none cursor-not-allowed font-black text-sm" value={matForm.unique_code} />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 font-black">
+              <div className="grid grid-cols-4 gap-4 font-black">
                 <div className="space-y-2 text-left">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Current Stock</label>
                   <input type="number" min="0" step="1" required className="w-full bg-[#F3F4F6] rounded-xl p-4 outline-none text-sm" value={matForm.stock_quantity} onChange={e => setMatForm({ ...matForm, stock_quantity: e.target.value })} />
+                </div>
+                <div className="space-y-2 text-left">
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Unit</label>
+                  <select className="w-full bg-[#F3F4F6] rounded-xl p-4 outline-none text-sm font-black" value={matForm.stock_unit} onChange={e => setMatForm({ ...matForm, stock_unit: e.target.value })}>
+                    {UNIT_OPTIONS.map(u => (
+                      <option key={u.value} value={u.value}>{u.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2 text-left">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Min Threshold</label>

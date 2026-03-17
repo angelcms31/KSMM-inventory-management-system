@@ -1,46 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; 
 import { HiOutlineBell } from "react-icons/hi";
 
 const ProdSalesRightSidebar = () => {
-  const [activities, setActivities] = useState([]);
+  const [lowStockLogs, setLowStockLogs] = useState([]);
   const [profilePic, setProfilePic] = useState(null);
-  
+
   const userName = localStorage.getItem("userName") || "User";
   const userRole = localStorage.getItem("userRole") || "Production";
   const loggedInUserId = localStorage.getItem("user_id");
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return "Just now";
-    const now = new Date();
-    const past = new Date(timestamp);
-    const diffInMs = now - past;
-    const diffInMins = Math.floor(diffInMs / 60000);
-
-    if (diffInMins < 1) return "Just now";
-    if (diffInMins < 60) return `${diffInMins} mins ago`;
-    const diffInHours = Math.floor(diffInMins / 60);
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
-    return past.toLocaleDateString();
-  };
-
-  const getStatusStyle = (action) => {
-    const act = action?.toLowerCase() || '';
-    if (act.includes('login') || act.includes('create')) return "bg-green-600";
-    if (act.includes('update') || act.includes('edit')) return "bg-blue-600";
-    if (act.includes('logout') || act.includes('delete')) return "bg-red-600";
-    return "bg-yellow-600";
-  };
-
   const fetchData = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/audit_logs");
-      const latestLogs = (Array.isArray(res.data) ? res.data : []).slice(0, 4);
-      setActivities(latestLogs);
+      const res = await axios.get("http://localhost:5000/api/low_stock_logs");
+      const logs = Array.isArray(res.data) ? res.data : [];
+      setLowStockLogs(logs.slice(0, 7));
     } catch (err) {
-      console.error("Error fetching logs:", err);
-      setActivities([]);
+      console.error("Error fetching low stock logs:", err);
+      setLowStockLogs([]);
     }
   };
 
@@ -57,29 +34,45 @@ const ProdSalesRightSidebar = () => {
   useEffect(() => {
     fetchData();
     fetchUserProfile();
-    
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  const getStockBadgeStyle = (item) => {
+    if (Number(item.stock_quantity) <= 0) return "bg-red-600";
+    return "bg-amber-500";
+  };
+
+  const getStockLabel = (item) => {
+    if (Number(item.stock_quantity) <= 0) return "NO STOCK";
+    return "LOW";
+  };
+
+  const getStockBarWidth = (current, threshold) => {
+    const c = Number(current) || 0;
+    const t = Number(threshold) || 1;
+    const pct = Math.min((c / (t * 2)) * 100, 100);
+    return `${pct}%`;
+  };
+
+  const getStockBarColor = (current, threshold) => {
+    const c = Number(current) || 0;
+    const t = Number(threshold) || 1;
+    if (c <= 0) return "bg-red-500";
+    if (c <= t) return "bg-amber-500";
+    return "bg-emerald-500";
+  };
+
   return (
-    <div className="w-[280px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 right-0 font-sans border-l border-white/5">
-      
-      <div className="p-6 flex items-center justify-between">
+    <div className="w-[280px] bg-[#262221] text-white flex flex-col self-stretch overflow-hidden font-sans border-l border-white/5">
+
+      <div className="p-6 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10 flex items-center justify-center flex-shrink-0">
             {profilePic ? (
-              <img 
-                src={profilePic} 
-                alt="User" 
-                className="w-full h-full object-cover"
-              />
+              <img src={profilePic} alt="User" className="w-full h-full object-cover" />
             ) : (
-              <img 
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} 
-                alt="Fallback Avatar" 
-                className="w-full h-full object-cover"
-              />
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} alt="Fallback Avatar" className="w-full h-full object-cover" />
             )}
           </div>
           <div className="min-w-0">
@@ -87,53 +80,73 @@ const ProdSalesRightSidebar = () => {
             <p className="text-[10px] text-gray-500 mt-1 tracking-tighter">{userRole}</p>
           </div>
         </div>
-        
+
         <div className="relative cursor-pointer group p-1.5 rounded-full hover:bg-white/5 transition-all duration-200 active:scale-90">
-          <HiOutlineBell 
-            size={20} 
-            className="text-gray-400 group-hover:text-white transition-colors duration-200" 
-          />
+          <HiOutlineBell size={20} className="text-gray-400 group-hover:text-white transition-colors duration-200" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#262221]"></span>
         </div>
       </div>
 
-      <div className="px-6 mb-4">
-        <div className="bg-[#1e1b1a] rounded-xl p-4 border border-white/5">
-          <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-5">Recent Activities</h5>
-          
-          <div className="space-y-6">
-            {activities.length > 0 ? activities.map((log, i) => (
-              <div key={i} className="flex justify-between items-start animate-fadeIn">
-                <div className="flex-grow pr-2 min-w-0">
-                  <p className="text-[11px] font-bold leading-tight text-gray-200 truncate">
-                    {log.action}
-                  </p>
-                  <p className="text-[9px] text-gray-500 mt-0.5 truncate italic">By {log.merged_name}</p>
-                  <p className="text-[9px] text-gray-600 mt-1">{formatTime(log.timestamp)}</p>
-                </div>
-                <span className={`${getStatusStyle(log.action)} text-[7px] px-2 py-0.5 rounded font-black uppercase tracking-tighter text-white`}>
-                  {log.action?.split(' ')[0] || 'LOG'}
-                </span>
-              </div>
-            )) : (
-              <p className="text-[11px] text-gray-600 text-center py-4 italic">No activity yet</p>
+      <div className="px-6 pb-6 flex-shrink-0">
+        <div className="bg-[#1e1b1a] rounded-xl border border-white/5 p-4">
+
+          <div className="flex items-center justify-between mb-4">
+            <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock Alerts</h5>
+            {lowStockLogs.length > 0 && (
+              <span className="bg-amber-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                {lowStockLogs.length} Alert{lowStockLogs.length > 1 ? 's' : ''}
+              </span>
             )}
           </div>
+
+          <div className="space-y-3">
+            {lowStockLogs.length > 0 ? lowStockLogs.map((item, i) => (
+              <div key={i} className="bg-[#262221] rounded-xl p-3 border border-white/5">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-black text-gray-200 truncate uppercase leading-tight">
+                      {item.material_name}
+                    </p>
+                    <p className="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-bold">
+                      {item.item_type === 'finished_good' ? 'Finished Good' : 'Raw Material'} · {item.unique_code}
+                    </p>
+                  </div>
+                  <span className={`${getStockBadgeStyle(item)} text-[7px] px-2 py-0.5 rounded font-black uppercase tracking-tighter text-white flex-shrink-0`}>
+                    {getStockLabel(item)}
+                  </span>
+                </div>
+
+                <div className="w-full bg-white/5 rounded-full h-1.5 mb-2">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${getStockBarColor(item.stock_quantity, item.reorder_threshold)}`}
+                    style={{ width: getStockBarWidth(item.stock_quantity, item.reorder_threshold) }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-[9px] text-gray-500 font-bold">
+                    Stock: <span className="text-amber-400">{item.stock_quantity}</span>
+                  </span>
+                  <span className="text-[9px] text-gray-600 font-bold">
+                    Min: {item.reorder_threshold}
+                  </span>
+                </div>
+              </div>
+            )) : (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-900/30 flex items-center justify-center mb-3">
+                  <span className="text-emerald-500 text-lg">✓</span>
+                </div>
+                <p className="text-[11px] text-gray-600 font-black uppercase tracking-wider">All stocks healthy</p>
+                <p className="text-[9px] text-gray-700 mt-1">No alerts at this time</p>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
 
-   {/*   Gmail inbox
-   <div className="px-6 flex-grow pb-6 overflow-hidden">
-        <div className="bg-[#1e1b1a] h-full rounded-xl p-4 border border-white/5 flex flex-col">
-          <h5 className="text-[12px] font-bold uppercase tracking-widest text-gray-400 mb-5">Inbox</h5>
-          <div className="text-gray-600 text-[11px] italic text-center mt-10">
-            No new messages
-          </div>
-        </div>
-      </div>
-       */}
     </div>
-  
   );
 };
 
