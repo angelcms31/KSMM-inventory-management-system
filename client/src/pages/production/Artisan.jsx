@@ -133,7 +133,12 @@ export default function Artisan() {
 
   const handleOpenAssign = (order) => {
     setSelectedPendingOrder(order);
-    setAssignForm({ artisan_id: '', target_date: '', quantity_needed: order.quantity_needed, selectedMaterials: [] });
+    setAssignForm({
+      artisan_id: '',
+      target_date: '',
+      quantity_needed: order.quantity_needed,
+      selectedMaterials: []
+    });
     setShowAssignModal(true);
   };
 
@@ -164,7 +169,7 @@ export default function Artisan() {
     if (validMaterials.length === 0) { alert('Please add at least one raw material.'); return; }
     const payload = {
       sku: selectedPendingOrder.sku,
-      quantity: parseInt(assignForm.quantity_needed) || selectedPendingOrder.quantity_needed,
+      quantity: parseInt(assignForm.quantity_needed),
       category: selectedPendingOrder.category || selectedPendingOrder.department || '',
       target_date: assignForm.target_date,
       artisan_id: parseInt(assignForm.artisan_id),
@@ -311,7 +316,6 @@ export default function Artisan() {
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-6 pb-10 min-h-0">
-
         <div className="grid grid-cols-2 gap-6">
           <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-6 flex flex-col min-h-0">
             <div className="flex justify-between items-center mb-5 flex-shrink-0">
@@ -487,20 +491,10 @@ export default function Artisan() {
               </div>
               <button onClick={() => setShowAssignModal(false)} className="text-slate-300 hover:text-black bg-slate-50 p-2 rounded-full shadow-sm"><HiXMark size={24} /></button>
             </div>
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 mb-6 flex gap-6 flex-shrink-0">
-              <div>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">SKU</p>
-                <p className="text-sm font-black text-slate-900">{selectedPendingOrder.sku}</p>
-              </div>
-              <div>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Product</p>
-                <p className="text-sm font-black text-slate-900">{getProductName(selectedPendingOrder.sku)}</p>
-              </div>
-            </div>
-            <form onSubmit={handleAssignOrder} className="flex-1 flex flex-col min-h-0 space-y-4 overflow-y-auto pr-1">
-              <div className="grid grid-cols-3 gap-4">
+            <form onSubmit={handleAssignOrder} className="flex-1 flex flex-col min-h-0 space-y-6 overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assign Artisan</label>
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assign Artisan</label>
                   <select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs" value={assignForm.artisan_id} onChange={e => setAssignForm({ ...assignForm, artisan_id: e.target.value })}>
                     <option value="">Select Artisan...</option>
                     {artisans.filter(a => a.status === 'Active').map(a => (
@@ -509,17 +503,29 @@ export default function Artisan() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
+                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
                   <input type="date" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs" value={assignForm.target_date} onChange={e => setAssignForm({ ...assignForm, target_date: e.target.value })} />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">
-                    Quantity Needed
-                    <span className="ml-1 text-amber-500 normal-case font-bold">(suggested: {selectedPendingOrder.quantity_needed})</span>
-                  </label>
-                  <input type="number" min="1" step="1" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs" value={assignForm.quantity_needed} onChange={e => setAssignForm({ ...assignForm, quantity_needed: e.target.value })} />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Quantity Needed</label>
+                <div className="flex flex-col gap-1.5">
+                   <div className="flex items-center gap-2 ml-2">
+                     <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Suggested: {selectedPendingOrder.quantity_needed}</span>
+                   </div>
+                   <input 
+                    type="number" 
+                    min="1" 
+                    step="1" 
+                    required 
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-black text-sm border-2 border-transparent focus:border-slate-200 transition-all" 
+                    value={assignForm.quantity_needed} 
+                    onChange={e => setAssignForm({ ...assignForm, quantity_needed: e.target.value })} 
+                  />
                 </div>
               </div>
+
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Raw Materials</h3>

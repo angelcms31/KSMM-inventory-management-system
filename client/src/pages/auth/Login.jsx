@@ -247,7 +247,7 @@ export default function Login() {
             <div className="space-y-7">
               <div className="relative">
                 <label className={`absolute -top-2.5 left-3 bg-white px-1 text-[11px] transition-colors ${error ? "text-red-500" : "text-gray-400"}`}>
-                  Email or Username
+                  Email
                 </label>
                 <input
                   type="text"
@@ -287,15 +287,6 @@ export default function Login() {
               )}
 
               <div className="flex justify-between items-center text-[11px] text-gray-500 pt-1">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="mr-2 h-3.5 w-3.5 accent-stone-800"
-                  />
-                  Remember me
-                </label>
                 <button
                   type="button"
                   onClick={navigateToOtp}
