@@ -46,7 +46,7 @@ const ManageUsers = () => {
     const lastName = (u.lastname || '').toLowerCase();
     const email = (u.email || '').toLowerCase();
     const contactNo = (u.contact_no || '').toLowerCase();
-    const idPrefix = (u.user_role || "US").substring(0, 2).toUpperCase();
+    const idPrefix = (u.user_role === 'Admin' && u.is_head_admin) ? "HA" : (u.user_role || "US").substring(0, 2).toUpperCase();
     const displayId = `${idPrefix}-${u.permanent_id || '0'}`.toLowerCase();
     return (
       firstName.startsWith(term) ||
@@ -110,7 +110,10 @@ const ManageUsers = () => {
     if (!formData.email.includes('@')) { alert("Email must contain @"); return; }
     if (formData.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
     try {
-      await axios.post("http://localhost:5000/api/add_user", formData);
+      await axios.post("http://localhost:5000/api/add_user", {
+        ...formData,
+        creatorId: localStorage.getItem("user_id")
+      });
       setShowAddModal(false);
       setFormData(initialFormState);
       fetchUsers();
@@ -122,7 +125,7 @@ const ManageUsers = () => {
   };
 
   const handleEditClick = (user) => {
-    const idPrefix = (user.user_role || "US").substring(0, 2).toUpperCase();
+    const idPrefix = user.is_head_admin ? "HA" : (user.user_role || "US").substring(0, 2).toUpperCase();
     const displayId = `${idPrefix}-${user.permanent_id || '0'}`;
     setSelectedUser({
       ...user,
@@ -179,6 +182,20 @@ const ManageUsers = () => {
     } catch (err) { alert("Error unlocking account"); }
   };
 
+  const handleApproveAdmin = async (user) => {
+    try {
+      await axios.put("http://localhost:5000/api/admin/approve", {
+        userId: user.user_id,
+        adminId: localStorage.getItem("user_id")
+      });
+      fetchUsers();
+      setActiveMenu(null);
+      alert("Admin account approved!");
+    } catch (err) {
+      alert(err.response?.data?.message || "Approval failed");
+    }
+  };
+
   const toggleStatus = async (user) => {
     const currentStatus = user.status || user.Status;
     const newStatus = currentStatus === 'Active' ? 'Deactivated' : 'Active';
@@ -202,7 +219,11 @@ const ManageUsers = () => {
     }
   };
 
-  if (loading) return <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">Loading...</div>;
+  if (loading) return (
+    <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">
+      Loading...
+    </div>
+  );
 
   return (
     <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden" onClick={() => setActiveMenu(null)}>
@@ -219,18 +240,33 @@ const ManageUsers = () => {
         </div>
       </div>
 
-      <div className="space-y-3 pb-10">
-        <section className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 relative h-fit text-left">
+      <div className="space-y-3 pb-24 lg:pb-10">
+        <section className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-4 lg:p-6 relative h-fit text-left">
           <div className="flex justify-between items-center mb-6 px-2">
-            <div>
-              <h1 className="text-2xl font-black uppercase text-slate-900 leading-none tracking-tighter">Manage Users</h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1 mr-2">
-                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 0)); }} disabled={currentPage === 0} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronLeft size={16}/></button>
-                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => p + 1); }} disabled={currentPage >= totalPages - 1} className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"><HiChevronRight size={16}/></button>
+            <h1 className="text-xl lg:text-2xl font-black uppercase text-slate-900 leading-none tracking-tighter">Manage Users</h1>
+            <div className="flex items-center gap-2 lg:gap-3">
+              <div className="flex gap-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 0)); }}
+                  disabled={currentPage === 0}
+                  className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"
+                >
+                  <HiChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCurrentPage(p => p + 1); }}
+                  disabled={currentPage >= totalPages - 1}
+                  className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"
+                >
+                  <HiChevronRight size={16} />
+                </button>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); setShowAddModal(true); }} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest">+ Add User</button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowAddModal(true); }}
+                className="bg-black text-white px-3 lg:px-5 py-2 lg:py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest"
+              >
+                + Add User
+              </button>
             </div>
           </div>
 
@@ -241,31 +277,64 @@ const ManageUsers = () => {
               <p className="text-sm">Try searching for a different name or ID</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
               {currentUsers.map((user, index) => {
                 const userStatus = user.status || user.Status;
                 const isLocked = user.is_locked || user.Is_Locked;
-                const idPrefix = (user.user_role || "US").substring(0, 2).toUpperCase();
+                const isApproved = user.is_approved;
+                const isHeadAdmin = user.is_head_admin;
+                const idPrefix = isHeadAdmin ? "AD" : (user.user_role || "US").substring(0, 2).toUpperCase();
                 const displayId = `${idPrefix}-${user.permanent_id || '0'}`;
                 const fullName = `${user.firstname} ${user.middlename ? `${user.middlename} ` : ''}${user.lastname}`;
 
                 return (
-                  <div key={index} className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm hover:shadow-md transition-all flex flex-col ${userStatus === 'Deactivated' ? 'opacity-80' : ''}`}>
-                    <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === index ? null : index); }} className="absolute top-4 right-4 text-gray-600 hover:text-black z-20">
+                  <div
+                    key={index}
+                    className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm hover:shadow-md transition-all flex flex-col ${userStatus === 'Deactivated' ? 'opacity-80' : ''}`}
+                  >
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === index ? null : index); }}
+                      className="absolute top-4 right-4 text-gray-600 hover:text-black z-20"
+                    >
                       <HiDotsHorizontal size={20} />
                     </button>
 
                     {activeMenu === index && (
                       <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-44 py-1 text-[11px] font-bold">
                         {isLocked ? (
-                          <button onClick={(e) => { e.stopPropagation(); handleUnlock(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600">Unlock & Activate</button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleUnlock(user); }}
+                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600"
+                          >
+                            Unlock & Activate
+                          </button>
                         ) : (
                           <>
-                            <button onClick={(e) => { e.stopPropagation(); handleEditClick(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">Update Information</button>
-                            <div className="border-t"></div>
-                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(user); }} className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}>
-                              {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
+                            {user.user_role === 'Admin' && !isApproved && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleApproveAdmin(user); }}
+                                className="w-full text-left px-4 py-2 hover:bg-gray-50 text-blue-600"
+                              >
+                                Approve Admin
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEditClick(user); }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-50"
+                            >
+                              Update Information
                             </button>
+                            {!isHeadAdmin && isApproved && (
+                              <>
+                                <div className="border-t"></div>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleStatus(user); }}
+                                  className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}
+                                >
+                                  {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
+                                </button>
+                              </>
+                            )}
                           </>
                         )}
                       </div>
@@ -282,10 +351,15 @@ const ManageUsers = () => {
                       </div>
                       <div className="flex-1 pt-0.5 min-w-0 flex flex-col pr-8">
                         <h3 className="font-bold text-sm text-black leading-tight truncate" title={fullName}>{fullName}</h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-[#9CA3AF] text-xs font-normal">{user.user_role}</p>
-                          {isLocked && <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Locked</span>}
-                          {userStatus === 'Deactivated' && <span className="bg-[#EF4444] text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Deactivated</span>}
+                        <div className="flex flex-col items-start gap-1 mt-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-[#9CA3AF] text-xs font-normal">{isHeadAdmin ? "Head Admin" : user.user_role}</p>
+                            {isLocked && <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Locked</span>}
+                            {userStatus === 'Deactivated' && <span className="bg-[#EF4444] text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Deactivated</span>}
+                          </div>
+                          {user.user_role === 'Admin' && !isApproved && (
+                            <span className="bg-blue-100 text-blue-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Pending Approval</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -319,26 +393,49 @@ const ManageUsers = () => {
       </div>
 
       {(showAddModal || showEditModal) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[3rem] w-full max-w-3xl p-12 relative shadow-2xl animate-in zoom-in duration-300">
-            <button onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="absolute top-10 right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm">
-              <HiX size={28}/>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-4 lg:p-6 text-left">
+          <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-3xl p-6 lg:p-12 relative shadow-2xl overflow-y-auto max-h-[90vh]">
+            <button
+              onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }}
+              className="absolute top-5 right-5 lg:top-10 lg:right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"
+            >
+              <HiX size={22} />
             </button>
-            <h2 className="text-3xl font-black text-slate-900 uppercase mb-8 tracking-tighter leading-none">{showAddModal ? "Add New User" : "Update User"}</h2>
 
-            <form onSubmit={showAddModal ? handleAddUser : handleUpdateUser} className="grid grid-cols-5 gap-x-10">
-              <div className="col-span-3 space-y-3">
+            <h2 className="text-2xl lg:text-3xl font-black text-slate-900 uppercase mb-6 lg:mb-8 tracking-tighter leading-none">
+              {showAddModal ? "Add New User" : "Update User"}
+            </h2>
+
+            <form onSubmit={showAddModal ? handleAddUser : handleUpdateUser} className="flex flex-col lg:grid lg:grid-cols-5 gap-6 lg:gap-x-10">
+              <div className="lg:col-span-3 space-y-3">
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">First Name</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.firstName : selectedUser?.firstName} onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
+                  <input
+                    required
+                    maxLength={24}
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                    value={showAddModal ? formData.firstName : selectedUser?.firstName}
+                    onChange={e => handleNameChange('firstName', e.target.value, showEditModal)}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Middle Name</label>
-                  <input className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.middleName : selectedUser?.middleName} onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
+                  <input
+                    maxLength={24}
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                    value={showAddModal ? formData.middleName : selectedUser?.middleName}
+                    onChange={e => handleNameChange('middleName', e.target.value, showEditModal)}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Last Name</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.lastName : selectedUser?.lastName} onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
+                  <input
+                    required
+                    maxLength={24}
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                    value={showAddModal ? formData.lastName : selectedUser?.lastName}
+                    onChange={e => handleNameChange('lastName', e.target.value, showEditModal)}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
@@ -356,17 +453,24 @@ const ManageUsers = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>
-                  <input required type="email" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={showAddModal ? formData.email : selectedUser?.email} onChange={e => handleEmailChange(e.target.value, showEditModal)} />
+                  <input
+                    required
+                    type="email"
+                    maxLength={30}
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                    value={showAddModal ? formData.email : selectedUser?.email}
+                    onChange={e => handleEmailChange(e.target.value, showEditModal)}
+                  />
                 </div>
               </div>
 
-              <div className="col-span-2 flex flex-col items-center justify-between py-2">
+              <div className="lg:col-span-2 flex flex-col items-center justify-between py-2 gap-4">
                 <div className="flex flex-col items-center w-full space-y-3">
-                  <div className="w-28 h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
+                  <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
                     {(showAddModal ? formData.profileImage : selectedUser?.profileImage) ? (
                       <img src={showAddModal ? formData.profileImage : selectedUser.profileImage} className="w-full h-full object-cover" alt="Preview" />
                     ) : (
-                      <HiCamera size={40} className="text-gray-200" />
+                      <HiCamera size={36} className="text-gray-200" />
                     )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
                       <p className="text-white text-[9px] font-black uppercase">Upload Photo</p>
@@ -382,9 +486,15 @@ const ManageUsers = () => {
                   </div>
 
                   <div className="w-full space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Gender</label>
+                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black flex items-center gap-1">
+                      Gender <HiChevronDown size={10} />
+                    </label>
                     <div className="relative">
-                      <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none" value={showAddModal ? formData.gender : selectedUser?.gender} onChange={e => showAddModal ? setFormData({...formData, gender: e.target.value}) : setSelectedUser({...selectedUser, gender: e.target.value})}>
+                      <select
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
+                        value={showAddModal ? formData.gender : selectedUser?.gender}
+                        onChange={e => showAddModal ? setFormData({...formData, gender: e.target.value}) : setSelectedUser({...selectedUser, gender: e.target.value})}
+                      >
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
@@ -394,9 +504,15 @@ const ManageUsers = () => {
                   </div>
 
                   <div className="w-full space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Position</label>
+                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black flex items-center gap-1">
+                      Position <HiChevronDown size={10} />
+                    </label>
                     <div className="relative">
-                      <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none" value={showAddModal ? formData.role : selectedUser?.role} onChange={e => showAddModal ? setFormData({...formData, role: e.target.value}) : setSelectedUser({...selectedUser, role: e.target.value})}>
+                      <select
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
+                        value={showAddModal ? formData.role : selectedUser?.role}
+                        onChange={e => showAddModal ? setFormData({...formData, role: e.target.value}) : setSelectedUser({...selectedUser, role: e.target.value})}
+                      >
                         <option value="Sales">Sales</option>
                         <option value="Admin">Admin</option>
                         <option value="Production">Production</option>
@@ -407,9 +523,20 @@ const ManageUsers = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-3 w-full mt-4">
-                  <button type="button" onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }} className="flex-1 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all">Cancel</button>
-                  <button type="submit" className="flex-1 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm</button>
+                <div className="flex gap-3 w-full mt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }}
+                    className="flex-1 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest cursor-pointer"
+                  >
+                    Confirm
+                  </button>
                 </div>
               </div>
             </form>

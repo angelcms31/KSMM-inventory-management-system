@@ -28,32 +28,39 @@ const createAuditLog = async (userId, action, role) => {
   }
 };
 
-const checkDuplicateAcrossTables = async (email, contactNo, excludeTable = null, excludeId = null) => {
-  const tables = [
-    { table: 'personaldata', emailCol: 'email', contactCol: 'contact_no', idCol: 'user_id' },
-    { table: 'artisan',      emailCol: 'email', contactCol: 'contact_no', idCol: 'artisan_id' },
-    { table: 'supplier',     emailCol: 'email', contactCol: 'contact_no', idCol: 'supplier_id' },
-  ];
-  for (const t of tables) {
-    const isExcluded = excludeTable === t.table;
-    const eRes = await getPool().query(
-      isExcluded
-        ? `SELECT 1 FROM ${t.table} WHERE LOWER(${t.emailCol}) = LOWER($1) AND ${t.idCol} != $2`
-        : `SELECT 1 FROM ${t.table} WHERE LOWER(${t.emailCol}) = LOWER($1)`,
-      isExcluded ? [email, excludeId] : [email]
-    );
-    if (eRes.rows.length > 0) return { conflict: true, field: 'Email' };
-    const cRes = await getPool().query(
-      isExcluded
-        ? `SELECT 1 FROM ${t.table} WHERE ${t.contactCol} = $1 AND ${t.idCol} != $2`
-        : `SELECT 1 FROM ${t.table} WHERE ${t.contactCol} = $1`,
-      isExcluded ? [contactNo, excludeId] : [contactNo]
-    );
-    if (cRes.rows.length > 0) return { conflict: true, field: 'Contact number' };
+const checkDuplicateAcrossTables = async (email, contactNo, currentTable = null, excludeId = null) => {
+  const pool = getPool();
+
+  const userRes = await pool.query(
+    `SELECT 1 FROM personaldata WHERE (LOWER(email) = LOWER($1) OR contact_no = $2) ${currentTable === 'personaldata' ? `AND user_id != $3` : ''}`,
+    currentTable === 'personaldata' ? [email, contactNo, excludeId] : [email, contactNo]
+  );
+
+  if (userRes.rows.length > 0) {
+    return { conflict: true, field: 'Email/Contact', message: 'Email is already used by a System User.' };
   }
+
+  if (currentTable === 'personaldata') {
+    const artisanRes = await pool.query(`SELECT 1 FROM artisan WHERE LOWER(email) = LOWER($1) OR contact_no = $2`, [email, contactNo]);
+    if (artisanRes.rows.length > 0) return { conflict: true, field: 'Email/Contact', message: 'Email is already used by an Artisan.' };
+
+    const supplierRes = await pool.query(`SELECT 1 FROM supplier WHERE LOWER(email) = LOWER($1) OR contact_no = $2`, [email, contactNo]);
+    if (supplierRes.rows.length > 0) return { conflict: true, field: 'Email/Contact', message: 'Email is already used by a Supplier.' };
+  }
+
+  if (currentTable === 'artisan' || currentTable === 'supplier') {
+    const tableIdCol = currentTable === 'artisan' ? 'artisan_id' : 'supplier_id';
+    const selfRes = await pool.query(
+      `SELECT 1 FROM ${currentTable} WHERE (LOWER(email) = LOWER($1) OR contact_no = $2) AND ${tableIdCol} != $3`,
+      [email, contactNo, excludeId]
+    );
+    if (selfRes.rows.length > 0) {
+        return { conflict: true, field: 'Email/Contact', message: `Email is already registered in ${currentTable}s.` };
+    }
+  }
+
   return { conflict: false };
 };
-
 // ─────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────
@@ -62,23 +69,44 @@ app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   try {
     const userCheck = await getPool().query(
-      `SELECT u.user_id, u.user_role as role, u.password, u.failed_attempts, u.is_locked, u.is_default_password, p.status, p.firstname as firstname 
+      `SELECT u.user_id, u.user_role as role, u.password, u.failed_attempts, 
+              u.is_locked, u.is_default_password, u.is_approved, u.is_head_admin,
+              p.status, p.firstname as firstname 
        FROM userlogin u JOIN personaldata p ON u.user_id = p.user_id 
        WHERE LOWER(u.user_account) = LOWER($1)`, [email]
     );
+
     if (userCheck.rows.length === 0) return res.status(401).json({ message: "Invalid credentials" });
+
     const user = userCheck.rows[0];
-    if (user.is_locked) return res.status(403).json({ message: "Account Locked" });
+
     if (user.status === 'Deactivated') return res.status(403).json({ message: "Account Deactivated" });
+
+    if (user.is_locked && !user.is_head_admin) return res.status(403).json({ message: "Account Locked" });
+
+    if (user.role === 'Admin' && !user.is_approved && !user.is_head_admin) {
+      return res.status(403).json({ message: "Your Admin account is pending approval from the Head Admin." });
+    }
+
     const match = await bcrypt.compare(password, user.password);
+
     if (match) {
       await getPool().query('UPDATE userlogin SET failed_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE user_id = $1', [user.user_id]);
       await createAuditLog(user.user_id, "Login", user.role);
+      
       return res.json({
-        success: true, role: user.role, firstName: user.firstname,
-        user_id: user.user_id, is_default_password: user.is_default_password ?? true
+        success: true, 
+        role: user.role, 
+        firstName: user.firstname,
+        user_id: user.user_id, 
+        is_head_admin: user.is_head_admin || false,
+        is_default_password: user.is_default_password ?? true
       });
     } else {
+      if (user.is_head_admin) {
+        return res.status(401).json({ message: "Invalid credentials." });
+      }
+
       const newAttempts = (user.failed_attempts || 0) + 1;
       if (newAttempts >= 3) {
         await getPool().query('UPDATE userlogin SET failed_attempts = $1, is_locked = TRUE WHERE user_id = $2', [newAttempts, user.user_id]);
@@ -88,7 +116,9 @@ app.post("/login", async (req, res) => {
         return res.status(401).json({ message: "Invalid credentials." });
       }
     }
-  } catch (error) { res.status(500).json({ message: "Login error" }); }
+  } catch (error) { 
+    res.status(500).json({ message: "Login error" }); 
+  }
 });
 
 app.post('/api/change_password', async (req, res) => {
@@ -145,17 +175,13 @@ app.post("/api/reset_password", async (req, res) => {
   } catch (err) { res.status(500).send("Server error during password reset"); }
 });
 
-// ─────────────────────────────────────────────
-// ADMIN — Users
-// ─────────────────────────────────────────────
-
 app.get("/api/users", async (req, res) => {
   try {
     const { search = "", page = 1, limit = 6 } = req.query;
     const offset = (page - 1) * limit;
     const result = await getPool().query(`
       WITH numbered_users AS (
-        SELECT p.*, u.user_role, u.is_locked, u.date_added,
+        SELECT p.*, u.user_role, u.is_locked, u.is_head_admin, u.is_approved, u.date_added,
                ROW_NUMBER() OVER(ORDER BY u.date_added ASC) as permanent_id,
                COUNT(*) OVER() as total_count
         FROM personaldata p JOIN userlogin u ON p.user_id = u.user_id
@@ -164,6 +190,7 @@ app.get("/api/users", async (req, res) => {
       WHERE firstname ILIKE $1 OR lastname ILIKE $1 OR email ILIKE $1
          OR CONCAT(SUBSTRING(user_role, 1, 2), '-', permanent_id::TEXT) ILIKE $1
       ORDER BY CASE WHEN is_locked = TRUE THEN 1 ELSE 2 END ASC,
+               CASE WHEN is_approved = FALSE AND user_role = 'Admin' THEN 1 ELSE 2 END ASC,
                CASE WHEN status = 'Active' THEN 1 ELSE 2 END ASC, date_added DESC
       LIMIT $2 OFFSET $3`, [`%${search}%`, limit, offset]);
     res.json({ users: result.rows, totalUsers: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 });
@@ -196,29 +223,57 @@ app.get("/api/user/:id", async (req, res) => {
 });
 
 app.post("/api/add_user", async (req, res) => {
-  const { firstName, middleName, lastName, email, contactNo, role, gender, profileImage } = req.body;
+  const { firstName, middleName, lastName, email, contactNo, role, gender, profileImage, creatorId } = req.body;
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const dup = await checkDuplicateAcrossTables(email, contactNo);
-    if (dup.conflict) { await client.query("ROLLBACK"); return res.status(400).json({ message: `${dup.field} is already in use.` }); }
+
+    const dup = await checkDuplicateAcrossTables(email, contactNo, 'personaldata');
+    if (dup.conflict) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: dup.message });
+    }
+
+    const creatorRes = await client.query("SELECT is_head_admin FROM userlogin WHERE user_id = $1", [creatorId]);
+    const isHeadAdminCreator = creatorRes.rows[0]?.is_head_admin || false;
+
     const pRes = await client.query(
       `INSERT INTO personaldata (firstname, middlename, lastname, email, contact_no, gender, profile_image, status) VALUES ($1,$2,$3,$4,$5,$6,$7,'Active') RETURNING user_id`,
       [firstName, middleName || '', lastName, email, contactNo, gender, profileImage]
     );
+
     const hashedPassword = await bcrypt.hash("password123", 10);
+    const needsApproval = role === 'Admin' && !isHeadAdminCreator;
+
     await client.query(
-      `INSERT INTO userlogin (user_account, password, user_role, user_id, failed_attempts, is_locked, is_default_password) VALUES ($1,$2,$3,$4,0,FALSE,TRUE)`,
-      [email, hashedPassword, role, pRes.rows[0].user_id]
+      `INSERT INTO userlogin (user_account, password, user_role, user_id, failed_attempts, is_locked, is_default_password, is_approved, is_head_admin) 
+       VALUES ($1,$2,$3,$4,0,FALSE,TRUE,$5,FALSE)`,
+      [email, hashedPassword, role, pRes.rows[0].user_id, !needsApproval]
     );
+
     await client.query("COMMIT");
+
+    let mailContent = `<h3>Account Created!</h3><p>Hi ${firstName}, use these credentials:</p><p>User: ${email}<br>Pass: password123</p>`;
+    if (needsApproval) {
+      mailContent += `<p><strong>Note:</strong> Your Admin account is pending approval from the Head Admin.</p>`;
+    } else {
+      mailContent += `<p>You will be required to change your password upon first login.</p>`;
+    }
+
     await transporter.sendMail({
-      from: process.env.MY_EMAIL, to: email, subject: "Welcome to Matthew & Melka",
-      html: `<h3>Account Created!</h3><p>Hi ${firstName}, use these credentials:</p><p>User: ${email}<br>Pass: password123</p><p>You will be required to change your password upon first login.</p>`
+      from: process.env.MY_EMAIL, 
+      to: email, 
+      subject: "Welcome to Matthew & Melka",
+      html: mailContent
     });
-    res.status(201).send("User created successfully");
-  } catch (err) { await client.query("ROLLBACK"); res.status(500).send(err.message); }
-  finally { client.release(); }
+
+    res.status(201).send(needsApproval ? "Admin created and pending approval" : "User created successfully");
+  } catch (err) { 
+    await client.query("ROLLBACK"); 
+    res.status(500).send(err.message); 
+  } finally { 
+    client.release(); 
+  }
 });
 
 app.put("/api/user/update", async (req, res) => {
@@ -226,10 +281,6 @@ app.put("/api/user/update", async (req, res) => {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const userIdRes = await client.query('SELECT user_id FROM personaldata WHERE LOWER(email) = LOWER($1)', [originalEmail]);
-    const userId = userIdRes.rows[0]?.user_id;
-    const dup = await checkDuplicateAcrossTables(email, contactNo, 'personaldata', userId);
-    if (dup.conflict) { await client.query("ROLLBACK"); return res.status(400).json({ message: `${dup.field} is already in use.` }); }
     await client.query(
       'UPDATE personaldata SET firstname=$1, middlename=$2, lastname=$3, contact_no=$4, gender=$5, profile_image=$6 WHERE email=$7',
       [firstName, middleName || '', lastName, contactNo, gender, profileImage, originalEmail || email]
@@ -243,12 +294,32 @@ app.put("/api/user/update", async (req, res) => {
 
 app.put("/api/user/status", async (req, res) => {
   const { userId, status, adminId, adminRole } = req.body;
-  if (status === 'Deactivated' && String(userId) === String(adminId))
-    return res.status(400).json({ message: 'You cannot deactivate your own account.' });
+  
   try {
+    const adminCheck = await getPool().query('SELECT is_head_admin FROM userlogin WHERE user_id = $1', [adminId]);
+    if (!adminCheck.rows[0]?.is_head_admin) {
+      return res.status(403).json({ message: 'Only the Head Admin can deactivate accounts.' });
+    }
+
+    if (String(userId) === String(adminId)) return res.status(400).json({ message: 'You cannot deactivate your own account.' });
+
     await getPool().query('UPDATE personaldata SET status = $1 WHERE user_id = $2', [status, userId]);
     await createAuditLog(adminId, `User ${status}: ID ${userId}`, adminRole);
     res.send(`User status updated to ${status}`);
+  } catch (err) { res.status(500).send(err.message); }
+});
+
+app.put("/api/admin/approve", async (req, res) => {
+  const { userId, adminId } = req.body;
+  try {
+    const adminCheck = await getPool().query('SELECT is_head_admin FROM userlogin WHERE user_id = $1', [adminId]);
+    if (!adminCheck.rows[0]?.is_head_admin) {
+      return res.status(403).json({ message: 'Only the Head Admin can approve Admin accounts.' });
+    }
+
+    await getPool().query('UPDATE userlogin SET is_approved = TRUE WHERE user_id = $1', [userId]);
+    await createAuditLog(adminId, `Approved Admin Account: ID ${userId}`, 'Head Admin');
+    res.send("Admin account approved");
   } catch (err) { res.status(500).send(err.message); }
 });
 
@@ -281,15 +352,24 @@ app.get("/api/artisans", async (req, res) => {
 
 app.post("/api/add_artisan", async (req, res) => {
   const { first_name, middle_name, last_name, email, contact_no, department, profile_image } = req.body;
+  
   try {
-    const dup = await checkDuplicateAcrossTables(email, contact_no);
-    if (dup.conflict) return res.status(400).json({ message: `${dup.field} is already in use.` });
+    const dup = await checkDuplicateAcrossTables(email, contact_no, 'artisan');
+    if (dup.conflict) {
+      return res.status(400).json({ message: dup.message });
+    }
+
     const result = await getPool().query(
-      `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, profile_image, department, status) VALUES ($1,$2,$3,$4,$5,$6,$7,'Active') RETURNING *`,
-      [first_name, middle_name, last_name, email, contact_no, profile_image, department]
+      `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, profile_image, department, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active') RETURNING *`,
+      [first_name, middle_name || '', last_name, email, contact_no, profile_image, department]
     );
-    res.json(result.rows[0]);
-  } catch (err) { res.status(500).send(err.message); }
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err.message); // Tingnan ang terminal para sa specific error
+    res.status(500).send("Server Error: " + err.message);
+  }
 });
 
 app.put("/api/artisans/:id", async (req, res) => {
@@ -297,7 +377,8 @@ app.put("/api/artisans/:id", async (req, res) => {
   const { first_name, middle_name, last_name, email, contact_no, profile_image, department, status } = req.body;
   try {
     const dup = await checkDuplicateAcrossTables(email, contact_no, 'artisan', id);
-    if (dup.conflict) return res.status(400).json({ message: `${dup.field} is already in use.` });
+    if (dup.conflict) return res.status(400).json({ message: dup.message });
+
     const result = await getPool().query(
       `UPDATE artisan SET first_name=$1, middle_name=$2, last_name=$3, email=$4, contact_no=$5, profile_image=$6, department=$7, status=$8 WHERE artisan_id=$9 RETURNING *`,
       [first_name, middle_name, last_name, email, contact_no, profile_image, department, status, id]
@@ -321,7 +402,7 @@ app.post("/api/artisan/status", async (req, res) => {
 
 app.get("/api/suppliers", async (req, res) => {
   try {
-    const result = await dbQuery('SELECT * FROM supplier ORDER BY supplier_id DESC', [], 'suppliers');
+    const result = await getPool().query('SELECT * FROM supplier ORDER BY supplier_id DESC');
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -329,9 +410,10 @@ app.get("/api/suppliers", async (req, res) => {
 app.post("/api/add_supplier", async (req, res) => {
   const { name, email, phone } = req.body;
   try {
-    const dup = await checkDuplicateAcrossTables(email, phone);
-    if (dup.conflict) return res.status(400).json({ message: `${dup.field} is already in use.` });
-    await getPool().query("INSERT INTO Supplier (name, contact_no, email) VALUES ($1,$2,$3)", [name, phone, email]);
+    const dup = await checkDuplicateAcrossTables(email, phone, 'supplier');
+    if (dup.conflict) return res.status(400).json({ message: dup.message });
+
+    await getPool().query("INSERT INTO Supplier (name, contact_no, email, status) VALUES ($1,$2,$3, 'Active')", [name, phone, email]);
     res.status(201).send("Success");
   } catch (err) { res.status(500).send(err.message); }
 });
@@ -340,13 +422,13 @@ app.put("/api/suppliers/:id", async (req, res) => {
   const { id } = req.params;
   const { name, email, contact_no } = req.body;
   try {
-    const dup = await checkDuplicateAcrossTables(email, contact_no, 'supplier', id);
-    if (dup.conflict) return res.status(400).json({ message: `${dup.field} is already in use.` });
+    const dup = await checkDuplicateForArtisanSupplier(email, contact_no, 'supplier', id);
+    if (dup.conflict) return res.status(400).json({ message: dup.message });
+
     const result = await getPool().query(
       "UPDATE supplier SET name=$1, email=$2, contact_no=$3 WHERE supplier_id=$4 RETURNING *",
       [name, email, contact_no, id]
     );
-    if (result.rows.length === 0) return res.status(404).send("Supplier not found");
     res.json(result.rows[0]);
   } catch (err) { res.status(500).send(err.message); }
 });
@@ -916,3 +998,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Local network access: http://${localIP}:${PORT}`);
 });
+
+
+
+

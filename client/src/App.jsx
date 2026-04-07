@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import axios from "axios";
 import { RecoveryContext } from "./context/RecoveryContext";
+import { getHashedPath } from "./utils/hash";
 
 import Login from "./pages/auth/Login";
 import OTPInput from "./pages/auth/OTPInput";
@@ -13,44 +14,45 @@ import SalesLayout from "./components/layouts/SalesLayout";
 import ProductionLayout from "./components/layouts/ProductionLayout";
 import FinanceLayout from "./components/layouts/FinanceLayout";
 
-import ManageUsers from "./pages/admin/ManageUsers";
-import ManageArtisan from "./pages/admin/ManageArtisan";
-import Suppliers from "./pages/admin/Suppliers";
-import AuditLogs from "./pages/admin/AuditLogs";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import FinanceDashboard from "./pages/finance/FinanceDashboard";
-import FinanceTransactions from "./pages/finance/FinanceTransaction";
-import ProductionDashboard from "./pages/production/ProductionDashboard";
-import Inventory from "./pages/production/Inventory";
-import Artisan from "./pages/production/Artisan";
-import SalesDashboard from "./pages/sales/SalesDashboard";
-import SalesInventory from "./pages/sales/SalesInventory";
-import Warehouse from "./pages/sales/Warehouse";
-import Statistics from "./pages/sales/Statistics";
-import FinanceLogs from "./pages/finance/FinanceLogs";
-import PurchaseOrder from "./pages/finance/PurchaseOrder";
-
 const AuthRoute = ({ children }) => {
   const userId = localStorage.getItem("user_id");
   const userRole = localStorage.getItem("userRole")?.toLowerCase();
 
   if (userId && userRole) {
-    if (userRole === "admin") return <Navigate to="/admin" replace />;
-    if (userRole === "sales") return <Navigate to="/sales" replace />;
-    if (userRole === "production") return <Navigate to="/production" replace />;
-    if (userRole === "finance") return <Navigate to="/finance" replace />;
+    const hashedPath = getHashedPath(userRole, "home");
+    return <Navigate to={`/dashboard/${hashedPath}`} replace />;
   }
   return children;
 };
 
 const ProtectedRoute = ({ children, allowedRole }) => {
-  const userId = localStorage.getItem("user_id");
-  const userRole = localStorage.getItem("userRole");
+  const { hash } = useParams();
+  const userId = localStorage.getItem("user_id"); // REQUIRED: Kunin ang ID
+  const userRole = localStorage.getItem("userRole")?.toLowerCase();
 
-  if (!userId) return <Navigate to="/" replace />;
-  if (allowedRole && userRole?.toLowerCase() !== allowedRole.toLowerCase()) {
+  // 1. Check kung may nakalogin
+  if (!userId || !userRole) {
     return <Navigate to="/" replace />;
   }
+
+  // 2. Check kung ang role ay allowed sa route na ito
+  if (userRole !== allowedRole.toLowerCase()) {
+    return <Navigate to="/" replace />;
+  }
+
+  // 3. I-verify kung ang hash sa URL ay valid para sa role na ito
+  const tabs = [
+    "home", "artisan", "suppliers", "audit", "users", 
+    "inventory", "warehouse", "statistics", 
+    "transactions", "logs", "purchaseorder"
+  ];
+
+  const isValidHash = tabs.some(t => getHashedPath(userRole, t) === hash);
+
+  if (!isValidHash) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 };
 
@@ -128,33 +130,10 @@ function App() {
         <Route path="/reset" element={<AuthRoute><Reset /></AuthRoute>} />
         <Route path="/recovered" element={<AuthRoute><Recovered /></AuthRoute>} />
 
-        <Route path="/admin" element={<ProtectedRoute allowedRole="Admin"><AdminLayout /></ProtectedRoute>}>
-          <Route path="" element={<AdminDashboard />} />
-          <Route path="artisan" element={<ManageArtisan />} />
-          <Route path="suppliers" element={<Suppliers />} />
-          <Route path="audit-logs" element={<AuditLogs />} />
-          <Route path="users" element={<ManageUsers />} />
-        </Route>
-
-        <Route path="/sales" element={<ProtectedRoute allowedRole="Sales"><SalesLayout /></ProtectedRoute>}>
-          <Route path="" element={<SalesDashboard />} />
-          <Route path="inventory" element={<SalesInventory />} />
-          <Route path="warehouse" element={<Warehouse />} />
-          <Route path="statistics" element={<Statistics />} />
-        </Route>
-
-        <Route path="/production" element={<ProtectedRoute allowedRole="Production"><ProductionLayout /></ProtectedRoute>}>
-          <Route path="" element={<ProductionDashboard />} />
-          <Route path="artisan" element={<Artisan />} />
-          <Route path="inventory" element={<Inventory />} />
-        </Route>
-
-        <Route path="/finance" element={<ProtectedRoute allowedRole="Finance"><FinanceLayout /></ProtectedRoute>}>
-          <Route path="" element={<FinanceDashboard />} />
-          <Route path="transactions" element={<FinanceTransactions />} />
-          <Route path="logs" element={<FinanceLogs />} />
-          <Route path="PurchaseOrder" element={<PurchaseOrder />} />
-        </Route>
+        <Route path="/dashboard/:hash" element={<ProtectedRoute allowedRole="Admin"><AdminLayout /></ProtectedRoute>} />
+        <Route path="/dashboard/:hash" element={<ProtectedRoute allowedRole="Sales"><SalesLayout /></ProtectedRoute>} />
+        <Route path="/dashboard/:hash" element={<ProtectedRoute allowedRole="Production"><ProductionLayout /></ProtectedRoute>} />
+        <Route path="/dashboard/:hash" element={<ProtectedRoute allowedRole="Finance"><FinanceLayout /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

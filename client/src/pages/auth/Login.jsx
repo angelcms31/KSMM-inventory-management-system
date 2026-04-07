@@ -3,6 +3,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { RecoveryContext } from "../../context/RecoveryContext";
 import { useNavigate } from "react-router-dom";
 import { HiOutlineEye, HiOutlineEyeOff } from "react-icons/hi";
+import { getHashedRole } from "../../utils/hash";
 
 export default function Login() {
   const { setEmail, setOTP } = useContext(RecoveryContext);
@@ -10,7 +11,6 @@ export default function Login() {
 
   const [localEmail, setLocalEmail] = useState("");
   const [localPassword, setLocalPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -23,23 +23,13 @@ export default function Login() {
   const [pendingRole, setPendingRole] = useState(null);
   const [defaultPassword, setDefaultPassword] = useState("");
 
-  useEffect(() => {
-    const savedEmail = localStorage.getItem("rememberedEmail");
-    if (savedEmail) {
-      setLocalEmail(savedEmail);
-      setRememberMe(true);
-    }
-  }, []);
-
   const redirectByRole = (role) => {
-    const r = role.toLowerCase();
-    if (r === "admin") navigate("/admin");
-    else if (r === "sales") navigate("/sales");
-    else if (r === "production") navigate("/production");
-    else if (r === "finance") navigate("/finance");
-    else {
+    const hashedRole = getHashedRole(role.toLowerCase());
+    if (hashedRole) {
+      navigate(`/dashboard/${hashedRole}`, { replace: true });
+    } else {
       setError(true);
-      setErrorMessage("Your role is not recognized: " + role);
+      setErrorMessage("Access denied: Invalid role configuration.");
     }
   };
 
@@ -52,25 +42,20 @@ export default function Login() {
       return;
     }
 
-    if (rememberMe) {
-      localStorage.setItem("rememberedEmail", localEmail);
-    } else {
-      localStorage.removeItem("rememberedEmail");
-    }
-
     axios
       .post("http://localhost:5000/login", {
         email: localEmail,
         password: localPassword,
       })
       .then((res) => {
-        const { role, firstName, firstname, user_id, is_default_password } = res.data;
+        const { role, firstName, firstname, user_id, is_default_password, is_head_admin } = res.data;
         const nameToSave = firstName || firstname;
         setError(false);
 
         localStorage.setItem("userName", nameToSave || "User");
         localStorage.setItem("userRole", role);
         localStorage.setItem("user_id", user_id);
+        localStorage.setItem("is_head_admin", is_head_admin);
 
         if (is_default_password) {
           setPendingUserId(user_id);
@@ -155,18 +140,18 @@ export default function Login() {
   if (showChangePassword) {
     return (
       <div className="flex h-screen w-screen bg-white font-serif overflow-hidden">
-        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-10 md:px-20 text-[#262221]">
+        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 md:px-20 text-[#262221]">
           <div className="text-center mb-10">
-            <h1 className="text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">
+            <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">
               Matthew & Melka
             </h1>
-            <p className="text-[10px] tracking-[0.2em] text-gray-400 font-sans mt-2">KEN SAMUDIO</p>
+            <p className="text-[10px] tracking-[0.2em] text-gray-400 font-sans mt-2 uppercase">Ken Samudio</p>
           </div>
 
-          <div className="w-full">
+          <div className="w-full max-w-md">
             <form onSubmit={handleChangePassword} autoComplete="off">
-              <h2 className="text-2xl font-bold mb-1 tracking-tight">Set New Password</h2>
-              <p className="text-gray-400 text-sm mb-10 font-sans">
+              <h2 className="text-xl md:text-2xl font-bold mb-1 tracking-tight">Set New Password</h2>
+              <p className="text-gray-400 text-xs md:text-sm mb-10 font-sans">
                 For security, please change your default password before continuing.
               </p>
 
@@ -178,11 +163,12 @@ export default function Login() {
                   <input
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword}
+                    maxLength={24}
                     autoComplete="new-password"
                     onChange={(e) => { setNewPassword(e.target.value); if (error) setError(false); }}
                     className={`w-full border rounded-md p-3.5 pr-12 text-sm outline-none transition-all ${error ? "border-red-400 ring-1 ring-red-100" : "border-gray-200 focus:border-stone-800"}`}
                   />
-                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-3.5 text-gray-400 hover:text-stone-800">
+                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-4 top-3.5 text-gray-400 hover:text-stone-800 cursor-pointer">
                     {showNewPassword ? <HiOutlineEyeOff size={20} /> : <HiOutlineEye size={20} />}
                   </button>
                 </div>
@@ -194,11 +180,12 @@ export default function Login() {
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
+                    maxLength={24}
                     autoComplete="new-password"
                     onChange={(e) => { setConfirmPassword(e.target.value); if (error) setError(false); }}
                     className={`w-full border rounded-md p-3.5 pr-12 text-sm outline-none transition-all ${error ? "border-red-400 ring-1 ring-red-100" : "border-gray-200 focus:border-stone-800"}`}
                   />
-                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-3.5 text-gray-400 hover:text-stone-800">
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-3.5 text-gray-400 hover:text-stone-800 cursor-pointer">
                     {showConfirmPassword ? <HiOutlineEyeOff size={20} /> : <HiOutlineEye size={20} />}
                   </button>
                 </div>
@@ -211,7 +198,7 @@ export default function Login() {
 
                 <button
                   type="submit"
-                  className="w-full bg-[#262221] text-white py-4 rounded-md uppercase tracking-[0.2em] text-[12px] font-bold shadow-lg hover:bg-black transition-all active:scale-[0.98]"
+                  className="w-full cursor-pointer bg-[#262221] text-white py-4 rounded-md uppercase tracking-[0.2em] text-[12px] font-bold shadow-lg hover:bg-stone-800 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
                 >
                   Save & Continue
                 </button>
@@ -230,18 +217,18 @@ export default function Login() {
 
   return (
     <div className="flex h-screen w-screen bg-white font-serif overflow-hidden">
-      <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-10 md:px-20 text-[#262221]">
+      <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 md:px-20 text-[#262221]">
         <div className="text-center mb-10">
-          <h1 className="text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">
+          <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">
             Matthew & Melka
           </h1>
-          <p className="text-[10px] tracking-[0.2em] text-gray-400 font-sans mt-2">KEN SAMUDIO</p>
-          <p className="mt-8 text-gray-500 text-sm italic">Inventory Management System</p>
+          <p className="text-[10px] tracking-[0.2em] text-gray-400 font-sans mt-2 uppercase">Ken Samudio</p>
+          <p className="mt-8 text-gray-500 text-xs md:text-sm italic">Inventory Management System</p>
         </div>
 
-        <div className="w-full">
+        <div className="w-full max-w-md">
           <form onSubmit={handleLogin} autoComplete="on">
-            <h2 className="text-2xl font-bold mb-1 tracking-tight">Welcome!</h2>
+            <h2 className="text-xl md:text-2xl font-bold mb-1 tracking-tight">Welcome!</h2>
             <p className="text-gray-400 text-sm mb-10 font-sans">Please login here</p>
 
             <div className="space-y-7">
@@ -252,6 +239,7 @@ export default function Login() {
                 <input
                   type="text"
                   name="email"
+                  maxLength={30}
                   autoComplete="email"
                   value={localEmail}
                   onChange={(e) => { setLocalEmail(e.target.value); if (error) setError(false); }}
@@ -266,22 +254,23 @@ export default function Login() {
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
+                  maxLength={24}
                   autoComplete="current-password"
                   value={localPassword}
                   onChange={(e) => { setLocalPassword(e.target.value); if (error) setError(false); }}
-                  className="w-full border border-gray-200 rounded-md p-3.5 pr-12 text-sm outline-none focus:border-stone-800"
+                  className="w-full border border-gray-200 rounded-md p-3.5 pr-12 text-sm outline-none focus:border-stone-800 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-3.5 text-gray-400 hover:text-stone-800"
+                  className="absolute right-4 top-3.5 text-gray-400 hover:text-stone-800 cursor-pointer transition-colors"
                 >
                   {showPassword ? <HiOutlineEyeOff size={20} /> : <HiOutlineEye size={20} />}
                 </button>
               </div>
 
               {error && (
-                <div className="text-red-500 text-[11px] italic mt-[-15px] animate-pulse">
+                <div className="text-red-500 text-[11px] font-bold italic mt-[-15px] animate-pulse">
                   {errorMessage}
                 </div>
               )}
@@ -290,7 +279,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={navigateToOtp}
-                  className="hover:underline text-gray-400 focus:outline-none"
+                  className="hover:underline hover:text-stone-800 text-gray-400 focus:outline-none cursor-pointer transition-colors"
                 >
                   Forgot Password?
                 </button>
@@ -298,7 +287,7 @@ export default function Login() {
 
               <button
                 type="submit"
-                className="w-full bg-[#262221] text-white py-4 rounded-md uppercase tracking-[0.2em] text-[12px] font-bold shadow-lg hover:bg-black transition-all active:scale-[0.98]"
+                className="w-full cursor-pointer bg-[#262221] text-white py-4 rounded-md uppercase tracking-[0.2em] text-[12px] font-bold shadow-lg hover:bg-black hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
               >
                 Login
               </button>

@@ -10,8 +10,8 @@ export default function FinanceLayout() {
     <div className="flex min-h-screen w-screen bg-gray-50">
       <FinanceSidebar />
 
-      <div className="flex-1 flex flex-col">
-        <main className="p-8 lg:p-12">
+      <div className="flex-1 min-w-0 flex flex-col">
+        <main className="p-8 lg:p-12 pb-24 md:pb-12">
           <Outlet context={{ onCompose: (data) => setPendingCompose(data) }} />
         </main>
       </div>

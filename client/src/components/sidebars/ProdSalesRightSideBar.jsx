@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { HiOutlineBell } from "react-icons/hi";
+import { HiOutlineBell, HiOutlineX } from "react-icons/hi";
 
 const ProdSalesRightSidebar = () => {
   const [lowStockLogs, setLowStockLogs] = useState([]);
   const [profilePic, setProfilePic] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const userName = localStorage.getItem("userName") || "User";
   const userRole = localStorage.getItem("userRole") || "Production";
@@ -63,17 +64,23 @@ const ProdSalesRightSidebar = () => {
     return "bg-emerald-500";
   };
 
-  return (
-    <div className="w-[280px] bg-[#262221] text-white flex flex-col self-stretch overflow-hidden font-sans border-l border-white/5">
-
+  const SidebarContent = () => (
+    <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 overflow-y-auto">
       <div className="p-6 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10 flex items-center justify-center flex-shrink-0">
-            {profilePic ? (
-              <img src={profilePic} alt="User" className="w-full h-full object-cover" />
-            ) : (
-              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`} alt="Fallback Avatar" className="w-full h-full object-cover" />
-            )}
+            <img
+              src={
+                profilePic
+                  ? (profilePic.startsWith('data:') || profilePic.startsWith('http')
+                    ? profilePic
+                    : `http://localhost:5000${profilePic}`)
+                  : `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`
+              }
+              alt="User"
+              className="w-full h-full object-cover"
+              onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`; }}
+            />
           </div>
           <div className="min-w-0">
             <h4 className="text-[13px] font-bold leading-none truncate w-32" title={userName}>{userName}</h4>
@@ -89,7 +96,6 @@ const ProdSalesRightSidebar = () => {
 
       <div className="px-6 pb-6 flex-shrink-0">
         <div className="bg-[#1e1b1a] rounded-xl border border-white/5 p-4">
-
           <div className="flex items-center justify-between mb-4">
             <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock Alerts</h5>
             {lowStockLogs.length > 0 && (
@@ -142,11 +148,58 @@ const ProdSalesRightSidebar = () => {
               </div>
             )}
           </div>
-
         </div>
       </div>
-
     </div>
+  );
+
+  return (
+    <>
+      <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
+        <SidebarContent />
+      </div>
+
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center"
+        style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+      >
+        <div className="relative">
+          <HiOutlineBell size={18} className="text-gray-300" />
+          {lowStockLogs.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]"></span>
+          )}
+        </div>
+      </button>
+
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex" onClick={() => setMobileOpen(false)}>
+          <div className="flex-1 bg-black/50" />
+          <div
+            className="w-[280px] h-full"
+            onClick={(e) => e.stopPropagation()}
+            style={{ animation: 'slideInRight 0.25s ease-out' }}
+          >
+            <div className="relative h-full">
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"
+              >
+                <HiOutlineX size={14} className="text-gray-300" />
+              </button>
+              <SidebarContent />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+    </>
   );
 };
 

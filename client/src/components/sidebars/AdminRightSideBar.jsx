@@ -3,11 +3,14 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { HiOutlineBell, HiOutlineRefresh, HiOutlinePaperAirplane, HiOutlineX, HiMinus } from "react-icons/hi";
 
-const AdminFinanceRightSidebar = () => {
+const AdminRightSidebar = () => {
   const [activities, setActivities] = useState([]);
   const navigate = useNavigate();
+
   const userName = localStorage.getItem("userName") || "Admin User";
-  const userRole = localStorage.getItem("userRole") || "Admin";
+  const isHeadAdmin = localStorage.getItem("is_head_admin") === "true";
+  const userRole = isHeadAdmin ? "Head Admin" : (localStorage.getItem("role") || "Admin");
+
   const [profilePic, setProfilePic] = useState(null);
   const [messages, setMessages] = useState([]);
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -20,6 +23,7 @@ const AdminFinanceRightSidebar = () => {
   const [sendSuccess, setSendSuccess] = useState(false);
   const [formatting, setFormatting] = useState({ bold: false, italic: false, underline: false });
   const [attachments, setAttachments] = useState([]);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const bodyRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -38,9 +42,9 @@ const AdminFinanceRightSidebar = () => {
 
   const getStatusStyle = (action) => {
     const act = action?.toLowerCase() || '';
-    if (act.includes('login') || act.includes('create')) return "bg-green-600";
+    if (act.includes('login') || act.includes('create') || act.includes('approve')) return "bg-green-600";
     if (act.includes('update') || act.includes('edit')) return "bg-blue-600";
-    if (act.includes('logout') || act.includes('delete')) return "bg-red-600";
+    if (act.includes('logout') || act.includes('delete') || act.includes('deactivate')) return "bg-red-600";
     return "bg-yellow-600";
   };
 
@@ -183,9 +187,8 @@ const AdminFinanceRightSidebar = () => {
     return () => clearInterval(interval);
   }, []);
 
-  return (
-    <div className="relative w-[280px] h-screen bg-[#262221] text-white flex flex-col sticky top-0 right-0 font-sans border-l border-white/5 z-40">
-
+  const SidebarContent = () => (
+    <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 z-40">
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10">
@@ -204,7 +207,9 @@ const AdminFinanceRightSidebar = () => {
           </div>
           <div>
             <h4 className="text-[14px] font-bold leading-none">{userName}</h4>
-            <p className="text-[11px] text-gray-500 mt-1">{userRole}</p>
+            <p className={`text-[10px] font-black uppercase tracking-widest mt-1.5 ${isHeadAdmin ? 'text-indigo-400' : 'text-gray-500'}`}>
+              {userRole}
+            </p>
           </div>
         </div>
         <div className="relative cursor-pointer group p-1.5 rounded-full hover:bg-white/5 transition-all duration-200 active:scale-90">
@@ -357,18 +362,10 @@ const AdminFinanceRightSidebar = () => {
           >
             <span className="text-[13px] font-semibold text-white tracking-tight">New Message</span>
             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setComposeMinimized(!composeMinimized)}
-                className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"
-                title="Minimize"
-              >
+              <button onClick={() => setComposeMinimized(!composeMinimized)} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10">
                 <HiMinus size={15} />
               </button>
-              <button
-                onClick={handleDiscard}
-                className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"
-                title="Close"
-              >
+              <button onClick={handleDiscard} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10">
                 <HiOutlineX size={15} />
               </button>
             </div>
@@ -378,50 +375,19 @@ const AdminFinanceRightSidebar = () => {
             <div className="bg-[#1e1b1a] flex flex-col" style={{ height: '400px' }}>
               <div className="border-b border-white/10 px-4 py-2.5 flex items-center gap-2">
                 <span className="text-[11px] text-gray-500 shrink-0">To</span>
-                <input
-                  type="text"
-                  value={compose.to}
-                  onChange={(e) => setCompose({ ...compose, to: e.target.value })}
-                  className="flex-1 bg-transparent text-[12px] text-gray-200 placeholder-gray-600 outline-none"
-                  placeholder="Recipients"
-                  autoFocus
-                />
-                <div className="flex items-center gap-2 text-[11px] text-gray-500 shrink-0">
-                  <button className="hover:text-gray-300 transition-colors">Cc</button>
-                  <button className="hover:text-gray-300 transition-colors">Bcc</button>
-                </div>
+                <input type="text" value={compose.to} onChange={(e) => setCompose({ ...compose, to: e.target.value })} className="flex-1 bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Recipients" autoFocus />
               </div>
-
               <div className="border-b border-white/10 px-4 py-2.5">
-                <input
-                  type="text"
-                  value={compose.subject}
-                  onChange={(e) => setCompose({ ...compose, subject: e.target.value })}
-                  className="w-full bg-transparent text-[12px] text-gray-200 placeholder-gray-600 outline-none"
-                  placeholder="Subject"
-                />
+                <input type="text" value={compose.subject} onChange={(e) => setCompose({ ...compose, subject: e.target.value })} className="w-full bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Subject" />
               </div>
-
-              <div
-                ref={bodyRef}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={handleBodyInput}
-                onKeyUp={handleBodyInput}
-                onMouseUp={handleBodyInput}
-                className="flex-1 px-4 py-3 overflow-y-auto text-[12px] text-gray-300 leading-relaxed outline-none"
-                style={{ minHeight: 0 }}
-                data-placeholder="Write your message..."
-              />
+              <div ref={bodyRef} contentEditable suppressContentEditableWarning onInput={handleBodyInput} className="flex-1 px-4 py-3 overflow-y-auto text-[12px] text-gray-300 outline-none" style={{ minHeight: 0 }} data-placeholder="Write your message..." />
 
               {attachments.length > 0 && (
                 <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-white/5 pt-2">
                   {attachments.map((file, i) => (
                     <div key={i} className="flex items-center gap-1 bg-white/10 rounded-full px-2.5 py-1 text-[10px] text-gray-300 max-w-[140px]">
                       <span className="truncate">{file.name}</span>
-                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5">
-                        <HiOutlineX size={10} />
-                      </button>
+                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5"><HiOutlineX size={10} /></button>
                     </div>
                   ))}
                 </div>
@@ -434,68 +400,28 @@ const AdminFinanceRightSidebar = () => {
               )}
 
               <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
-                <button
-                  onClick={handleSend}
-                  disabled={sending || !compose.to || !compose.subject || !compose.body.trim()}
-                  className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-semibold px-5 py-2 rounded-full transition-colors"
-                >
+                <button onClick={handleSend} disabled={sending || !compose.to || !compose.subject || !compose.body.trim()} className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] text-white text-[12px] font-semibold px-5 py-2 rounded-full">
                   {sending ? "Sending..." : "Send"}
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
                   </svg>
                 </button>
-
                 <div className="flex items-center gap-0.5">
-                  <button
-                    onMouseDown={(e) => { e.preventDefault(); applyFormat('bold'); }}
-                    title="Bold (Ctrl+B)"
-                    className={`p-1.5 rounded-full transition-colors ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" />
-                    </svg>
+                  <button onMouseDown={(e) => { e.preventDefault(); applyFormat('bold'); }} className={`p-1.5 rounded-full ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" /></svg>
                   </button>
-
-                  <button
-                    onMouseDown={(e) => { e.preventDefault(); applyFormat('italic'); }}
-                    title="Italic (Ctrl+I)"
-                    className={`p-1.5 rounded-full transition-colors ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" />
-                    </svg>
+                  <button onMouseDown={(e) => { e.preventDefault(); applyFormat('italic'); }} className={`p-1.5 rounded-full ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></svg>
                   </button>
-
-                  <button
-                    onMouseDown={(e) => { e.preventDefault(); applyFormat('underline'); }}
-                    title="Underline (Ctrl+U)"
-                    className={`p-1.5 rounded-full transition-colors ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" />
-                    </svg>
+                  <button onMouseDown={(e) => { e.preventDefault(); applyFormat('underline'); }} className={`p-1.5 rounded-full ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></svg>
                   </button>
-
-                  <button
-                    onClick={handleAttachClick}
-                    title="Attach file"
-                    className="p-1.5 rounded-full text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                    </svg>
+                  <button onClick={handleAttachClick} className="p-1.5 rounded-full text-gray-500">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
                   </button>
-
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
-
-                  <button
-                    onClick={handleDiscard}
-                    title="Discard draft"
-                    className="p-1.5 rounded-full text-gray-500 hover:text-red-400 hover:bg-white/5 transition-colors ml-0.5"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-                    </svg>
+                  <button onClick={handleDiscard} className="p-1.5 rounded-full text-gray-500 hover:text-red-400">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg>
                   </button>
                 </div>
               </div>
@@ -513,6 +439,46 @@ const AdminFinanceRightSidebar = () => {
       `}</style>
     </div>
   );
+
+  return (
+    <>
+      <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
+        <SidebarContent />
+      </div>
+
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center"
+        style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+      >
+        <div className="relative">
+          <HiOutlineBell size={18} className="text-gray-300" />
+          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-[#262221]"></span>
+        </div>
+      </button>
+
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex" onClick={() => setMobileOpen(false)}>
+          <div className="flex-1 bg-black/50" />
+          <div className="w-[280px] h-full overflow-y-auto" onClick={(e) => e.stopPropagation()} style={{ animation: 'slideInRight 0.25s ease-out' }}>
+            <div className="relative h-full">
+              <button onClick={() => setMobileOpen(false)} className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <HiOutlineX size={14} className="text-gray-300" />
+              </button>
+              <SidebarContent />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+    </>
+  );
 };
 
-export default AdminFinanceRightSidebar;
+export default AdminRightSidebar;

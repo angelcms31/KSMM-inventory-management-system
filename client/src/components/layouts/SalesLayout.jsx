@@ -1,18 +1,18 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
-import SalesSidebar from "../sidebars/SalesSidebar"; 
+import SalesSidebar from "../sidebars/SalesSidebar";
 import ProdSalesRightSidebar from "../sidebars/ProdSalesRightSideBar";
 
 export default function SalesLayout() {
   return (
     <div className="flex min-h-screen w-screen bg-gray-50">
-      <SalesSidebar /> 
-      <div className="flex-1 flex flex-col">
-        <main className="p-8 lg:p-12">
+      <SalesSidebar />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <main className="p-8 lg:p-12 pb-24 md:pb-12">
           <Outlet />
         </main>
       </div>
-            <ProdSalesRightSidebar />
+      <ProdSalesRightSidebar />
     </div>
   );
 }
