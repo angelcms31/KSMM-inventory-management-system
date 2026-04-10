@@ -3,7 +3,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { RecoveryContext } from "../../context/RecoveryContext";
 import { useNavigate } from "react-router-dom";
 import { HiOutlineEye, HiOutlineEyeOff } from "react-icons/hi";
-import { getHashedRole } from "../../utils/hash";
+import { getHashedRole, getAuthHash } from "../../utils/hash";
 
 export default function Login() {
   const { setEmail, setOTP } = useContext(RecoveryContext);
@@ -22,6 +22,19 @@ export default function Login() {
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingRole, setPendingRole] = useState(null);
   const [defaultPassword, setDefaultPassword] = useState("");
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("device_remembered_email");
+    if (savedEmail) {
+      setLocalEmail(savedEmail);
+    }
+  }, []);
+
+  const handleEmailChange = (e) => {
+    const val = e.target.value;
+    setLocalEmail(val);
+    if (error) setError(false);
+  };
 
   const redirectByRole = (role) => {
     const hashedRole = getHashedRole(role.toLowerCase());
@@ -52,6 +65,7 @@ export default function Login() {
         const nameToSave = firstName || firstname;
         setError(false);
 
+        localStorage.setItem("device_remembered_email", localEmail);
         localStorage.setItem("userName", nameToSave || "User");
         localStorage.setItem("userRole", role);
         localStorage.setItem("user_id", user_id);
@@ -112,9 +126,9 @@ export default function Login() {
 
   const navigateToOtp = (e) => {
     if (e) e.preventDefault();
+    
     if (!localEmail) {
-      setError(true);
-      setErrorMessage("Please enter your email first for recovery.");
+      navigate(`/auth/${getAuthHash("forgot")}`);
       return;
     }
 
@@ -127,8 +141,10 @@ export default function Login() {
       .then(() => {
         setOTP(OTP);
         setEmail(localEmail);
+        sessionStorage.setItem("recoveryEmail", localEmail);
+        sessionStorage.setItem("recoveryOTP", OTP);
         setError(false);
-        navigate("/otp");
+        navigate(`/auth/${getAuthHash("otp")}`);
       })
       .catch((err) => {
         setError(true);
@@ -242,7 +258,7 @@ export default function Login() {
                   maxLength={30}
                   autoComplete="email"
                   value={localEmail}
-                  onChange={(e) => { setLocalEmail(e.target.value); if (error) setError(false); }}
+                  onChange={handleEmailChange}
                   className={`w-full border rounded-md p-3.5 text-sm outline-none transition-all ${error ? "border-red-400 ring-1 ring-red-100" : "border-gray-200 focus:border-stone-800"}`}
                 />
               </div>

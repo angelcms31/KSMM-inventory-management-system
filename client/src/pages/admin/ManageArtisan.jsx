@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { HiOutlineMail, HiOutlinePhone, HiX, HiCamera, HiDotsHorizontal, HiOutlineSearch, HiChevronLeft, HiChevronRight } from "react-icons/hi";
+import { HiOutlineMail, HiOutlinePhone, HiX, HiCamera, HiDotsHorizontal, HiOutlineSearch, HiChevronLeft, HiChevronRight, HiChevronDown } from "react-icons/hi";
 
 const ManageArtisan = () => {
   const [allArtisans, setAllArtisans] = useState([]);
@@ -191,10 +191,10 @@ const ManageArtisan = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {currentArtisans.map((artisan, index) => (
-              <div key={artisan.artisan_id} className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm flex flex-col ${artisan.status === 'Deactivated' ? 'opacity-80' : ''}`}>
-                <button onClick={() => setActiveMenu(activeMenu === index ? null : index)} className="absolute top-4 right-4 text-gray-600 transition-colors hover:text-black"><HiDotsHorizontal size={20} /></button>
+              <div key={artisan.artisan_id} className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm flex flex-col overflow-hidden ${artisan.status === 'Deactivated' ? 'opacity-80' : ''}`}>
+                <button onClick={() => setActiveMenu(activeMenu === index ? null : index)} className="absolute top-4 right-4 text-gray-600 transition-colors hover:text-black z-10"><HiDotsHorizontal size={20} /></button>
 
                 {activeMenu === index && (
                   <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-10 w-44 py-1 text-[11px] font-bold animate-in fade-in zoom-in duration-200">
@@ -205,30 +205,36 @@ const ManageArtisan = () => {
                   </div>
                 )}
 
-                <div className="flex items-start gap-2.5 mb-3">
+                <div className="flex items-start gap-2.5 mb-3 min-w-0">
                   <div className="relative flex-shrink-0">
                     <img src={artisan.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${artisan.first_name}`} className="w-14 h-14 rounded-full object-cover border border-gray-100" alt="Profile" />
                     <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${artisan.status === 'Deactivated' ? 'bg-red-500' : 'bg-green-500'}`}></div>
                   </div>
                   <div className="flex-1 pt-0.5 min-w-0 pr-8">
                     <h3 className="font-bold text-sm text-black truncate">{artisan.first_name} {artisan.last_name}</h3>
-                    <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-wider">{artisan.department || 'No Dept'}</p>
+                    <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-wider truncate">{artisan.department || 'No Dept'}</p>
                   </div>
                 </div>
 
-                <div className="border border-gray-300 rounded-2xl p-3 bg-white">
+                <div className="border border-gray-300 rounded-2xl p-3 bg-white min-w-0">
                   <p className="text-[#9CA3AF] text-[10px] uppercase font-normal mb-1">ID No.</p>
                   <p className="font-black text-black text-xs mb-3 pb-2 border-b border-gray-200">AR-{artisan.artisan_id}</p>
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-2 text-black text-xs truncate"><HiOutlineMail size={18}/>{artisan.email}</p>
-                    <p className="flex items-center gap-2 text-black text-xs"><HiOutlinePhone size={18}/>{artisan.contact_no ? `+63 ${artisan.contact_no}` : 'No Contact'}</p>
+                  <div className="space-y-2 min-w-0">
+                    <p className="flex items-center gap-2 text-black text-xs min-w-0">
+                      <HiOutlineMail size={18} className="flex-shrink-0" />
+                      <span className="truncate">{artisan.email}</span>
+                    </p>
+                    <p className="flex items-center gap-2 text-black text-xs min-w-0">
+                      <HiOutlinePhone size={18} className="flex-shrink-0" />
+                      <span className="truncate">{artisan.contact_no ? `+63 ${artisan.contact_no}` : 'No Contact'}</span>
+                    </p>
                   </div>
                 </div>
               </div>
             ))}
 
             {currentArtisans.length === 0 && (
-              <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
+              <div className="col-span-1 sm:col-span-2 lg:col-span-3 flex flex-col items-center justify-center py-20 text-gray-400">
                 <HiOutlineSearch size={48} className="mb-2 opacity-20" />
                 <p className="text-lg font-bold">No results found</p>
               </div>
@@ -239,12 +245,12 @@ const ManageArtisan = () => {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-12 relative shadow-2xl animate-in zoom-in duration-300">
+          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] w-full max-w-2xl p-6 sm:p-12 relative shadow-2xl animate-in zoom-in duration-300">
             <button onClick={closeModal} className="absolute top-10 right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full"><HiX size={28}/></button>
-            <h2 className="text-4xl font-black text-slate-900 uppercase mb-10 tracking-tighter leading-none">{showAddModal ? "Add Artisan" : "Update Artisan"}</h2>
+            <h2 className="text-2xl sm:text-4xl font-black text-slate-900 uppercase mb-6 sm:mb-10 tracking-tighter leading-none">{showAddModal ? "Add Artisan" : "Update Artisan"}</h2>
 
             <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan}>
-              <div className="grid grid-cols-2 gap-x-12 mb-6 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 mb-6 items-start">
                 <div className="space-y-5">
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">First Name</label>
@@ -260,19 +266,22 @@ const ManageArtisan = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Department</label>
-                    <select
-                      required
-                      className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200 appearance-none cursor-pointer"
-                      value={showAddModal ? formData.department : selectedArtisan?.department}
-                      onChange={e => showAddModal ? setFormData({...formData, department: e.target.value}) : setSelectedArtisan({...selectedArtisan, department: e.target.value})}
-                    >
-                      <option value="">Select Department</option>
-                      <option value="Earrings">Earrings</option>
-                      <option value="Necklace">Necklace</option>
-                      <option value="Bracelets">Bracelets</option>
-                      <option value="Bag">Bag</option>
-                      <option value="Accessory">Accessory</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        required
+                        className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200 appearance-none cursor-pointer pr-10"
+                        value={showAddModal ? formData.department : selectedArtisan?.department}
+                        onChange={e => showAddModal ? setFormData({...formData, department: e.target.value}) : setSelectedArtisan({...selectedArtisan, department: e.target.value})}
+                      >
+                        <option value="">Select Department</option>
+                        <option value="Earrings">Earrings</option>
+                        <option value="Necklace">Necklace</option>
+                        <option value="Bracelets">Bracelets</option>
+                        <option value="Bag">Bag</option>
+                        <option value="Accessory">Accessory</option>
+                      </select>
+                      <HiChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                    </div>
                   </div>
                 </div>
 
@@ -298,7 +307,7 @@ const ManageArtisan = () => {
                       <span className="px-3 text-sm font-black text-slate-500 border-r border-slate-300 py-4 flex-shrink-0">+63</span>
                       <input
                         required
-                        className="flex-1 bg-transparent p-4 outline-none font-bold text-sm"
+                        className="flex-1 bg-transparent p-4 outline-none font-bold text-sm min-w-0"
                         placeholder="9XXXXXXXXX"
                         maxLength={10}
                         value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo}

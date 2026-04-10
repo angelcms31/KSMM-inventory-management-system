@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import {
   HiOutlineClock, HiOutlineUser, HiOutlineShieldCheck,
-  HiOutlineSearch, HiOutlineClipboardList, HiChevronDown, HiX, HiChevronLeft, HiChevronRight,
-  HiOutlineDownload, HiOutlineBeaker
+  HiOutlineSearch, HiChevronDown, HiX, HiChevronLeft, HiChevronRight,
+  HiOutlineDownload
 } from "react-icons/hi";
 import { FaRegFilePdf, FaRegFileExcel } from "react-icons/fa";
 
@@ -55,7 +55,6 @@ const AuditLogs = () => {
         setVarianceLogs(Array.isArray(res.data) ? res.data : []);
       }
     } catch (err) {
-      console.error("Error fetching logs:", err);
       setLogs([]);
       setVarianceLogs([]);
     } finally {
@@ -78,9 +77,7 @@ const AuditLogs = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getActiveLogs = () => {
-    return logType === "audit" ? logs : varianceLogs;
-  };
+  const getActiveLogs = () => logType === "audit" ? logs : varianceLogs;
 
   const filteredLogs = getActiveLogs().filter(log => {
     const term = searchTerm.trim().toLowerCase();
@@ -90,7 +87,6 @@ const AuditLogs = () => {
         (log.material_name || '').toLowerCase().includes(term) ||
         (log.merged_name || '').toLowerCase().includes(term) ||
         String(log.work_order_id || '').includes(term);
-
       let dateMatch = true;
       if (log.timestamp) {
         const date = new Date(log.timestamp);
@@ -105,7 +101,6 @@ const AuditLogs = () => {
       (log.merged_name || '').toLowerCase().startsWith(term) ||
       (log.role || '').toLowerCase().startsWith(term) ||
       (log.action || '').toLowerCase().startsWith(term);
-
     let dateMatch = true;
     if (log.timestamp) {
       const date = new Date(log.timestamp);
@@ -113,7 +108,6 @@ const AuditLogs = () => {
       if (filterMonth) dateMatch = dateMatch && (date.getMonth() + 1) === parseInt(filterMonth);
       if (filterDay) dateMatch = dateMatch && date.getDate() === parseInt(filterDay);
     }
-
     return nameMatch && dateMatch;
   });
 
@@ -126,9 +120,7 @@ const AuditLogs = () => {
 
   const getSortedLogsForExport = () => {
     let logsToExport = [...filteredLogs];
-    if (filterUser) {
-      logsToExport = logsToExport.filter(log => log.merged_name === filterUser);
-    }
+    if (filterUser) logsToExport = logsToExport.filter(log => log.merged_name === filterUser);
     if (exportStartDate || exportEndDate) {
       logsToExport = logsToExport.filter(log => {
         if (!log.timestamp) return false;
@@ -142,9 +134,8 @@ const AuditLogs = () => {
       });
     }
     logsToExport.sort((a, b) => {
-      if (sortBy === "date") {
-        return sortOrder === "asc" ? new Date(a.timestamp || 0) - new Date(b.timestamp || 0) : new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
-      } else if (sortBy === "user") {
+      if (sortBy === "date") return sortOrder === "asc" ? new Date(a.timestamp || 0) - new Date(b.timestamp || 0) : new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+      if (sortBy === "user") {
         const nameA = (a.merged_name || a.material_name || "").toLowerCase();
         const nameB = (b.merged_name || b.material_name || "").toLowerCase();
         return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
@@ -186,7 +177,7 @@ const AuditLogs = () => {
       const month = filterMonth ? months[parseInt(filterMonth) - 1] : months[new Date().getMonth()];
       XLSX.writeFile(workbook, `${label}_Logs_${year}_${month}.xlsx`);
       setSortModalOpen(false);
-    } catch (err) { console.error(err); }
+    } catch (err) {}
   };
 
   const exportToPDF = async () => {
@@ -212,7 +203,7 @@ const AuditLogs = () => {
       const month = filterMonth ? months[parseInt(filterMonth) - 1] : months[new Date().getMonth()];
       doc.save(`${labelFile}_Logs_${year}_${month}.pdf`);
       setSortModalOpen(false);
-    } catch (err) { console.error(err); alert("PDF export failed."); }
+    } catch (err) { alert("PDF export failed."); }
   };
 
   const handleExportClick = (format) => {
@@ -221,14 +212,15 @@ const AuditLogs = () => {
   };
 
   const getActionBadge = (action) => {
-    if (!action) return <span className="px-3 py-1 rounded-full text-[9px] font-bold uppercase bg-gray-100 text-gray-500">N/A</span>;
+    const base = "inline-block px-3 py-1 rounded-full text-[9px] font-bold uppercase max-w-[110px] truncate";
+    if (!action) return <span className={`${base} bg-gray-100 text-gray-500`}>N/A</span>;
     const a = action.toLowerCase();
-    if (a === 'login') return <span className="px-3 py-1 rounded-full text-[9px] font-bold uppercase bg-emerald-100 text-emerald-700">{action}</span>;
-    if (a === 'logout') return <span className="px-3 py-1 rounded-full text-[9px] font-bold uppercase bg-slate-100 text-slate-500">{action}</span>;
-    if (a.includes('password')) return <span className="px-3 py-1 rounded-full text-[9px] font-bold uppercase bg-amber-100 text-amber-700">{action}</span>;
-    if (a.includes('deactivat') || a.includes('locked') || a.includes('reject')) return <span className="px-3 py-1 rounded-full text-[9px] font-bold uppercase bg-red-100 text-red-600">{action}</span>;
-    if (a.includes('unlock') || a.includes('activ') || a.includes('approv')) return <span className="px-3 py-1 rounded-full text-[9px] font-bold uppercase bg-blue-100 text-blue-600">{action}</span>;
-    return <span className="px-3 py-1 rounded-full text-[9px] font-bold uppercase bg-gray-100 text-gray-600">{action}</span>;
+    if (a === 'login') return <span className={`${base} bg-emerald-100 text-emerald-700`}>{action}</span>;
+    if (a === 'logout') return <span className={`${base} bg-slate-100 text-slate-500`}>{action}</span>;
+    if (a.includes('password')) return <span className={`${base} bg-amber-100 text-amber-700`}>{action}</span>;
+    if (a.includes('deactivat') || a.includes('locked') || a.includes('reject')) return <span className={`${base} bg-red-100 text-red-600`}>{action}</span>;
+    if (a.includes('unlock') || a.includes('activ') || a.includes('approv')) return <span className={`${base} bg-blue-100 text-blue-600`}>{action}</span>;
+    return <span className={`${base} bg-gray-100 text-gray-600`}>{action}</span>;
   };
 
   const getVarianceBadge = (val) => {
@@ -241,11 +233,11 @@ const AuditLogs = () => {
 
   return (
     <div className="h-screen bg-[#F8F9FA] flex flex-col font-sans overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-10 pt-6 pb-10 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-10 pt-6 pb-10 custom-scrollbar">
         <div className="flex justify-between items-center mb-4">
           <div ref={dropdownRef} className="relative">
             <div
-              className="flex items-center gap-1 cursor-pointer font-black text-3xl text-gray-900 select-none"
+              className="flex items-center gap-1 cursor-pointer font-black text-2xl sm:text-3xl text-gray-900 select-none"
               onClick={() => setDropdownOpen(prev => !prev)}
             >
               {logType === "audit" ? "Audit Logs" : "Variance Logs"}
@@ -267,12 +259,12 @@ const AuditLogs = () => {
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-4 flex gap-3 items-center">
-          <div className="relative flex-1 min-w-0">
+        <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-4 flex gap-2 items-center overflow-x-auto">
+          <div className="relative flex-1 min-w-[140px]">
             <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
-              placeholder={logType === "audit" ? "Search by name, role or action..." : "Search by material, artisan or WO..."}
+              placeholder={logType === "audit" ? "Search name, role, action..." : "Search material, artisan, WO..."}
               className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -324,7 +316,7 @@ const AuditLogs = () => {
             )}
           </div>
 
-          <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+          <div className="w-px h-6 bg-gray-200 flex-shrink-0 hidden sm:block" />
           <button
             className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest flex items-center gap-2 flex-shrink-0"
             onClick={() => setSortModalOpen(true)}
@@ -335,7 +327,7 @@ const AuditLogs = () => {
         </div>
 
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-[#FCFCFC]">
+          <div className="p-4 sm:p-6 border-b border-gray-50 flex justify-between items-center bg-[#FCFCFC]">
             <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">
               {logType === "audit" ? "Activity Stream" : "Material Variance Records"}
             </h3>
@@ -352,42 +344,42 @@ const AuditLogs = () => {
 
           <div className="overflow-x-auto">
             {logType === "audit" ? (
-              <table className="w-full text-left">
+              <table className="w-full text-left min-w-[500px]">
                 <thead>
                   <tr className="text-[11px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-50">
-                    <th className="px-8 py-6">User Details</th>
+                    <th className="px-4 sm:px-8 py-6">User Details</th>
                     <th className="py-6">System Role</th>
                     <th className="py-6">Action</th>
-                    <th className="px-8 py-6 text-right">Timestamp</th>
+                    <th className="px-4 sm:px-8 py-6 text-right">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody className="text-[13px] font-bold text-gray-700">
                   {currentLogs.length > 0 ? currentLogs.map((log, i) => (
                     <tr key={i} className="group border-b border-gray-50 last:border-none hover:bg-[#FBFBFB] transition-colors">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 group-hover:bg-black group-hover:text-white transition-all">
-                            <HiOutlineUser size={20} />
+                      <td className="px-4 sm:px-8 py-5">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 group-hover:bg-black group-hover:text-white transition-all flex-shrink-0">
+                            <HiOutlineUser size={18} />
                           </div>
-                          <div>
-                            <p className="font-bold text-gray-800 uppercase tracking-tighter text-sm">{log.merged_name || 'Unknown User'}</p>
+                          <div className="min-w-0">
+                            <p className="font-bold text-gray-800 uppercase tracking-tighter text-xs sm:text-sm truncate">{log.merged_name || 'Unknown User'}</p>
                             <p className="text-[10px] text-gray-400 font-medium">UID: {log.user_id || 'N/A'}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-5">
                         <div className="flex items-center gap-2">
-                          <HiOutlineShieldCheck className="text-gray-200" />
-                          <span className="uppercase tracking-widest text-[11px] font-bold text-gray-400">{log.role || "N/A"}</span>
+                          <HiOutlineShieldCheck className="text-gray-200 flex-shrink-0" />
+                          <span className="uppercase tracking-widest text-[11px] font-bold text-gray-400 truncate">{log.role || "N/A"}</span>
                         </div>
                       </td>
                       <td className="py-5">{getActionBadge(log.action)}</td>
-                      <td className="px-8 py-5 text-right font-medium text-gray-400 tabular-nums text-xs">
+                      <td className="px-4 sm:px-8 py-5 text-right font-medium text-gray-400 tabular-nums text-xs whitespace-nowrap">
                         {log.timestamp ? (
                           <>
-                            {new Date(log.timestamp).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric'})}
-                            <span className="mx-2 text-gray-200">|</span>
-                            {new Date(log.timestamp).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true})}
+                            {new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            <span className="mx-1 sm:mx-2 text-gray-200">|</span>
+                            {new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                           </>
                         ) : "No Date"}
                       </td>
@@ -398,45 +390,45 @@ const AuditLogs = () => {
                 </tbody>
               </table>
             ) : (
-              <table className="w-full text-left">
+              <table className="w-full text-left min-w-[640px]">
                 <thead>
                   <tr className="text-[11px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-50">
-                    <th className="px-8 py-6">Work Order</th>
+                    <th className="px-4 sm:px-8 py-6">Work Order</th>
                     <th className="py-6">Material</th>
                     <th className="py-6">Artisan</th>
                     <th className="py-6 text-center">Expected</th>
                     <th className="py-6 text-center">Actual</th>
                     <th className="py-6 text-center">Variance</th>
-                    <th className="px-8 py-6 text-right">Timestamp</th>
+                    <th className="px-4 sm:px-8 py-6 text-right">Timestamp</th>
                   </tr>
                 </thead>
                 <tbody className="text-[13px] font-bold text-gray-700">
                   {currentLogs.length > 0 ? currentLogs.map((log, i) => (
                     <tr key={i} className="group border-b border-gray-50 last:border-none hover:bg-[#FBFBFB] transition-colors">
-                      <td className="px-8 py-5"><span className="text-xs font-black text-gray-400 tracking-wider">WO-{log.work_order_id || 'N/A'}</span></td>
-                      <td className="py-5">
+                      <td className="px-4 sm:px-8 py-5"><span className="text-xs font-black text-gray-400 tracking-wider">WO-{log.work_order_id || 'N/A'}</span></td>
+                      <td className="py-5 min-w-0">
                         <div>
-                          <p className="font-bold text-gray-800 text-sm">{log.material_name || 'N/A'}</p>
+                          <p className="font-bold text-gray-800 text-sm truncate max-w-[120px]">{log.material_name || 'N/A'}</p>
                           <p className="text-[10px] text-gray-400 font-medium">MID: {log.material_id || 'N/A'}</p>
                         </div>
                       </td>
                       <td className="py-5">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 group-hover:bg-black group-hover:text-white transition-all">
+                          <div className="w-7 h-7 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 group-hover:bg-black group-hover:text-white transition-all flex-shrink-0">
                             <HiOutlineUser size={14} />
                           </div>
-                          <span className="text-xs font-bold text-gray-600 uppercase">{log.merged_name || 'N/A'}</span>
+                          <span className="text-xs font-bold text-gray-600 uppercase truncate max-w-[80px]">{log.merged_name || 'N/A'}</span>
                         </div>
                       </td>
                       <td className="py-5 text-center"><span className="text-sm font-black text-gray-500">{log.expected_qty ?? 'N/A'}</span></td>
                       <td className="py-5 text-center"><span className="text-sm font-black text-gray-800">{log.actual_qty ?? 'N/A'}</span></td>
                       <td className="py-5 text-center">{getVarianceBadge(log.variance)}</td>
-                      <td className="px-8 py-5 text-right font-medium text-gray-400 tabular-nums text-xs">
+                      <td className="px-4 sm:px-8 py-5 text-right font-medium text-gray-400 tabular-nums text-xs whitespace-nowrap">
                         {log.timestamp ? (
                           <>
-                            {new Date(log.timestamp).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric'})}
-                            <span className="mx-2 text-gray-200">|</span>
-                            {new Date(log.timestamp).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:true})}
+                            {new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            <span className="mx-1 sm:mx-2 text-gray-200">|</span>
+                            {new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                           </>
                         ) : "No Date"}
                       </td>
@@ -451,10 +443,10 @@ const AuditLogs = () => {
         </div>
 
         {sortModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-50">
-            <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-xl relative shadow-2xl">
-              <button className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" onClick={() => setSortModalOpen(false)}><HiX size={24}/></button>
-              <h2 className="text-2xl font-black text-slate-900 uppercase mb-6 tracking-tighter">Export Settings</h2>
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-50 p-4">
+            <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 w-full max-w-xl relative shadow-2xl max-h-[90vh] overflow-y-auto">
+              <button className="absolute top-6 right-6 sm:top-8 sm:right-8 text-slate-300 hover:text-black transition-all" onClick={() => setSortModalOpen(false)}><HiX size={24}/></button>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase mb-6 tracking-tighter">Export Settings</h2>
               <div className="space-y-4 mb-6">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Date & Time Range (Optional)</label>

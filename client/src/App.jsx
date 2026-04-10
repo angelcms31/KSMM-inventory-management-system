@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import axios from "axios";
 import { RecoveryContext } from "./context/RecoveryContext";
-import { getHashedPath } from "./utils/hash";
+import { getHashedPath, getAuthHash } from "./utils/hash";
 
 import Login from "./pages/auth/Login";
 import OTPInput from "./pages/auth/OTPInput";
 import Recovered from "./pages/auth/Recovered";
 import Reset from "./pages/auth/Reset";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 
 import AdminLayout from "./components/layouts/AdminLayout";
 import SalesLayout from "./components/layouts/SalesLayout";
@@ -27,20 +28,17 @@ const AuthRoute = ({ children }) => {
 
 const ProtectedRoute = ({ children, allowedRole }) => {
   const { hash } = useParams();
-  const userId = localStorage.getItem("user_id"); // REQUIRED: Kunin ang ID
+  const userId = localStorage.getItem("user_id");
   const userRole = localStorage.getItem("userRole")?.toLowerCase();
 
-  // 1. Check kung may nakalogin
   if (!userId || !userRole) {
     return <Navigate to="/" replace />;
   }
 
-  // 2. Check kung ang role ay allowed sa route na ito
   if (userRole !== allowedRole.toLowerCase()) {
     return <Navigate to="/" replace />;
   }
 
-  // 3. I-verify kung ang hash sa URL ay valid para sa role na ito
   const tabs = [
     "home", "artisan", "suppliers", "audit", "users", 
     "inventory", "warehouse", "statistics", 
@@ -54,6 +52,18 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   }
 
   return children;
+};
+
+const AuthSwitcher = () => {
+  const { authHash } = useParams();
+
+  if (authHash === getAuthHash("login")) return <Login />;
+  if (authHash === getAuthHash("otp")) return <OTPInput />;
+  if (authHash === getAuthHash("forgot")) return <ForgotPassword />;
+  if (authHash === getAuthHash("reset")) return <Reset />;
+  if (authHash === getAuthHash("recovered")) return <Recovered />;
+
+  return <Navigate to="/" replace />;
 };
 
 function App() {
@@ -125,10 +135,13 @@ function App() {
   return (
     <RecoveryContext.Provider value={{ otp, setOTP, setEmail, email }}>
       <Routes>
-        <Route path="/" element={<AuthRoute><Login /></AuthRoute>} />
-        <Route path="/otp" element={<AuthRoute><OTPInput /></AuthRoute>} />
-        <Route path="/reset" element={<AuthRoute><Reset /></AuthRoute>} />
-        <Route path="/recovered" element={<AuthRoute><Recovered /></AuthRoute>} />
+        <Route path="/" element={<Navigate to={`/auth/${getAuthHash('login')}`} replace />} />
+        
+        <Route path="/auth/:authHash" element={
+          <AuthRoute>
+            <AuthSwitcher />
+          </AuthRoute>
+        } />
 
         <Route path="/dashboard/:hash" element={<ProtectedRoute allowedRole="Admin"><AdminLayout /></ProtectedRoute>} />
         <Route path="/dashboard/:hash" element={<ProtectedRoute allowedRole="Sales"><SalesLayout /></ProtectedRoute>} />
