@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext, useLocation } from 'react-router-dom';
+import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   HiOutlineSearch, HiOutlinePencil, HiOutlineClipboardList,
@@ -11,6 +11,7 @@ export default function PurchaseOrder() {
   const outletContext = useOutletContext() || {};
   const { onCompose } = outletContext;
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -63,21 +64,20 @@ export default function PurchaseOrder() {
     if (!materials.length) return;
     const params = new URLSearchParams(location.search);
     const materialIdFromQuery = params.get('material_id');
-
-    if (materialIdFromQuery) {
-      const mat = materials.find(m => parseInt(m.material_id) === parseInt(materialIdFromQuery));
-      if (mat) {
-        const suggested = Math.max(mat.reorder_threshold * 2 - mat.stock_quantity, mat.reorder_threshold);
-        resetForm();
-        setSuggestedQty(suggested);
-        setFormData(prev => ({
-          ...prev,
-          material_id: String(mat.material_id),
-          ordered_quantity: String(suggested),
-          status: 'Pending'
-        }));
-        setShowModal(true);
-      }
+    if (!materialIdFromQuery) return;
+    navigate(location.pathname, { replace: true });
+    const mat = materials.find(m => parseInt(m.material_id) === parseInt(materialIdFromQuery));
+    if (mat) {
+      const suggested = Math.max(mat.reorder_threshold * 2 - mat.stock_quantity, mat.reorder_threshold);
+      resetForm();
+      setSuggestedQty(suggested);
+      setFormData(prev => ({
+        ...prev,
+        material_id: String(mat.material_id),
+        ordered_quantity: String(suggested),
+        status: 'Pending'
+      }));
+      setShowModal(true);
     }
   }, [materials, location.search]);
 
@@ -198,9 +198,7 @@ export default function PurchaseOrder() {
   const triggerComposeEmail = (supplierId, materialId, quantity) => {
     const supplier = suppliers.find(s => parseInt(s.supplier_id) === parseInt(supplierId));
     const material = materials.find(m => parseInt(m.material_id) === parseInt(materialId));
-
     if (!supplier?.email || !onCompose) return;
-
     const body =
       `Dear ${supplier.name},\n\n` +
       `We would like to place the following purchase order:\n\n` +
@@ -209,7 +207,6 @@ export default function PurchaseOrder() {
       `Please confirm receipt of this order.\n\n` +
       `Best regards,\n` +
       `Matthew & Melka Team`;
-
     onCompose({
       to: supplier.email,
       subject: `Purchase Order - Matthew & Melka`,
@@ -230,9 +227,7 @@ export default function PurchaseOrder() {
         const snapshotSupplierId = formData.supplier_id;
         const snapshotMaterialId = formData.material_id;
         const snapshotQty = formData.ordered_quantity;
-
         await axios.post('http://localhost:5000/api/create_order', { ...payload, status: 'Ongoing' });
-
         setShowModal(false);
         resetForm();
         fetchData();
@@ -284,9 +279,7 @@ export default function PurchaseOrder() {
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">
-              Materials requiring immediate replenishment
-            </p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Materials requiring immediate replenishment</p>
           </div>
           <div className="flex gap-2">
             <button onClick={() => setLowStockPage(p => Math.max(p - 1, 0))} disabled={lowStockPage === 0} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={20} /></button>
@@ -359,15 +352,14 @@ export default function PurchaseOrder() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-center border-separate border-spacing-y-2">
+          <table className="w-full text-center border-separate border-spacing-y-1">
             <thead>
               <tr className="text-[10px] font-black text-slate-300 uppercase tracking-widest border-b">
-                <th className="pb-4 text-left">PO ID</th>
+                <th className="pb-4 text-left pl-4">PO ID</th>
                 <th className="pb-4 text-left">Supplier</th>
                 <th className="pb-4 text-left">Material</th>
                 <th className="pb-4 text-center">Qty</th>
-                <th className="pb-4 text-center">Unit</th>
-                <th className="pb-4 text-right">Total</th>
+                <th className="pb-4 text-right pr-6">Total Cost</th>
                 <th className="pb-4 text-left">Requisitioner</th>
                 <th className="pb-4 text-left">Status</th>
                 <th className="pb-4 text-right pr-4">Actions</th>
@@ -380,38 +372,42 @@ export default function PurchaseOrder() {
                 return (
                   <tr key={order.assignment_id} className="hover:bg-slate-50 transition-all group">
                     <td className="py-4 pl-4 rounded-l-2xl border-y border-l border-transparent group-hover:border-slate-100 text-sm font-black text-slate-900 uppercase text-left">PO-{order.assignment_id}</td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 truncate max-w-[120px] uppercase text-xs text-left">{order.supplier_name || 'N/A'}</td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 truncate max-w-[120px] uppercase text-xs text-left">{order.material_name || 'N/A'}</td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center text-xs font-black text-slate-700">{order.ordered_quantity ?? '—'}</td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center text-[10px] font-black text-slate-500 uppercase">
-                      {mat?.stock_unit || '---'}
+                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 truncate max-w-[140px] uppercase text-xs text-left">{order.supplier_name || 'N/A'}</td>
+                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 truncate max-w-[140px] uppercase text-xs text-left">{order.material_name || 'N/A'}</td>
+                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center">
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs font-black text-slate-700">{order.ordered_quantity ?? '—'}</span>
+                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">{mat?.stock_unit || '---'}</span>
+                      </div>
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-right text-xs font-black text-emerald-600 pr-2">
-                      {order.total_amount != null
-                        ? `₱${Number(order.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
-                        : '—'}
+                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-right pr-6">
+                      <span className="text-sm font-black text-emerald-600">
+                        {order.total_amount != null ? `₱${Number(order.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '—'}
+                      </span>
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-[11px] italic text-slate-500 uppercase text-left">{order.requisitioner_name || 'Admin'}</td>
+                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-[10px] font-black text-slate-400 uppercase text-left">
+                      {order.requisitioner_name || 'Admin'}
+                    </td>
                     <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-left">
-                      <span className={`px-4 py-1 rounded-lg text-[8px] uppercase font-black text-white shadow-sm ${getStatusStyle(order.status)}`}>
+                      <span className={`px-4 py-1.5 rounded-full text-[8px] uppercase font-black text-white shadow-sm ${getStatusStyle(order.status)}`}>
                         {order.status === 'Approved' ? 'Ongoing' : order.status}
                       </span>
                     </td>
                     <td className="py-4 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
                       <div className="flex justify-end gap-2">
                         {isDelivered && (
-                          <button onClick={() => handlePrintReceipt(order)} title="Print Receipt" className="p-2.5 bg-slate-50 text-slate-500 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200 shadow-sm"><HiOutlinePrinter size={18} /></button>
+                          <button onClick={() => handlePrintReceipt(order)} className="p-2.5 bg-slate-50 text-slate-400 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200"><HiOutlinePrinter size={18} /></button>
                         )}
                         {order.status === 'Ongoing' && (
-                          <button onClick={() => handleMarkDelivered(order.assignment_id)} title="Mark as Delivered" className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-100 shadow-sm"><HiOutlineCheck size={18} /></button>
+                          <button onClick={() => handleMarkDelivered(order.assignment_id)} className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-100"><HiOutlineCheck size={18} /></button>
                         )}
-                        <button onClick={() => handleEditClick(order)} disabled={isDelivered} className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-30 cursor-not-allowed' : ''}`}><HiOutlinePencil size={18} /></button>
+                        <button onClick={() => handleEditClick(order)} disabled={isDelivered} className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-20 cursor-not-allowed' : ''}`}><HiOutlinePencil size={18} /></button>
                       </div>
                     </td>
                   </tr>
                 );
               }) : (
-                <tr><td colSpan="9" className="py-20 text-center opacity-20 font-black uppercase tracking-widest text-slate-400 text-xs">No active orders found.</td></tr>
+                <tr><td colSpan="8" className="py-20 text-center opacity-20 font-black uppercase tracking-widest text-slate-400 text-xs">No active orders found.</td></tr>
               )}
             </tbody>
           </table>

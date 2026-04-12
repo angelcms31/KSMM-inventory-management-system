@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { RecoveryContext } from "./context/RecoveryContext";
 import { getHashedPath, getAuthHash } from "./utils/hash";
@@ -26,13 +26,17 @@ import ProductionInventory from "./pages/production/Inventory";
 
 const AuthSwitcher = () => {
   const { authHash } = useParams();
+  const navigate = useNavigate();
   const userId = localStorage.getItem("user_id");
   const userRole = localStorage.getItem("userRole")?.toLowerCase();
 
-  if (userId && userRole) {
-    const hashedPath = getHashedPath(userRole, "home");
-    return <Navigate to={`/dashboard/${hashedPath}`} replace />;
-  }
+  useEffect(() => {
+    if (userId && userRole) {
+      navigate(`/dashboard/${getHashedPath(userRole, "home")}`, { replace: true });
+    }
+  }, []);
+
+  if (userId && userRole) return null;
 
   if (authHash === getAuthHash("login")) return <Login />;
   if (authHash === getAuthHash("otp")) return <OTPInput />;
@@ -43,20 +47,40 @@ const AuthSwitcher = () => {
   return <Navigate to={`/auth/${getAuthHash("login")}`} replace />;
 };
 
-const ProtectedRoute = ({ children, allowedRole }) => {
+const RedirectToHome = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const userId = localStorage.getItem("user_id");
+    const userRole = localStorage.getItem("userRole")?.toLowerCase();
+    if (userId && userRole) {
+      navigate(`/dashboard/${getHashedPath(userRole, "home")}`, { replace: true });
+    } else {
+      navigate(`/auth/${getAuthHash("login")}`, { replace: true });
+    }
+  }, []);
+  return null;
+};
+
+const DashboardRoot = () => {
+  const navigate = useNavigate();
   const userId = localStorage.getItem("user_id");
   const userRole = localStorage.getItem("userRole")?.toLowerCase();
 
-  if (!userId || !userRole) {
-    return <Navigate to={`/auth/${getAuthHash("login")}`} replace />;
-  }
+  useEffect(() => {
+    if (!userId || !userRole) {
+      navigate(`/auth/${getAuthHash("login")}`, { replace: true });
+    }
+  }, []);
 
-  if (userRole !== allowedRole.toLowerCase()) {
-    const myDefault = getHashedPath(userRole, "home");
-    return <Navigate to={`/dashboard/${myDefault}`} replace />;
-  }
+  if (!userId || !userRole) return null;
 
-  return children;
+  switch (userRole) {
+    case "admin":      return <AdminLayout />;
+    case "finance":    return <FinanceLayout />;
+    case "sales":      return <SalesLayout />;
+    case "production": return <ProductionLayout />;
+    default:           return <RedirectToHome />;
+  }
 };
 
 function App() {
@@ -79,6 +103,8 @@ function App() {
   };
 
   useEffect(() => {
+    if (!localStorage.getItem("user_id")) return;
+
     const resetTimer = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {
@@ -89,38 +115,22 @@ function App() {
       }, 1800000);
     };
 
-    if (localStorage.getItem("user_id")) {
-      resetTimer();
-      const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
-      events.forEach(e => window.addEventListener(e, resetTimer));
-      return () => events.forEach(e => window.removeEventListener(e, resetTimer));
-    }
+    resetTimer();
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
+    events.forEach(e => window.addEventListener(e, resetTimer));
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [location.pathname]);
 
   return (
     <RecoveryContext.Provider value={{ otp, setOTP, setEmail, email }}>
       <Routes>
-        <Route path="/" element={<Navigate to={`/auth/${getAuthHash('login')}`} replace />} />
+        <Route path="/" element={<Navigate to={`/auth/${getAuthHash("login")}`} replace />} />
         <Route path="/auth/:authHash" element={<AuthSwitcher />} />
 
-        <Route
-          path="/dashboard"
-          element={(() => {
-            const role = localStorage.getItem("userRole")?.toLowerCase();
-            switch (role) {
-              case "admin":
-                return <ProtectedRoute allowedRole="Admin"><AdminLayout /></ProtectedRoute>;
-              case "sales":
-                return <ProtectedRoute allowedRole="Sales"><SalesLayout /></ProtectedRoute>;
-              case "production":
-                return <ProtectedRoute allowedRole="Production"><ProductionLayout /></ProtectedRoute>;
-              case "finance":
-                return <ProtectedRoute allowedRole="Finance"><FinanceLayout /></ProtectedRoute>;
-              default:
-                return <Navigate to="/" replace />;
-            }
-          })()}
-        >
+        <Route path="/dashboard/:hash" element={<DashboardRoot />}>
           <Route path={getHashedPath("sales", "home")} element={<SalesDashboard />} />
           <Route path={getHashedPath("sales", "inventory")} element={<SalesInventory />} />
           <Route path={getHashedPath("sales", "warehouse")} element={<Warehouse />} />
@@ -131,7 +141,7 @@ function App() {
           <Route path={getHashedPath("production", "inventory")} element={<ProductionInventory />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<RedirectToHome />} />
       </Routes>
     </RecoveryContext.Provider>
   );
