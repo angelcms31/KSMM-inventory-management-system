@@ -313,9 +313,6 @@ const ManageArtisan = () => {
                         value={showAddModal ? formData.contactNo : selectedArtisan?.contactNo}
                         onChange={e => handlePhoneChange(e.target.value, showEditModal)}
                       />
-                      <span className="pr-3 text-[10px] font-black text-slate-400 flex-shrink-0">
-                        {(showAddModal ? formData.contactNo : selectedArtisan?.contactNo || '').length}/10
-                      </span>
                     </div>
                   </div>
                 </div>

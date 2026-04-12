@@ -6,6 +6,7 @@ import AdminDashboard from "../../pages/admin/AdminDashboard";
 import ManageArtisan from "../../pages/admin/ManageArtisan";
 import Suppliers from "../../pages/admin/Suppliers";
 import AuditLogs from "../../pages/admin/AuditLogs";
+import Variance from "../../pages/admin/VarianceLogs";
 import ManageUsers from "../../pages/admin/ManageUsers";
 
 export default function AdminLayout() {
@@ -21,6 +22,8 @@ export default function AdminLayout() {
         return <Suppliers />;
       case "audit":
         return <AuditLogs />;
+      case "variance":
+        return <Variance />;
       case "users":
         return <ManageUsers />;
       default:

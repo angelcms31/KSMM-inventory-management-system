@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  HiOutlineHome, 
-  HiOutlineCube, 
-  HiOutlineTruck, 
-  HiOutlineLogout 
+import {
+  HiOutlineHome,
+  HiOutlineCube,
+  HiOutlineTruck,
+  HiOutlineLogout
 } from "react-icons/hi";
+import { getHashedPath } from "../../utils/hash";
 
 const ProductionSidebar = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -22,10 +23,14 @@ const ProductionSidebar = () => {
   }, []);
 
   const menuItems = [
-    { name: 'Home', path: '/production', icon: <HiOutlineHome size={18} /> },
-    { name: 'Artisan', path: '/production/artisan', icon: <HiOutlineCube size={18} /> },
-    { name: 'Work Order Inventory', path: '/production/inventory', icon: <HiOutlineTruck size={18} /> },
+    { name: 'Home', tab: 'home', icon: <HiOutlineHome size={18} /> },
+    { name: 'Artisan', tab: 'artisan', icon: <HiOutlineCube size={18} /> },
+    { name: 'Work Order Inventory', tab: 'inventory', icon: <HiOutlineTruck size={18} /> },
   ];
+
+  const getPath = (tab) => `/dashboard/${getHashedPath('production', tab)}`;
+
+  const isActive = (tab) => location.pathname === getPath(tab);
 
   const handleLogout = async () => {
     try {
@@ -62,24 +67,25 @@ const ProductionSidebar = () => {
         <nav className="flex-grow mt-2">
           <ul className="space-y-1">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const active = isActive(item.tab);
+              const path = getPath(item.tab);
               return (
                 <li key={item.name} className="relative pl-3">
                   <Link
-                    to={item.path}
+                    to={path}
                     className={`group flex items-center justify-between py-2.5 px-4 transition-all duration-300 relative ${
-                      isActive
+                      active
                         ? "bg-white text-black rounded-l-full shadow-md"
                         : "text-gray-400 hover:text-white"
                     }`}
                   >
                     <div className="flex items-center space-x-3">
-                      <span className={`${isActive ? "text-black" : "text-gray-500 group-hover:text-white"}`}>
+                      <span className={`${active ? "text-black" : "text-gray-500 group-hover:text-white"}`}>
                         {item.icon}
                       </span>
                       <span className="text-[13.5px] font-medium">{item.name}</span>
                     </div>
-                    {isActive && (
+                    {active && (
                       <div className="w-1.5 h-1.5 bg-[#262221] rounded-full mr-1" />
                     )}
                   </Link>
@@ -113,26 +119,27 @@ const ProductionSidebar = () => {
         >
           <div className="flex items-center justify-around px-2 py-2">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const active = isActive(item.tab);
+              const path = getPath(item.tab);
               return (
                 <Link
                   key={item.name}
-                  to={item.path}
+                  to={path}
                   className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px]"
                 >
                   <div
                     className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${
-                      isActive ? 'bg-white shadow-md' : 'bg-transparent'
+                      active ? 'bg-white shadow-md' : 'bg-transparent'
                     }`}
                   >
                     <span
-                      className={`transition-colors duration-300 ${isActive ? 'text-[#262221]' : 'text-gray-400'}`}
+                      className={`transition-colors duration-300 ${active ? 'text-[#262221]' : 'text-gray-400'}`}
                       style={{ display: 'flex' }}
                     >
                       {React.cloneElement(item.icon, { size: 22 })}
                     </span>
                   </div>
-                  {isActive && (
+                  {active && (
                     <span className="mt-1 w-1 h-1 rounded-full bg-white block" />
                   )}
                 </Link>

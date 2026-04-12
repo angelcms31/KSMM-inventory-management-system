@@ -487,7 +487,7 @@ const ManageUsers = () => {
 
                   <div className="w-full space-y-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black flex items-center gap-1">
-                      Gender <HiChevronDown size={10} />
+                      Gender 
                     </label>
                     <div className="relative">
                       <select
@@ -505,7 +505,7 @@ const ManageUsers = () => {
 
                   <div className="w-full space-y-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black flex items-center gap-1">
-                      Position <HiChevronDown size={10} />
+                      Position 
                     </label>
                     <div className="relative">
                       <select

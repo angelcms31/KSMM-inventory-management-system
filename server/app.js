@@ -608,6 +608,92 @@ app.get("/api/warehouses/:id/inventory", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// SALES — Orders
+// ─────────────────────────────────────────────
+
+
+app.get("/api/sales_orders", async (req, res) => {
+  try {
+    const result = await getPool().query(`
+      SELECT so.*, fg.name AS product_name, fg.selling_price, fg.product_image,
+        (so.quantity * fg.selling_price) AS total_amount
+      FROM sales_orders so
+      LEFT JOIN finishedgoods fg ON so.sku = fg.sku
+      ORDER BY so.order_id DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.post("/api/sales_orders", async (req, res) => {
+  const { client_name, platform, courier, sku, quantity, order_date, user_id } = req.body;
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+
+    const stockRes = await client.query(
+      "SELECT current_stock, name FROM finishedgoods WHERE sku = $1",
+      [sku]
+    );
+
+    if (stockRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    const currentStock = Number(stockRes.rows[0].current_stock);
+    const orderedQty = Number(quantity);
+
+    if (orderedQty > currentStock) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        message: `Insufficient stock. Available: ${currentStock} units.`
+      });
+    }
+
+    const orderRes = await client.query(
+      `INSERT INTO sales_orders (client_name, platform, courier, sku, quantity, order_date, status, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'Pending', $7) RETURNING *`,
+      [client_name, platform, courier, sku, orderedQty, order_date, user_id]
+    );
+
+    await client.query(
+      "UPDATE finishedgoods SET current_stock = current_stock - $1 WHERE sku = $2",
+      [orderedQty, sku]
+    );
+
+    await client.query("COMMIT");
+    res.status(201).json(orderRes.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(500).send(err.message);
+  } finally {
+    client.release();
+  }
+});
+
+app.patch("/api/sales_orders/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const validStatuses = ["Pending", "Shipped", "Delivered"];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status." });
+  }
+  try {
+    const result = await getPool().query(
+      "UPDATE sales_orders SET status = $1 WHERE order_id = $2 RETURNING *",
+      [status, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: "Order not found." });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// ─────────────────────────────────────────────
 // FINANCE — Purchase Orders
 // ─────────────────────────────────────────────
 
@@ -986,8 +1072,24 @@ app.put('/api/work_orders/:id', async (req, res) => {
   } finally { client.release(); }
 });
 
+app.get('/api/clear-gmail-tokens', async (req, res) => {
+  try {
+    await dbQuery("DELETE FROM gmail_tokens"); 
+    
+    res.send(`
+      <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+        <h1 style="color: #10b981;">✅ Tokens Cleared Successfully!</h1>
+        <p>The expired Gmail session has been removed from the database.</p>
+        <p><strong>Next Step:</strong> Go back to your dashboard, refresh the page, and click the <b>Connect Gmail</b> button.</p>
+      </div>
+    `);
+  } catch (err) {
+    console.error("Error clearing tokens:", err);
+    res.status(500).send("Error clearing tokens: " + err.message);
+  }
+});
 const { registerGmailRoutes } = require('./gmailroutes');
-registerGmailRoutes(app);
+registerGmailRoutes(app, dbQuery);
 
 const PORT = 5000;
 initDB();

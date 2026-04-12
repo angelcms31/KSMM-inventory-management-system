@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
   HiOutlineSearch, HiOutlinePencil, HiOutlineClipboardList,
@@ -8,7 +8,10 @@ import {
 } from 'react-icons/hi';
 
 export default function PurchaseOrder() {
-  const { onCompose } = useOutletContext() || {};
+  const outletContext = useOutletContext() || {};
+  const { onCompose } = outletContext;
+  const location = useLocation();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [currentPage, setCurrentPage] = useState(0);
@@ -30,7 +33,6 @@ export default function PurchaseOrder() {
     supplier_id: '',
     material_id: '',
     ordered_quantity: '',
-    expected_delivery: '',
     status: 'Pending'
   });
 
@@ -56,6 +58,28 @@ export default function PurchaseOrder() {
   };
 
   useEffect(() => { fetchData(); fetchUserName(); }, []);
+
+  useEffect(() => {
+    if (!materials.length) return;
+    const params = new URLSearchParams(location.search);
+    const materialIdFromQuery = params.get('material_id');
+
+    if (materialIdFromQuery) {
+      const mat = materials.find(m => parseInt(m.material_id) === parseInt(materialIdFromQuery));
+      if (mat) {
+        const suggested = Math.max(mat.reorder_threshold * 2 - mat.stock_quantity, mat.reorder_threshold);
+        resetForm();
+        setSuggestedQty(suggested);
+        setFormData(prev => ({
+          ...prev,
+          material_id: String(mat.material_id),
+          ordered_quantity: String(suggested),
+          status: 'Pending'
+        }));
+        setShowModal(true);
+      }
+    }
+  }, [materials, location.search]);
 
   const activeSuppliers = suppliers.filter(s => s.status === 'Active');
 
@@ -106,54 +130,53 @@ export default function PurchaseOrder() {
     const win = window.open('', '_blank', 'width=600,height=700');
     if (!win) { alert('Please allow popups to print the receipt.'); return; }
     win.document.write(`
-        <html>
-          <head>
-            <title>Purchase Order Receipt - PO-${order.assignment_id}</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { font-family: 'Courier New', monospace; padding: 32px; color: #111; font-size: 13px; }
-              .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 16px; margin-bottom: 16px; }
-              .company { font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-              .subtitle { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-              .po-num { font-size: 16px; font-weight: 700; margin-top: 8px; }
-              .section { margin-bottom: 14px; }
-              .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dotted #ddd; }
-              .row:last-child { border-bottom: none; }
-              .label { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-              .value { font-weight: 700; text-align: right; }
-              .total-row { display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px dashed #111; margin-top: 8px; font-size: 16px; font-weight: 900; }
-              .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 2px dashed #ccc; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-              .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; background: ${order.status === 'Delivered' ? '#10b981' : order.status === 'Ongoing' ? '#2563eb' : '#f59e0b'}; color: white; margin-top: 4px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div class="company">Matthew & Melka</div>
-              <div class="subtitle">Purchase Order Receipt</div>
-              <div class="po-num">PO-${order.assignment_id}</div>
-              <div class="status-badge">${order.status}</div>
-            </div>
-            <div class="section">
-              <div class="row"><span class="label">Date Issued</span><span class="value">${order.order_date ? new Date(order.order_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</span></div>
-              <div class="row"><span class="label">Expected Arrival</span><span class="value">${order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</span></div>
-              <div class="row"><span class="label">Requisitioner</span><span class="value">${order.requisitioner_name || 'Admin'}</span></div>
-            </div>
-            <div class="section">
-              <div class="row"><span class="label">Supplier</span><span class="value">${order.supplier_name || '—'}</span></div>
-              <div class="row"><span class="label">Material</span><span class="value">${order.material_name || '—'}</span></div>
-              <div class="row"><span class="label">Quantity Ordered</span><span class="value">${order.ordered_quantity} units</span></div>
-            </div>
-            <div class="total-row">
-              <span>Total Amount</span>
-              <span>₱${Number(order.total_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div class="footer">
-              <p>Printed on ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-              <p style="margin-top:4px;">Matthew & Melka Inventory System</p>
-            </div>
-          </body>
-        </html>
-      `);
+      <html>
+        <head>
+          <title>Purchase Order Receipt - PO-${order.assignment_id}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Courier New', monospace; padding: 32px; color: #111; font-size: 13px; }
+            .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 16px; margin-bottom: 16px; }
+            .company { font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+            .subtitle { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+            .po-num { font-size: 16px; font-weight: 700; margin-top: 8px; }
+            .section { margin-bottom: 14px; }
+            .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dotted #ddd; }
+            .row:last-child { border-bottom: none; }
+            .label { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+            .value { font-weight: 700; text-align: right; }
+            .total-row { display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px dashed #111; margin-top: 8px; font-size: 16px; font-weight: 900; }
+            .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 2px dashed #ccc; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+            .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; background: ${order.status === 'Delivered' ? '#10b981' : order.status === 'Ongoing' ? '#2563eb' : '#f59e0b'}; color: white; margin-top: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company">Matthew & Melka</div>
+            <div class="subtitle">Purchase Order Receipt</div>
+            <div class="po-num">PO-${order.assignment_id}</div>
+            <div class="status-badge">${order.status}</div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="label">Date Issued</span><span class="value">${order.order_date ? new Date(order.order_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</span></div>
+            <div class="row"><span class="label">Requisitioner</span><span class="value">${order.requisitioner_name || 'Admin'}</span></div>
+          </div>
+          <div class="section">
+            <div class="row"><span class="label">Supplier</span><span class="value">${order.supplier_name || '—'}</span></div>
+            <div class="row"><span class="label">Material</span><span class="value">${order.material_name || '—'}</span></div>
+            <div class="row"><span class="label">Quantity Ordered</span><span class="value">${order.ordered_quantity} units</span></div>
+          </div>
+          <div class="total-row">
+            <span>Total Amount</span>
+            <span>₱${Number(order.total_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div class="footer">
+            <p>Printed on ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p style="margin-top:4px;">Matthew & Melka Inventory System</p>
+          </div>
+        </body>
+      </html>
+    `);
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); win.close(); }, 300);
@@ -168,11 +191,30 @@ export default function PurchaseOrder() {
       material_id: order.material_id || '',
       ordered_quantity: order.ordered_quantity || '',
       status: order.status || 'Ongoing',
-      expected_delivery: order.expected_delivery
-        ? new Date(order.expected_delivery).toISOString().split('T')[0]
-        : ''
     });
     setShowModal(true);
+  };
+
+  const triggerComposeEmail = (supplierId, materialId, quantity) => {
+    const supplier = suppliers.find(s => parseInt(s.supplier_id) === parseInt(supplierId));
+    const material = materials.find(m => parseInt(m.material_id) === parseInt(materialId));
+
+    if (!supplier?.email || !onCompose) return;
+
+    const body =
+      `Dear ${supplier.name},\n\n` +
+      `We would like to place the following purchase order:\n\n` +
+      `Material: ${material?.material_name || '—'}\n` +
+      `Quantity: ${quantity}\n\n` +
+      `Please confirm receipt of this order.\n\n` +
+      `Best regards,\n` +
+      `Matthew & Melka Team`;
+
+    onCompose({
+      to: supplier.email,
+      subject: `Purchase Order - Matthew & Melka`,
+      body,
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -181,29 +223,21 @@ export default function PurchaseOrder() {
     try {
       if (isEdit) {
         await axios.put(`http://localhost:5000/api/orders/${selectedOrderId}`, payload);
+        setShowModal(false);
+        resetForm();
+        fetchData();
       } else {
+        const snapshotSupplierId = formData.supplier_id;
+        const snapshotMaterialId = formData.material_id;
+        const snapshotQty = formData.ordered_quantity;
+
         await axios.post('http://localhost:5000/api/create_order', { ...payload, status: 'Ongoing' });
-        const supplier = suppliers.find(s => parseInt(s.supplier_id) === parseInt(formData.supplier_id));
-        const material = materials.find(m => parseInt(m.material_id) === parseInt(formData.material_id));
-        if (supplier?.email && onCompose) {
-          const deliveryDate = formData.expected_delivery
-            ? new Date(formData.expected_delivery).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
-            : '—';
-          const defaultBody =
-            `Dear ${supplier.name},\n\n` +
-            `We would like to place the following purchase order:\n\n` +
-            `Material: ${material?.material_name || '—'}\n` +
-            `Quantity: ${formData.ordered_quantity}\n` +
-            `Expected Delivery: ${deliveryDate}\n\n` +
-            `Please confirm receipt of this order.\n\n` +
-            `Best regards,\n` +
-            `Matthew & Melka Team`;
-          onCompose({ to: supplier.email, subject: `Purchase Order - Matthew & Melka`, body: defaultBody });
-        }
+
+        setShowModal(false);
+        resetForm();
+        fetchData();
+        triggerComposeEmail(snapshotSupplierId, snapshotMaterialId, snapshotQty);
       }
-      setShowModal(false);
-      resetForm();
-      fetchData();
     } catch { alert('Action failed.'); }
   };
 
@@ -211,7 +245,7 @@ export default function PurchaseOrder() {
     setIsEdit(false);
     setSelectedOrderId(null);
     setSuggestedQty(null);
-    setFormData({ supplier_id: '', material_id: '', ordered_quantity: '', expected_delivery: '', status: 'Pending' });
+    setFormData({ supplier_id: '', material_id: '', ordered_quantity: '', status: 'Pending' });
   };
 
   return (
@@ -334,7 +368,6 @@ export default function PurchaseOrder() {
                 <th className="pb-4 text-center">Qty</th>
                 <th className="pb-4 text-center">Unit</th>
                 <th className="pb-4 text-right">Total</th>
-                <th className="pb-4 text-center">Arrival Date</th>
                 <th className="pb-4 text-left">Requisitioner</th>
                 <th className="pb-4 text-left">Status</th>
                 <th className="pb-4 text-right pr-4">Actions</th>
@@ -358,7 +391,6 @@ export default function PurchaseOrder() {
                         ? `₱${Number(order.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
                         : '—'}
                     </td>
-                    <td className="py-4 text-slate-400 text-[11px] border-y border-transparent group-hover:border-slate-100 text-center uppercase">{order.expected_delivery ? new Date(order.expected_delivery).toLocaleDateString('en-CA') : '--'}</td>
                     <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-[11px] italic text-slate-500 uppercase text-left">{order.requisitioner_name || 'Admin'}</td>
                     <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-left">
                       <span className={`px-4 py-1 rounded-lg text-[8px] uppercase font-black text-white shadow-sm ${getStatusStyle(order.status)}`}>
@@ -368,36 +400,18 @@ export default function PurchaseOrder() {
                     <td className="py-4 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
                       <div className="flex justify-end gap-2">
                         {isDelivered && (
-                          <button
-                            onClick={() => handlePrintReceipt(order)}
-                            title="Print Receipt"
-                            className="p-2.5 bg-slate-50 text-slate-500 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200 shadow-sm"
-                          >
-                            <HiOutlinePrinter size={18} />
-                          </button>
+                          <button onClick={() => handlePrintReceipt(order)} title="Print Receipt" className="p-2.5 bg-slate-50 text-slate-500 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200 shadow-sm"><HiOutlinePrinter size={18} /></button>
                         )}
                         {order.status === 'Ongoing' && (
-                          <button
-                            onClick={() => handleMarkDelivered(order.assignment_id)}
-                            title="Mark as Delivered"
-                            className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-100 shadow-sm"
-                          >
-                            <HiOutlineCheck size={18} />
-                          </button>
+                          <button onClick={() => handleMarkDelivered(order.assignment_id)} title="Mark as Delivered" className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-100 shadow-sm"><HiOutlineCheck size={18} /></button>
                         )}
-                        <button
-                          onClick={() => handleEditClick(order)}
-                          disabled={isDelivered}
-                          className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-30 cursor-not-allowed' : ''}`}
-                        >
-                          <HiOutlinePencil size={18} />
-                        </button>
+                        <button onClick={() => handleEditClick(order)} disabled={isDelivered} className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-30 cursor-not-allowed' : ''}`}><HiOutlinePencil size={18} /></button>
                       </div>
                     </td>
                   </tr>
                 );
               }) : (
-                <tr><td colSpan="10" className="py-20 text-center opacity-20 font-black uppercase tracking-widest text-slate-400 text-xs">No active orders found.</td></tr>
+                <tr><td colSpan="9" className="py-20 text-center opacity-20 font-black uppercase tracking-widest text-slate-400 text-xs">No active orders found.</td></tr>
               )}
             </tbody>
           </table>
@@ -426,7 +440,7 @@ export default function PurchaseOrder() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-6 font-bold items-end">
+              <div className="grid grid-cols-1 gap-6 font-bold">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">
                     Quantity {suggestedQty !== null && (
@@ -437,16 +451,7 @@ export default function PurchaseOrder() {
                       return mat?.stock_unit ? <span className="text-slate-400 normal-case font-bold tracking-normal ml-1">· {mat.stock_unit}</span> : null;
                     })()}
                   </label>
-                  <input
-                    type="number" min="1" step="1" required
-                    className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm"
-                    value={formData.ordered_quantity}
-                    onChange={e => setFormData({ ...formData, ordered_quantity: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Expected Arrival</label>
-                  <input type="date" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm" value={formData.expected_delivery} onChange={e => setFormData({ ...formData, expected_delivery: e.target.value })} />
+                  <input type="number" min="1" step="1" required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm" value={formData.ordered_quantity} onChange={e => setFormData({ ...formData, ordered_quantity: e.target.value })} />
                 </div>
               </div>
               <div className="flex gap-4 pt-4 justify-end">

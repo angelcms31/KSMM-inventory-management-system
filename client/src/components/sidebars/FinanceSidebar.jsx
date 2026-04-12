@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
   HiOutlineHome, 
   HiOutlinePresentationChartBar, 
   HiOutlineShieldCheck, 
   HiOutlineLogout,
-  HiOutlineShoppingCart 
+  HiOutlineShoppingCart,
+  HiChevronDown
 } from "react-icons/hi";
+import { getHashedPath } from "../../utils/hash";
 
-const FinanceSidebar = () => {
+const FinanceSidebar = ({ activeTab }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userName, setUserName] = useState("User");
-  const location = useLocation();
+  const [mobileLogsOpen, setMobileLogsOpen] = useState(false);
   const navigate = useNavigate();
+  const role = "finance";
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -23,24 +26,28 @@ const FinanceSidebar = () => {
   }, []);
 
   const menuItems = [
-    { name: 'Home', path: '/finance', icon: <HiOutlineHome size={18} /> },
-    { name: 'Transactions', path: '/finance/transactions', icon: <HiOutlinePresentationChartBar size={18} /> },
-    { name: 'Purchase Orders', path: '/finance/PurchaseOrder', icon: <HiOutlineShoppingCart size={18} /> },
-    { name: 'Audit Logs', path: '/finance/logs', icon: <HiOutlineShieldCheck size={18} /> },
+    { id: 'home', name: 'Home', icon: <HiOutlineHome size={20} /> },
+    { id: 'inventory', name: 'Transactions', icon: <HiOutlinePresentationChartBar size={20} /> },
+    { id: 'purchaseorder', name: 'Purchase Orders', icon: <HiOutlineShoppingCart size={20} /> },
+    { id: 'variance', name: 'Variance Logs', icon: <HiOutlineShieldCheck size={20} /> },
   ];
+
+  const handleTabClick = (tabId) => {
+    setMobileLogsOpen(false);
+    const newHash = getHashedPath(role, tabId);
+    navigate(`/dashboard/${newHash}`, { replace: true });
+  };
 
   const handleLogout = async () => {
     try {
-      const userId = localStorage.getItem("userId");
-      const role = localStorage.getItem("userRole");
+      const userId = localStorage.getItem("user_id");
+      const userRole = localStorage.getItem("userRole");
       if (userId) {
-        await axios.post("http://localhost:5000/api/logout", { userId, role });
+        await axios.post("http://localhost:5000/api/logout", { userId, role: userRole });
       }
       localStorage.clear();
       window.history.pushState(null, null, window.location.href);
-      window.onpopstate = function () {
-        window.history.go(1);
-      };
+      window.onpopstate = () => window.history.go(1);
       navigate("/", { replace: true });
       window.location.reload();
     } catch (err) {
@@ -64,15 +71,13 @@ const FinanceSidebar = () => {
         <nav className="flex-grow mt-2">
           <ul className="space-y-1">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive = activeTab === item.id;
               return (
-                <li key={item.name} className="relative pl-3">
-                  <Link
-                    to={item.path}
-                    className={`group flex items-center justify-between py-2.5 px-4 transition-all duration-300 relative ${
-                      isActive
-                        ? "bg-white text-black rounded-l-full shadow-md"
-                        : "text-gray-400 hover:text-white"
+                <li key={item.id} className="relative pl-3">
+                  <button
+                    onClick={() => handleTabClick(item.id)}
+                    className={`w-full group flex items-center justify-between py-2.5 px-4 transition-all duration-300 relative rounded-l-full cursor-pointer outline-none ${
+                      isActive ? "bg-white text-black shadow-md" : "text-gray-400 hover:text-white"
                     }`}
                   >
                     <div className="flex items-center space-x-3">
@@ -81,10 +86,8 @@ const FinanceSidebar = () => {
                       </span>
                       <span className="text-[13.5px] font-medium">{item.name}</span>
                     </div>
-                    {isActive && (
-                      <div className="w-1.5 h-1.5 bg-[#262221] rounded-full mr-1" />
-                    )}
-                  </Link>
+                    {isActive && <div className="w-1.5 h-1.5 bg-[#262221] rounded-full mr-1" />}
+                  </button>
                 </li>
               );
             })}
@@ -94,7 +97,7 @@ const FinanceSidebar = () => {
         <div className="px-6 mt-auto pb-8">
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-3 text-gray-500 hover:text-red-400 transition-colors w-full py-2 group"
+            className="flex items-center space-x-3 text-gray-500 hover:text-red-400 transition-colors w-full py-2 group cursor-pointer outline-none"
           >
             <HiOutlineLogout size={18} />
             <span className="text-[13.5px] font-medium">Log Out</span>
@@ -104,7 +107,7 @@ const FinanceSidebar = () => {
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-3">
         <div
-          className="rounded-2xl"
+          className="rounded-2xl relative"
           style={{
             background: 'rgba(38, 34, 33, 0.95)',
             backdropFilter: 'blur(20px)',
@@ -115,35 +118,26 @@ const FinanceSidebar = () => {
         >
           <div className="flex items-center justify-around px-2 py-2">
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive = activeTab === item.id;
               return (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px]"
+                <button
+                  key={item.id}
+                  onClick={() => handleTabClick(item.id)}
+                  className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] outline-none cursor-pointer"
                 >
-                  <div
-                    className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${
-                      isActive ? 'bg-white shadow-md' : 'bg-transparent'
-                    }`}
-                  >
-                    <span
-                      className={`transition-colors duration-300 ${isActive ? 'text-[#262221]' : 'text-gray-400'}`}
-                      style={{ display: 'flex' }}
-                    >
+                  <div className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${isActive ? 'bg-white shadow-md' : 'bg-transparent'}`}>
+                    <span className={`transition-colors duration-300 ${isActive ? 'text-[#262221]' : 'text-gray-400'}`} style={{ display: 'flex' }}>
                       {React.cloneElement(item.icon, { size: 22 })}
                     </span>
                   </div>
-                  {isActive && (
-                    <span className="mt-1 w-1 h-1 rounded-full bg-white block" />
-                  )}
-                </Link>
+                  {isActive && <span className="mt-1 w-1 h-1 rounded-full bg-white block" />}
+                </button>
               );
             })}
 
             <button
               onClick={handleLogout}
-              className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px]"
+              className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] cursor-pointer outline-none"
             >
               <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-transparent">
                 <HiOutlineLogout size={22} className="text-gray-400" />

@@ -7,15 +7,22 @@ import {
   HiOutlineTruck, 
   HiOutlineShieldCheck, 
   HiOutlineUserGroup, 
-  HiOutlineLogout 
+  HiOutlineLogout,
+  HiChevronDown,
+  HiOutlineClipboardList,
+  HiOutlineBeaker
 } from "react-icons/hi";
 import { getHashedPath } from "../../utils/hash";
 
 const AdminSidebar = ({ activeTab, setActiveTab }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userName, setUserName] = useState("User");
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [mobileLogsOpen, setMobileLogsOpen] = useState(false);
   const navigate = useNavigate();
   const role = localStorage.getItem("userRole")?.toLowerCase() || "";
+
+  const auditSubTabs = ['audit', 'variance'];
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -24,16 +31,25 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (auditSubTabs.includes(activeTab)) setLogsOpen(true);
+  }, [activeTab]);
+
   const menuItems = [
     { id: 'home', name: 'Home', icon: <HiOutlineHome size={20} /> },
     { id: 'artisan', name: 'Artisan', icon: <HiOutlineCube size={20} /> },
     { id: 'suppliers', name: 'Suppliers', icon: <HiOutlineTruck size={20} /> },
-    { id: 'audit', name: 'Audit logs', icon: <HiOutlineShieldCheck size={18} /> },
     { id: 'users', name: 'Users', icon: <HiOutlineUserGroup size={20} /> },
+  ];
+
+  const logSubItems = [
+    { id: 'audit', name: 'Audit Logs', icon: <HiOutlineClipboardList size={16} /> },
+    { id: 'variance', name: 'Variance Logs', icon: <HiOutlineBeaker size={16} /> },
   ];
 
   const handleTabClick = (tabId) => {
     setActiveTab(tabId);
+    setMobileLogsOpen(false);
     const newHash = getHashedPath(role, tabId);
     navigate(`/dashboard/${newHash}`, { replace: true });
   };
@@ -56,6 +72,8 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
     }
   };
 
+  const isLogsActive = auditSubTabs.includes(activeTab);
+
   return (
     <>
       <div className="hidden lg:flex w-[240px] h-screen bg-[#262221] text-white flex-col sticky top-0 left-0 font-sans overflow-hidden border-r border-white/5">
@@ -75,11 +93,9 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
               return (
                 <li key={item.id} className="relative pl-3">
                   <button
-                    onClick={() => handleTabClick(item.id)} 
+                    onClick={() => handleTabClick(item.id)}
                     className={`w-full group flex items-center justify-between py-2.5 px-4 transition-all duration-300 relative rounded-l-full cursor-pointer outline-none ${
-                      isActive
-                        ? "bg-white text-black shadow-md"
-                        : "text-gray-400 hover:text-white"
+                      isActive ? "bg-white text-black shadow-md" : "text-gray-400 hover:text-white"
                     }`}
                   >
                     <div className="flex items-center space-x-3">
@@ -88,13 +104,57 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
                       </span>
                       <span className="text-[13.5px] font-medium">{item.name}</span>
                     </div>
-                    {isActive && (
-                      <div className="w-1.5 h-1.5 bg-[#262221] rounded-full mr-1" />
-                    )}
+                    {isActive && <div className="w-1.5 h-1.5 bg-[#262221] rounded-full mr-1" />}
                   </button>
                 </li>
               );
             })}
+
+            <li className="relative pl-3">
+              <button
+                onClick={() => setLogsOpen(prev => !prev)}
+                className={`w-full group flex items-center justify-between py-2.5 px-4 transition-all duration-300 rounded-l-full cursor-pointer outline-none ${
+                  isLogsActive ? "bg-white text-black shadow-md" : "text-gray-400 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <span className={`${isLogsActive ? "text-black" : "text-gray-500 group-hover:text-white"}`}>
+                    <HiOutlineShieldCheck size={18} />
+                  </span>
+                  <span className="text-[13.5px] font-medium">Logs</span>
+                </div>
+                <HiChevronDown
+                  size={14}
+                  className={`transition-transform duration-300 mr-1 ${logsOpen ? 'rotate-180' : ''} ${isLogsActive ? 'text-black' : 'text-gray-500'}`}
+                />
+              </button>
+
+              {logsOpen && (
+                <ul className="mt-1 ml-4 space-y-0.5 border-l border-white/10 pl-3">
+                  {logSubItems.map((sub) => {
+                    const isSubActive = activeTab === sub.id;
+                    return (
+                      <li key={sub.id}>
+                        <button
+                          onClick={() => handleTabClick(sub.id)}
+                          className={`w-full flex items-center gap-2.5 py-2 px-3 rounded-lg text-[12.5px] font-medium transition-all duration-200 cursor-pointer outline-none ${
+                            isSubActive
+                              ? 'bg-white/10 text-white'
+                              : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                          }`}
+                        >
+                          <span className={isSubActive ? 'text-white' : 'text-gray-600'}>
+                            {sub.icon}
+                          </span>
+                          {sub.name}
+                          {isSubActive && <div className="ml-auto w-1 h-1 rounded-full bg-white" />}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </li>
           </ul>
         </nav>
 
@@ -111,7 +171,7 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
 
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-3">
         <div
-          className="rounded-2xl"
+          className="rounded-2xl relative"
           style={{
             background: 'rgba(38, 34, 33, 0.95)',
             backdropFilter: 'blur(20px)',
@@ -120,33 +180,56 @@ const AdminSidebar = ({ activeTab, setActiveTab }) => {
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           }}
         >
+          {mobileLogsOpen && (
+            <div className="absolute bottom-20 left-0 right-0 mx-4 bg-[#262221] border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
+              {logSubItems.map((sub) => (
+                <button
+                  key={sub.id}
+                  onClick={() => handleTabClick(sub.id)}
+                  className={`w-full flex items-center gap-3 p-4 text-[14px] font-medium transition-colors ${
+                    activeTab === sub.id ? 'bg-white text-black' : 'text-gray-400 hover:bg-white/5'
+                  }`}
+                >
+                  {sub.icon}
+                  {sub.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center justify-around px-2 py-2">
             {menuItems.map((item) => {
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
-                  onClick={() => handleTabClick(item.id)}
+                  onClick={() => {
+                    setMobileLogsOpen(false);
+                    handleTabClick(item.id);
+                  }}
                   className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] outline-none cursor-pointer"
                 >
-                  <div
-                    className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${
-                      isActive ? 'bg-white shadow-md' : 'bg-transparent'
-                    }`}
-                  >
-                    <span
-                      className={`transition-colors duration-300 ${isActive ? 'text-[#262221]' : 'text-gray-400'}`}
-                      style={{ display: 'flex' }}
-                    >
+                  <div className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${isActive ? 'bg-white shadow-md' : 'bg-transparent'}`}>
+                    <span className={`transition-colors duration-300 ${isActive ? 'text-[#262221]' : 'text-gray-400'}`} style={{ display: 'flex' }}>
                       {React.cloneElement(item.icon, { size: 22 })}
                     </span>
                   </div>
-                  {isActive && (
-                    <span className="mt-1 w-1 h-1 rounded-full bg-white block" />
-                  )}
+                  {isActive && <span className="mt-1 w-1 h-1 rounded-full bg-white block" />}
                 </button>
               );
             })}
+
+            <button
+              onClick={() => setMobileLogsOpen(!mobileLogsOpen)}
+              className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] outline-none cursor-pointer"
+            >
+              <div className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${isLogsActive ? 'bg-white shadow-md' : 'bg-transparent'}`}>
+                <span className={`transition-colors duration-300 ${isLogsActive ? 'text-[#262221]' : 'text-gray-400'}`} style={{ display: 'flex' }}>
+                  <HiOutlineShieldCheck size={22} />
+                </span>
+              </div>
+              {isLogsActive && <span className="mt-1 w-1 h-1 rounded-full bg-white block" />}
+            </button>
 
             <button
               onClick={handleLogout}
