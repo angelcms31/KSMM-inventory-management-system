@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { 
-  HiOutlinePlus, HiOutlineMail, HiOutlinePhone, HiX, 
+  HiOutlineMail, HiOutlinePhone, HiX, 
   HiCamera, HiDotsHorizontal, HiChevronDown, HiOutlineSearch, HiChevronLeft, HiChevronRight
 } from "react-icons/hi";
 
@@ -40,21 +40,30 @@ const ManageUsers = () => {
 
   const filteredUsers = allUsers.filter(u => {
     if (!searchTerm.trim()) return true;
-    const term = searchTerm.trim().toLowerCase();
+
+    const term = searchTerm.trim().toLowerCase().replace(/\s+/g, ' ');
     const firstName = (u.firstname || '').toLowerCase();
     const middleName = (u.middlename || '').toLowerCase();
     const lastName = (u.lastname || '').toLowerCase();
     const email = (u.email || '').toLowerCase();
     const contactNo = (u.contact_no || '').toLowerCase();
-    const idPrefix = (u.user_role === 'Admin' && u.is_head_admin) ? "HA" : (u.user_role || "US").substring(0, 2).toUpperCase();
-    const displayId = `${idPrefix}-${u.permanent_id || '0'}`.toLowerCase();
+    const idPrefix = u.is_head_admin ? "ha" : (u.user_role || "us").substring(0, 2).toLowerCase();
+    const displayId = `${idPrefix}-${u.permanent_id || '0'}`;
+
+    const fullNameWithMiddle = [firstName, middleName, lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const fullNameNoMiddle = `${firstName} ${lastName}`.trim();
+    const lastFirst = `${lastName} ${firstName}`.trim();
+
     return (
-      firstName.startsWith(term) ||
-      middleName.startsWith(term) ||
-      lastName.startsWith(term) ||
+      firstName.includes(term) ||
+      middleName.includes(term) ||
+      lastName.includes(term) ||
       email.includes(term) ||
       contactNo.includes(term) ||
-      displayId.startsWith(term)
+      displayId.includes(term) ||
+      fullNameWithMiddle.includes(term) ||
+      fullNameNoMiddle.includes(term) ||
+      lastFirst.includes(term)
     );
   });
 
@@ -219,6 +228,12 @@ const ManageUsers = () => {
     }
   };
 
+  const closeModal = () => {
+    setShowAddModal(false);
+    setShowEditModal(false);
+    setFormData(initialFormState);
+  };
+
   if (loading) return (
     <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">
       Loading...
@@ -226,13 +241,13 @@ const ManageUsers = () => {
   );
 
   return (
-    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden" onClick={() => setActiveMenu(null)}>
+    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden text-left" onClick={() => setActiveMenu(null)}>
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by name, email, contact, or ID..." 
+          <input
+            type="text"
+            placeholder="Search by name, email, contact, or ID..."
             className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -240,155 +255,153 @@ const ManageUsers = () => {
         </div>
       </div>
 
-      <div className="space-y-3 pb-24 lg:pb-10">
-        <section className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-4 lg:p-6 relative h-fit text-left">
+      <div className="space-y-3 pb-10">
+        <section className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 relative h-fit text-left">
           <div className="flex justify-between items-center mb-6 px-2">
-            <h1 className="text-xl lg:text-2xl font-black uppercase text-slate-900 leading-none tracking-tighter">Manage Users</h1>
-            <div className="flex items-center gap-2 lg:gap-3">
-              <div className="flex gap-1">
+            <h1 className="text-2xl font-black uppercase text-slate-900 leading-none tracking-tighter">Manage Users</h1>
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1 mr-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 0)); }}
                   disabled={currentPage === 0}
-                  className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"
+                  className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"
                 >
                   <HiChevronLeft size={16} />
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setCurrentPage(p => p + 1); }}
                   disabled={currentPage >= totalPages - 1}
-                  className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100"
+                  className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"
                 >
                   <HiChevronRight size={16} />
                 </button>
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); setShowAddModal(true); }}
-                className="bg-black text-white px-3 lg:px-5 py-2 lg:py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest"
+                className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg tracking-widest hover:scale-105 transition-all"
               >
                 + Add User
               </button>
             </div>
           </div>
 
-          {currentUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-              <HiOutlineSearch size={48} className="mb-2 opacity-20" />
-              <p className="text-lg font-bold">No user found</p>
-              <p className="text-sm">Try searching for a different name or ID</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4">
-              {currentUsers.map((user, index) => {
-                const userStatus = user.status || user.Status;
-                const isLocked = user.is_locked || user.Is_Locked;
-                const isApproved = user.is_approved;
-                const isHeadAdmin = user.is_head_admin;
-                const idPrefix = isHeadAdmin ? "AD" : (user.user_role || "US").substring(0, 2).toUpperCase();
-                const displayId = `${idPrefix}-${user.permanent_id || '0'}`;
-                const fullName = `${user.firstname} ${user.middlename ? `${user.middlename} ` : ''}${user.lastname}`;
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {currentUsers.map((user, index) => {
+              const userStatus = user.status || user.Status;
+              const isLocked = user.is_locked || user.Is_Locked;
+              const isApproved = user.is_approved;
+              const isHeadAdmin = user.is_head_admin;
+              const idPrefix = isHeadAdmin ? "AD" : (user.user_role || "US").substring(0, 2).toUpperCase();
+              const displayId = `${idPrefix}-${user.permanent_id || '0'}`;
+              const fullName = `${user.firstname} ${user.middlename ? `${user.middlename} ` : ''}${user.lastname}`;
 
-                return (
-                  <div
-                    key={index}
-                    className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm hover:shadow-md transition-all flex flex-col ${userStatus === 'Deactivated' ? 'opacity-80' : ''}`}
+              return (
+                <div
+                  key={index}
+                  className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm flex flex-col overflow-hidden ${userStatus === 'Deactivated' ? 'opacity-80' : ''}`}
+                >
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === index ? null : index); }}
+                    className="absolute top-4 right-4 text-gray-600 hover:text-black z-10"
                   >
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === index ? null : index); }}
-                      className="absolute top-4 right-4 text-gray-600 hover:text-black z-20"
-                    >
-                      <HiDotsHorizontal size={20} />
-                    </button>
+                    <HiDotsHorizontal size={20} />
+                  </button>
 
-                    {activeMenu === index && (
-                      <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-44 py-1 text-[11px] font-bold">
-                        {isLocked ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleUnlock(user); }}
-                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600"
-                          >
-                            Unlock & Activate
-                          </button>
-                        ) : (
-                          <>
-                            {user.user_role === 'Admin' && !isApproved && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleApproveAdmin(user); }}
-                                className="w-full text-left px-4 py-2 hover:bg-gray-50 text-blue-600"
-                              >
-                                Approve Admin
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEditClick(user); }}
-                              className="w-full text-left px-4 py-2 hover:bg-gray-50"
-                            >
-                              Update Information
-                            </button>
-                            {!isHeadAdmin && isApproved && (
-                              <>
-                                <div className="border-t"></div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); toggleStatus(user); }}
-                                  className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}
-                                >
-                                  {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
-                                </button>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex items-start gap-2.5 mb-3">
-                      <div className="relative flex-shrink-0">
-                        <img 
-                          src={user.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.firstname}`} 
-                          className="w-14 h-14 rounded-full object-cover border border-gray-100 shadow-sm" 
-                          alt="Profile"
-                        />
-                        <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${isLocked ? 'bg-yellow-400' : userStatus === 'Deactivated' ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                      </div>
-                      <div className="flex-1 pt-0.5 min-w-0 flex flex-col pr-8">
-                        <h3 className="font-bold text-sm text-black leading-tight truncate" title={fullName}>{fullName}</h3>
-                        <div className="flex flex-col items-start gap-1 mt-0.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-[#9CA3AF] text-xs font-normal">{isHeadAdmin ? "Head Admin" : user.user_role}</p>
-                            {isLocked && <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Locked</span>}
-                            {userStatus === 'Deactivated' && <span className="bg-[#EF4444] text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Deactivated</span>}
-                          </div>
+                  {activeMenu === index && (
+                    <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-44 py-1 text-[11px] font-bold">
+                      {isLocked ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleUnlock(user); }}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600"
+                        >
+                          Unlock & Activate
+                        </button>
+                      ) : (
+                        <>
                           {user.user_role === 'Admin' && !isApproved && (
-                            <span className="bg-blue-100 text-blue-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Pending Approval</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleApproveAdmin(user); }}
+                              className="w-full text-left px-4 py-2 hover:bg-gray-50 text-blue-600"
+                            >
+                              Approve Admin
+                            </button>
                           )}
-                        </div>
-                      </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleEditClick(user); }}
+                            className="w-full text-left px-4 py-2 hover:bg-gray-50"
+                          >
+                            Update Information
+                          </button>
+                          {!isHeadAdmin && isApproved && (
+                            <>
+                              <div className="border-t"></div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleStatus(user); }}
+                                className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}
+                              >
+                                {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
                     </div>
+                  )}
 
-                    <div className="border border-gray-300 rounded-2xl p-3 bg-white">
-                      <div className="flex justify-between text-[#9CA3AF] text-[10px] font-normal mb-1.5 uppercase tracking-widest">
-                        <span>ID No.</span>
-                        <span>Date Added</span>
-                      </div>
-                      <div className="flex justify-between font-black text-black text-xs mb-3 pb-2 border-b border-gray-200 uppercase tracking-tight">
-                        <span>{displayId}</span>
-                        <span className="text-[10px]">{user.date_added ? new Date(user.date_added).toLocaleDateString() : 'N/A'}</span>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="flex items-center gap-2 text-black text-xs font-normal truncate">
-                          <HiOutlineMail size={18} className="text-black flex-shrink-0"/> 
-                          <span className="truncate">{user.email}</span>
-                        </p>
-                        <p className="flex items-center gap-2 text-black text-xs font-normal">
-                          <HiOutlinePhone size={18} className="text-black flex-shrink-0"/> 
-                          {user.contact_no ? `+63 ${user.contact_no}` : 'No Contact'}
-                        </p>
+                  <div className="flex items-start gap-2.5 mb-3 min-w-0">
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={user.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.firstname}`}
+                        className="w-14 h-14 rounded-full object-cover border border-gray-100"
+                        alt="Profile"
+                      />
+                      <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${isLocked ? 'bg-yellow-400' : userStatus === 'Deactivated' ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    </div>
+                    <div className="flex-1 pt-0.5 min-w-0 pr-8">
+                      <h3 className="font-bold text-sm text-black truncate" title={fullName}>{fullName}</h3>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-wider">{isHeadAdmin ? "Head Admin" : user.user_role}</p>
+                        {isLocked && <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Locked</span>}
+                        {userStatus === 'Deactivated' && <span className="bg-[#EF4444] text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Deactivated</span>}
+                        {user.user_role === 'Admin' && !isApproved && (
+                          <span className="bg-blue-100 text-blue-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Pending</span>
+                        )}
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+
+                  <div className="border border-gray-300 rounded-2xl p-3 bg-white min-w-0">
+                    <div className="flex justify-between text-[#9CA3AF] text-[10px] font-normal mb-1 uppercase tracking-widest">
+                      <span>ID No.</span>
+                      <span>Date Added</span>
+                    </div>
+                    <div className="flex justify-between font-black text-black text-xs mb-3 pb-2 border-b border-gray-200 uppercase tracking-tight">
+                      <span>{displayId}</span>
+                      <span className="text-[10px]">{user.date_added ? new Date(user.date_added).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                    <div className="space-y-2 min-w-0">
+                      <p className="flex items-center gap-2 text-black text-xs min-w-0">
+                        <HiOutlineMail size={18} className="flex-shrink-0" />
+                        <span className="truncate">{user.email}</span>
+                      </p>
+                      <p className="flex items-center gap-2 text-black text-xs min-w-0">
+                        <HiOutlinePhone size={18} className="flex-shrink-0" />
+                        <span>{user.contact_no ? `+63 ${user.contact_no}` : 'No Contact'}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {currentUsers.length === 0 && (
+              <div className="col-span-1 sm:col-span-2 lg:col-span-3 flex flex-col items-center justify-center py-20 text-gray-400">
+                <HiOutlineSearch size={48} className="mb-2 opacity-20" />
+                <p className="text-lg font-bold">No user found</p>
+                <p className="text-sm">Try searching for a different name or ID</p>
+              </div>
+            )}
+          </div>
         </section>
       </div>
 
@@ -396,7 +409,7 @@ const ManageUsers = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-4 lg:p-6 text-left">
           <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-3xl p-6 lg:p-12 relative shadow-2xl overflow-y-auto max-h-[90vh]">
             <button
-              onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }}
+              onClick={closeModal}
               className="absolute top-5 right-5 lg:top-10 lg:right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"
             >
               <HiX size={22} />
@@ -406,8 +419,8 @@ const ManageUsers = () => {
               {showAddModal ? "Add New User" : "Update User"}
             </h2>
 
-            <form onSubmit={showAddModal ? handleAddUser : handleUpdateUser} className="flex flex-col lg:grid lg:grid-cols-5 gap-6 lg:gap-x-10">
-              <div className="lg:col-span-3 space-y-3">
+            <form onSubmit={showAddModal ? handleAddUser : handleUpdateUser} className="grid grid-cols-1 sm:grid-cols-5 gap-6 sm:gap-x-10">
+               <div className="sm:col-span-3 space-y-3">
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">First Name</label>
                   <input
@@ -464,8 +477,7 @@ const ManageUsers = () => {
                 </div>
               </div>
 
-              <div className="lg:col-span-2 flex flex-col items-center justify-between py-2 gap-4">
-                <div className="flex flex-col items-center w-full space-y-3">
+            <div className="sm:col-span-2 flex flex-col items-center justify-between py-2 gap-4">                <div className="flex flex-col items-center w-full space-y-3">
                   <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
                     {(showAddModal ? formData.profileImage : selectedUser?.profileImage) ? (
                       <img src={showAddModal ? formData.profileImage : selectedUser.profileImage} className="w-full h-full object-cover" alt="Preview" />
@@ -486,9 +498,7 @@ const ManageUsers = () => {
                   </div>
 
                   <div className="w-full space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black flex items-center gap-1">
-                      Gender 
-                    </label>
+                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Gender</label>
                     <div className="relative">
                       <select
                         className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
@@ -504,9 +514,7 @@ const ManageUsers = () => {
                   </div>
 
                   <div className="w-full space-y-1">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black flex items-center gap-1">
-                      Position 
-                    </label>
+                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Position</label>
                     <div className="relative">
                       <select
                         className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
@@ -526,7 +534,7 @@ const ManageUsers = () => {
                 <div className="flex gap-3 w-full mt-2">
                   <button
                     type="button"
-                    onClick={() => { setShowAddModal(false); setShowEditModal(false); setFormData(initialFormState); }}
+                    onClick={closeModal}
                     className="flex-1 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all cursor-pointer"
                   >
                     Cancel

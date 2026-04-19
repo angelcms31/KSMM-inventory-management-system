@@ -1,4 +1,6 @@
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
@@ -7,6 +9,17 @@ const { getPool, initDB, dbQuery } = require("./db");
 require("dotenv").config();
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "http://localhost:5173", credentials: true }
+});
+
+io.on("connection", (socket) => {
+  console.log("Client connected:", socket.id);
+  socket.on("disconnect", () => console.log("Client disconnected:", socket.id));
+});
+
+module.exports = { app, server, io };
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
@@ -28,35 +41,91 @@ const createAuditLog = async (userId, action, role) => {
   }
 };
 
-const checkDuplicateAcrossTables = async (email, contactNo, currentTable = null, excludeId = null) => {
+const checkUserDuplicate = async (email, contactNo, excludeId = null) => {
   const pool = getPool();
 
   const userRes = await pool.query(
-    `SELECT 1 FROM personaldata WHERE (LOWER(email) = LOWER($1) OR contact_no = $2) ${currentTable === 'personaldata' ? `AND user_id != $3` : ''}`,
-    currentTable === 'personaldata' ? [email, contactNo, excludeId] : [email, contactNo]
+    `SELECT 1 FROM personaldata WHERE (LOWER(email) = LOWER($1) OR contact_no = $2)${excludeId ? ' AND user_id != $3' : ''}`,
+    excludeId ? [email, contactNo, excludeId] : [email, contactNo]
   );
-
   if (userRes.rows.length > 0) {
-    return { conflict: true, field: 'Email/Contact', message: 'Email is already used by a System User.' };
+    return { conflict: true, message: 'Email or contact is already used by a System User.' };
   }
 
-  if (currentTable === 'personaldata') {
-    const artisanRes = await pool.query(`SELECT 1 FROM artisan WHERE LOWER(email) = LOWER($1) OR contact_no = $2`, [email, contactNo]);
-    if (artisanRes.rows.length > 0) return { conflict: true, field: 'Email/Contact', message: 'Email is already used by an Artisan.' };
-
-    const supplierRes = await pool.query(`SELECT 1 FROM supplier WHERE LOWER(email) = LOWER($1) OR contact_no = $2`, [email, contactNo]);
-    if (supplierRes.rows.length > 0) return { conflict: true, field: 'Email/Contact', message: 'Email is already used by a Supplier.' };
+  const artisanRes = await pool.query(
+    `SELECT 1 FROM artisan WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+    [email, contactNo]
+  );
+  if (artisanRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already used by an Artisan.' };
   }
 
-  if (currentTable === 'artisan' || currentTable === 'supplier') {
-    const tableIdCol = currentTable === 'artisan' ? 'artisan_id' : 'supplier_id';
-    const selfRes = await pool.query(
-      `SELECT 1 FROM ${currentTable} WHERE (LOWER(email) = LOWER($1) OR contact_no = $2) AND ${tableIdCol} != $3`,
-      [email, contactNo, excludeId]
-    );
-    if (selfRes.rows.length > 0) {
-        return { conflict: true, field: 'Email/Contact', message: `Email is already registered in ${currentTable}s.` };
-    }
+  const supplierRes = await pool.query(
+    `SELECT 1 FROM supplier WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+    [email, contactNo]
+  );
+  if (supplierRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already used by a Supplier.' };
+  }
+
+  return { conflict: false };
+};
+
+const checkArtisanDuplicate = async (email, contactNo, excludeId = null) => {
+  const pool = getPool();
+
+  const artisanRes = await pool.query(
+    `SELECT 1 FROM artisan WHERE (LOWER(email) = LOWER($1) OR contact_no = $2)${excludeId ? ' AND artisan_id != $3' : ''}`,
+    excludeId ? [email, contactNo, excludeId] : [email, contactNo]
+  );
+  if (artisanRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already registered to another Artisan.' };
+  }
+
+  const userRes = await pool.query(
+    `SELECT 1 FROM personaldata WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+    [email, contactNo]
+  );
+  if (userRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already used by a System User.' };
+  }
+
+  const supplierRes = await pool.query(
+    `SELECT 1 FROM supplier WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+    [email, contactNo]
+  );
+  if (supplierRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already used by a Supplier.' };
+  }
+
+  return { conflict: false };
+};
+
+const checkSupplierDuplicate = async (email, contactNo, excludeId = null) => {
+  const pool = getPool();
+
+  const supplierRes = await pool.query(
+    `SELECT 1 FROM supplier WHERE (LOWER(email) = LOWER($1) OR contact_no = $2)${excludeId ? ' AND supplier_id != $3' : ''}`,
+    excludeId ? [email, contactNo, excludeId] : [email, contactNo]
+  );
+  if (supplierRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already registered to another Supplier.' };
+  }
+
+  const userRes = await pool.query(
+    `SELECT 1 FROM personaldata WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+    [email, contactNo]
+  );
+  if (userRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already used by a System User.' };
+  }
+
+  const artisanRes = await pool.query(
+    `SELECT 1 FROM artisan WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+    [email, contactNo]
+  );
+  if (artisanRes.rows.length > 0) {
+    return { conflict: true, message: 'Email or contact is already used by an Artisan.' };
   }
 
   return { conflict: false };
@@ -81,9 +150,7 @@ app.post("/login", async (req, res) => {
     const user = userCheck.rows[0];
 
     if (user.status === 'Deactivated') return res.status(403).json({ message: "Account Deactivated" });
-
     if (user.is_locked && !user.is_head_admin) return res.status(403).json({ message: "Account Locked" });
-
     if (user.role === 'Admin' && !user.is_approved && !user.is_head_admin) {
       return res.status(403).json({ message: "Your Admin account is pending approval from the Head Admin." });
     }
@@ -93,20 +160,16 @@ app.post("/login", async (req, res) => {
     if (match) {
       await getPool().query('UPDATE userlogin SET failed_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE user_id = $1', [user.user_id]);
       await createAuditLog(user.user_id, "Login", user.role);
-      
       return res.json({
-        success: true, 
-        role: user.role, 
+        success: true,
+        role: user.role,
         firstName: user.firstname,
-        user_id: user.user_id, 
+        user_id: user.user_id,
         is_head_admin: user.is_head_admin || false,
         is_default_password: user.is_default_password ?? true
       });
     } else {
-      if (user.is_head_admin) {
-        return res.status(401).json({ message: "Invalid credentials." });
-      }
-
+      if (user.is_head_admin) return res.status(401).json({ message: "Invalid credentials." });
       const newAttempts = (user.failed_attempts || 0) + 1;
       if (newAttempts >= 3) {
         await getPool().query('UPDATE userlogin SET failed_attempts = $1, is_locked = TRUE WHERE user_id = $2', [newAttempts, user.user_id]);
@@ -116,8 +179,8 @@ app.post("/login", async (req, res) => {
         return res.status(401).json({ message: "Invalid credentials." });
       }
     }
-  } catch (error) { 
-    res.status(500).json({ message: "Login error" }); 
+  } catch (error) {
+    res.status(500).json({ message: "Login error" });
   }
 });
 
@@ -131,7 +194,9 @@ app.post('/api/change_password', async (req, res) => {
     const hashed = await bcrypt.hash(new_password, 10);
     await getPool().query('UPDATE userlogin SET password = $1, is_default_password = FALSE WHERE user_id = $2', [hashed, user_id]);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ message: 'Failed to update password.' }); }
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update password.' });
+  }
 });
 
 app.post("/api/logout", async (req, res) => {
@@ -143,7 +208,9 @@ app.post("/api/logout", async (req, res) => {
     } else {
       res.status(400).send("No user ID provided");
     }
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/send_recovery_email", async (req, res) => {
@@ -155,7 +222,9 @@ app.post("/send_recovery_email", async (req, res) => {
       html: `<h3>Your OTP for password recovery is: <b>${OTP}</b></h3><p>This code will expire soon.</p>`
     });
     res.status(200).send("OTP sent successfully");
-  } catch (error) { res.status(500).send("Failed to send email"); }
+  } catch (error) {
+    res.status(500).send("Failed to send email");
+  }
 });
 
 app.post("/api/reset_password", async (req, res) => {
@@ -172,13 +241,20 @@ app.post("/api/reset_password", async (req, res) => {
     } else {
       res.status(404).send("User not found");
     }
-  } catch (err) { res.status(500).send("Server error during password reset"); }
+  } catch (err) {
+    res.status(500).send("Server error during password reset");
+  }
 });
+
+// ─────────────────────────────────────────────
+// ADMIN
+// ─────────────────────────────────────────────
 
 app.get("/api/users", async (req, res) => {
   try {
     const { search = "", page = 1, limit = 6 } = req.query;
     const offset = (page - 1) * limit;
+    
     const result = await getPool().query(`
       WITH numbered_users AS (
         SELECT p.*, u.user_role, u.is_locked, u.is_head_admin, u.is_approved, u.date_added,
@@ -187,21 +263,38 @@ app.get("/api/users", async (req, res) => {
         FROM personaldata p JOIN userlogin u ON p.user_id = u.user_id
       )
       SELECT * FROM numbered_users
-      WHERE firstname ILIKE $1 OR lastname ILIKE $1 OR email ILIKE $1
-         OR CONCAT(SUBSTRING(user_role, 1, 2), '-', permanent_id::TEXT) ILIKE $1
+      WHERE (
+        firstname ILIKE $1 
+        OR lastname ILIKE $1 
+        OR email ILIKE $1
+        OR COALESCE(middlename, '') ILIKE $1
+        OR (firstname || ' ' || lastname) ILIKE $1
+        OR (firstname || ' ' || COALESCE(middlename, '') || ' ' || lastname) ILIKE $1
+        OR CONCAT(SUBSTRING(user_role, 1, 2), '-', permanent_id::TEXT) ILIKE $1
+      )
       ORDER BY CASE WHEN is_locked = TRUE THEN 1 ELSE 2 END ASC,
                CASE WHEN is_approved = FALSE AND user_role = 'Admin' THEN 1 ELSE 2 END ASC,
-               CASE WHEN status = 'Active' THEN 1 ELSE 2 END ASC, date_added DESC
+               CASE WHEN status = 'Active' THEN 1 ELSE 2 END ASC, 
+               date_added DESC
       LIMIT $2 OFFSET $3`, [`%${search}%`, limit, offset]);
-    res.json({ users: result.rows, totalUsers: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 });
-  } catch (err) { res.status(500).send("Database error"); }
+
+    res.json({ 
+      users: result.rows, 
+      totalUsers: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Database error");
+  }
 });
 
 app.get("/api/user/profile/:email", async (req, res) => {
   try {
     const result = await getPool().query("SELECT Profile_Image FROM PersonalData WHERE Email = $1", [req.params.email]);
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/user/name/:id", async (req, res) => {
@@ -210,7 +303,9 @@ app.get("/api/user/name/:id", async (req, res) => {
       "SELECT CONCAT(firstname, ' ', lastname) as name FROM personaldata WHERE user_id = $1", [req.params.id]
     );
     res.json(result.rows.length > 0 ? { name: result.rows[0].name } : { name: "Unknown User" });
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/user/:id", async (req, res) => {
@@ -219,7 +314,9 @@ app.get("/api/user/:id", async (req, res) => {
       "SELECT profile_image, firstname, lastname FROM personaldata WHERE user_id = $1", [req.params.id]
     );
     res.json(result.rows.length > 0 ? result.rows[0] : { message: "User not found" });
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/add_user", async (req, res) => {
@@ -228,7 +325,7 @@ app.post("/api/add_user", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const dup = await checkDuplicateAcrossTables(email, contactNo, 'personaldata');
+    const dup = await checkUserDuplicate(email, contactNo);
     if (dup.conflict) {
       await client.query("ROLLBACK");
       return res.status(400).json({ message: dup.message });
@@ -252,6 +349,7 @@ app.post("/api/add_user", async (req, res) => {
     );
 
     await client.query("COMMIT");
+    io.emit("users:updated");
 
     let mailContent = `<h3>Account Created!</h3><p>Hi ${firstName}, use these credentials:</p><p>User: ${email}<br>Pass: password123</p>`;
     if (needsApproval) {
@@ -261,18 +359,18 @@ app.post("/api/add_user", async (req, res) => {
     }
 
     await transporter.sendMail({
-      from: process.env.MY_EMAIL, 
-      to: email, 
+      from: process.env.MY_EMAIL,
+      to: email,
       subject: "Welcome to Matthew & Melka",
       html: mailContent
     });
 
     res.status(201).send(needsApproval ? "Admin created and pending approval" : "User created successfully");
-  } catch (err) { 
-    await client.query("ROLLBACK"); 
-    res.status(500).send(err.message); 
-  } finally { 
-    client.release(); 
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(500).send(err.message);
+  } finally {
+    client.release();
   }
 });
 
@@ -281,32 +379,71 @@ app.put("/api/user/update", async (req, res) => {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
+
+    const userRes = await client.query(
+      "SELECT user_id FROM personaldata WHERE LOWER(email) = LOWER($1)",
+      [originalEmail || email]
+    );
+    const userId = userRes.rows[0]?.user_id;
+
+    const userCheck = await client.query(
+      `SELECT 1 FROM personaldata WHERE (LOWER(email) = LOWER($1) OR contact_no = $2) AND user_id != $3`,
+      [email, contactNo, userId]
+    );
+    if (userCheck.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: 'Email or contact is already used by a System User.' });
+    }
+
+    const artisanCheck = await client.query(
+      `SELECT 1 FROM artisan WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+      [email, contactNo]
+    );
+    if (artisanCheck.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: 'Email or contact is already used by an Artisan.' });
+    }
+
+    const supplierCheck = await client.query(
+      `SELECT 1 FROM supplier WHERE LOWER(email) = LOWER($1) OR contact_no = $2`,
+      [email, contactNo]
+    );
+    if (supplierCheck.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: 'Email or contact is already used by a Supplier.' });
+    }
+
     await client.query(
       'UPDATE personaldata SET firstname=$1, middlename=$2, lastname=$3, contact_no=$4, gender=$5, profile_image=$6 WHERE email=$7',
       [firstName, middleName || '', lastName, contactNo, gender, profileImage, originalEmail || email]
     );
     await client.query('UPDATE userlogin SET user_role=$1 WHERE user_account=$2', [role, originalEmail || email]);
     await client.query("COMMIT");
+    io.emit("users:updated");
     res.send("Update successful");
-  } catch (err) { await client.query("ROLLBACK"); res.status(500).send(err.message); }
-  finally { client.release(); }
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(500).send(err.message);
+  } finally {
+    client.release();
+  }
 });
 
 app.put("/api/user/status", async (req, res) => {
   const { userId, status, adminId, adminRole } = req.body;
-  
   try {
     const adminCheck = await getPool().query('SELECT is_head_admin FROM userlogin WHERE user_id = $1', [adminId]);
     if (!adminCheck.rows[0]?.is_head_admin) {
       return res.status(403).json({ message: 'Only the Head Admin can deactivate accounts.' });
     }
-
     if (String(userId) === String(adminId)) return res.status(400).json({ message: 'You cannot deactivate your own account.' });
-
     await getPool().query('UPDATE personaldata SET status = $1 WHERE user_id = $2', [status, userId]);
     await createAuditLog(adminId, `User ${status}: ID ${userId}`, adminRole);
+    io.emit("users:updated");
     res.send(`User status updated to ${status}`);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.put("/api/admin/approve", async (req, res) => {
@@ -316,11 +453,13 @@ app.put("/api/admin/approve", async (req, res) => {
     if (!adminCheck.rows[0]?.is_head_admin) {
       return res.status(403).json({ message: 'Only the Head Admin can approve Admin accounts.' });
     }
-
     await getPool().query('UPDATE userlogin SET is_approved = TRUE WHERE user_id = $1', [userId]);
     await createAuditLog(adminId, `Approved Admin Account: ID ${userId}`, 'Head Admin');
+    io.emit("users:updated");
     res.send("Admin account approved");
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.put("/api/user/unlock", async (req, res) => {
@@ -329,13 +468,12 @@ app.put("/api/user/unlock", async (req, res) => {
     await getPool().query('UPDATE userlogin SET is_locked = FALSE, failed_attempts = 0 WHERE user_id = $1', [userId]);
     const adminRes = await getPool().query('SELECT user_role FROM userlogin WHERE user_id = $1', [adminId]);
     await createAuditLog(adminId, `Unlocked User: ID ${userId}`, adminRes.rows[0]?.user_role || 'Admin');
+    io.emit("users:updated");
     res.send("User account unlocked");
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
-
-// ─────────────────────────────────────────────
-// ADMIN — Artisans
-// ─────────────────────────────────────────────
 
 app.get("/api/artisans", async (req, res) => {
   try {
@@ -343,31 +481,36 @@ app.get("/api/artisans", async (req, res) => {
     const offset = (page - 1) * limit;
     const result = await getPool().query(`
       SELECT *, COUNT(*) OVER() as total_count FROM artisan
-      WHERE (first_name ILIKE $1 OR middle_name ILIKE $1 OR last_name ILIKE $1 OR CONCAT('AR-', artisan_id) ILIKE $1)
+      WHERE (
+        first_name ILIKE $1
+        OR middle_name ILIKE $1
+        OR last_name ILIKE $1
+        OR CONCAT('AR-', artisan_id) ILIKE $1
+        OR CONCAT(first_name, ' ', last_name) ILIKE $1
+        OR CONCAT(first_name, ' ', middle_name, ' ', last_name) ILIKE $1
+      )
       ORDER BY CASE WHEN status='Active' THEN 1 WHEN status='Deactivated' THEN 2 ELSE 3 END ASC, artisan_id DESC
       LIMIT $2 OFFSET $3`, [`%${search}%`, limit, offset]);
     res.json({ artisans: result.rows, totalArtisans: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0 });
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/add_artisan", async (req, res) => {
   const { first_name, middle_name, last_name, email, contact_no, department, profile_image } = req.body;
-  
   try {
-    const dup = await checkDuplicateAcrossTables(email, contact_no, 'artisan');
-    if (dup.conflict) {
-      return res.status(400).json({ message: dup.message });
-    }
+    const dup = await checkArtisanDuplicate(email, contact_no);
+    if (dup.conflict) return res.status(400).json({ message: dup.message });
 
     const result = await getPool().query(
       `INSERT INTO artisan (first_name, middle_name, last_name, email, contact_no, profile_image, department, status) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'Active') RETURNING *`,
       [first_name, middle_name || '', last_name, email, contact_no, profile_image, department]
     );
-
+    io.emit("artisans:updated");
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err.message); // Tingnan ang terminal para sa specific error
     res.status(500).send("Server Error: " + err.message);
   }
 });
@@ -376,15 +519,18 @@ app.put("/api/artisans/:id", async (req, res) => {
   const { id } = req.params;
   const { first_name, middle_name, last_name, email, contact_no, profile_image, department, status } = req.body;
   try {
-    const dup = await checkDuplicateAcrossTables(email, contact_no, 'artisan', id);
+    const dup = await checkArtisanDuplicate(email, contact_no, id);
     if (dup.conflict) return res.status(400).json({ message: dup.message });
 
     const result = await getPool().query(
       `UPDATE artisan SET first_name=$1, middle_name=$2, last_name=$3, email=$4, contact_no=$5, profile_image=$6, department=$7, status=$8 WHERE artisan_id=$9 RETURNING *`,
       [first_name, middle_name, last_name, email, contact_no, profile_image, department, status, id]
     );
+    io.emit("artisans:updated");
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/artisan/status", async (req, res) => {
@@ -392,45 +538,52 @@ app.post("/api/artisan/status", async (req, res) => {
   try {
     const result = await getPool().query("UPDATE artisan SET status = $1 WHERE email = $2", [status, email]);
     if (result.rowCount === 0) return res.status(404).send("Artisan not found with that email.");
+    io.emit("artisans:updated");
     res.status(200).send(`Artisan status updated to ${status}`);
-  } catch (err) { res.status(500).send("Database error: " + err.message); }
+  } catch (err) {
+    res.status(500).send("Database error: " + err.message);
+  }
 });
-
-// ─────────────────────────────────────────────
-// ADMIN — Suppliers
-// ─────────────────────────────────────────────
 
 app.get("/api/suppliers", async (req, res) => {
   try {
     const result = await getPool().query('SELECT * FROM supplier ORDER BY supplier_id DESC');
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/add_supplier", async (req, res) => {
   const { name, email, phone } = req.body;
   try {
-    const dup = await checkDuplicateAcrossTables(email, phone, 'supplier');
+    const dup = await checkSupplierDuplicate(email, phone);
     if (dup.conflict) return res.status(400).json({ message: dup.message });
 
     await getPool().query("INSERT INTO Supplier (name, contact_no, email, status) VALUES ($1,$2,$3, 'Active')", [name, phone, email]);
+    io.emit("suppliers:updated");
     res.status(201).send("Success");
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.put("/api/suppliers/:id", async (req, res) => {
   const { id } = req.params;
   const { name, email, contact_no } = req.body;
   try {
-    const dup = await checkDuplicateForArtisanSupplier(email, contact_no, 'supplier', id);
+    const dup = await checkSupplierDuplicate(email, contact_no, id);
     if (dup.conflict) return res.status(400).json({ message: dup.message });
 
     const result = await getPool().query(
       "UPDATE supplier SET name=$1, email=$2, contact_no=$3 WHERE supplier_id=$4 RETURNING *",
       [name, email, contact_no, id]
     );
+    io.emit("suppliers:updated");
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.patch("/api/suppliers/status/:id", async (req, res) => {
@@ -438,8 +591,11 @@ app.patch("/api/suppliers/status/:id", async (req, res) => {
   const { status } = req.body;
   try {
     await getPool().query('UPDATE supplier SET status = $1 WHERE supplier_id = $2', [status, id]);
+    io.emit("suppliers:updated");
     res.status(200).send("Status updated");
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/supplier/orders/:id", async (req, res) => {
@@ -448,12 +604,10 @@ app.get("/api/supplier/orders/:id", async (req, res) => {
       `SELECT order_id, product_name, total_value, status FROM orders WHERE supplier_id = $1 ORDER BY order_id DESC`, [req.params.id]
     );
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
-
-// ─────────────────────────────────────────────
-// ADMIN — Audit Logs
-// ─────────────────────────────────────────────
 
 app.get("/api/audit_logs", async (req, res) => {
   try {
@@ -465,11 +619,13 @@ app.get("/api/audit_logs", async (req, res) => {
         ) as merged_name
       FROM audit_logs l ORDER BY l.timestamp DESC`);
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 // ─────────────────────────────────────────────
-// SALES — Products & Inventory
+// SALES
 // ─────────────────────────────────────────────
 
 app.get("/api/products", async (req, res) => {
@@ -480,7 +636,9 @@ app.get("/api/products", async (req, res) => {
       [`%${search}%`]
     );
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/products/unique-list", async (req, res) => {
@@ -490,7 +648,9 @@ app.get("/api/products/unique-list", async (req, res) => {
       [], 'finishedgoods'
     );
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.put("/api/products/:sku", async (req, res) => {
@@ -515,11 +675,15 @@ app.put("/api/products/:sku", async (req, res) => {
       }
     }
     await client.query("COMMIT");
+    io.emit("products:updated");
+    io.emit("work_orders:updated");
     res.status(200).send("Product updated and demand check complete");
   } catch (err) {
     await client.query("ROLLBACK");
     res.status(500).send("Database Error: " + err.message);
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
 
 app.post("/api/sales_Add_inventory", async (req, res) => {
@@ -546,16 +710,16 @@ app.post("/api/sales_Add_inventory", async (req, res) => {
       [warehouseRes.rows[0].warehouse_id, sku, quantity || 0]
     );
     await client.query("COMMIT");
+    io.emit("products:updated");
+    io.emit("warehouses:updated");
     res.status(200).send("Success");
   } catch (err) {
     await client.query("ROLLBACK");
     res.status(500).send("Database Error: " + err.message);
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
-
-// ─────────────────────────────────────────────
-// SALES — Warehouses
-// ─────────────────────────────────────────────
 
 app.get("/api/warehouses", async (req, res) => {
   try {
@@ -566,7 +730,9 @@ app.get("/api/warehouses", async (req, res) => {
         (SELECT COUNT(*) FROM FinishedGoods fg JOIN WarehouseInventory wi ON fg.sku = wi.sku WHERE wi.warehouse_id = w.warehouse_id AND wi.quantity <= fg.min_stocks) as low_stock_count
       FROM Warehouse w ORDER BY w.name ASC`);
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/warehouses/all", async (req, res) => {
@@ -577,15 +743,20 @@ app.get("/api/warehouses/all", async (req, res) => {
         (SELECT SUM(quantity) FROM WarehouseInventory WHERE warehouse_id = w.warehouse_id) as current_utilization
       FROM Warehouse w ORDER BY w.warehouse_id ASC`);
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/warehouses/add", async (req, res) => {
   const { name, location, capacity, manager } = req.body;
   try {
     await getPool().query("INSERT INTO Warehouse (name, location, capacity_total, manager_name) VALUES ($1,$2,$3,$4)", [name, location, capacity, manager]);
+    io.emit("warehouses:updated");
     res.status(201).send("Warehouse added successfully");
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.put("/api/warehouses/:id", async (req, res) => {
@@ -593,8 +764,11 @@ app.put("/api/warehouses/:id", async (req, res) => {
   const { name, location, capacity_total, manager_name } = req.body;
   try {
     await getPool().query("UPDATE Warehouse SET name=$1, location=$2, capacity_total=$3, manager_name=$4 WHERE warehouse_id=$5", [name, location, capacity_total, manager_name, id]);
+    io.emit("warehouses:updated");
     res.status(200).send("Warehouse updated successfully");
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.get("/api/warehouses/:id/inventory", async (req, res) => {
@@ -604,13 +778,10 @@ app.get("/api/warehouses/:id/inventory", async (req, res) => {
       [req.params.id]
     );
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
-
-// ─────────────────────────────────────────────
-// SALES — Orders
-// ─────────────────────────────────────────────
-
 
 app.get("/api/sales_orders", async (req, res) => {
   try {
@@ -619,8 +790,7 @@ app.get("/api/sales_orders", async (req, res) => {
         (so.quantity * fg.selling_price) AS total_amount
       FROM sales_orders so
       LEFT JOIN finishedgoods fg ON so.sku = fg.sku
-      ORDER BY so.order_id DESC
-    `);
+      ORDER BY so.order_id DESC`);
     res.json(result.rows);
   } catch (err) {
     res.status(500).send(err.message);
@@ -632,39 +802,26 @@ app.post("/api/sales_orders", async (req, res) => {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-
-    const stockRes = await client.query(
-      "SELECT current_stock, name FROM finishedgoods WHERE sku = $1",
-      [sku]
-    );
-
+    const stockRes = await client.query("SELECT current_stock, name FROM finishedgoods WHERE sku = $1", [sku]);
     if (stockRes.rows.length === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Product not found." });
     }
-
     const currentStock = Number(stockRes.rows[0].current_stock);
     const orderedQty = Number(quantity);
-
     if (orderedQty > currentStock) {
       await client.query("ROLLBACK");
-      return res.status(400).json({
-        message: `Insufficient stock. Available: ${currentStock} units.`
-      });
+      return res.status(400).json({ message: `Insufficient stock. Available: ${currentStock} units.` });
     }
-
     const orderRes = await client.query(
       `INSERT INTO sales_orders (client_name, platform, courier, sku, quantity, order_date, status, user_id)
        VALUES ($1, $2, $3, $4, $5, $6, 'Pending', $7) RETURNING *`,
       [client_name, platform, courier, sku, orderedQty, order_date, user_id]
     );
-
-    await client.query(
-      "UPDATE finishedgoods SET current_stock = current_stock - $1 WHERE sku = $2",
-      [orderedQty, sku]
-    );
-
+    await client.query("UPDATE finishedgoods SET current_stock = current_stock - $1 WHERE sku = $2", [orderedQty, sku]);
     await client.query("COMMIT");
+    io.emit("sales_orders:updated");
+    io.emit("products:updated");
     res.status(201).json(orderRes.rows[0]);
   } catch (err) {
     await client.query("ROLLBACK");
@@ -678,15 +835,14 @@ app.patch("/api/sales_orders/:id/status", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   const validStatuses = ["Pending", "Shipped", "Delivered"];
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ message: "Invalid status." });
-  }
+  if (!validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status." });
   try {
     const result = await getPool().query(
       "UPDATE sales_orders SET status = $1 WHERE order_id = $2 RETURNING *",
       [status, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: "Order not found." });
+    io.emit("sales_orders:updated");
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).send(err.message);
@@ -694,7 +850,7 @@ app.patch("/api/sales_orders/:id/status", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// FINANCE — Purchase Orders
+// FINANCE
 // ─────────────────────────────────────────────
 
 app.get("/api/all_orders", async (req, res) => {
@@ -711,7 +867,9 @@ app.get("/api/all_orders", async (req, res) => {
       LEFT JOIN personaldata p ON po.user_id = p.user_id
       ORDER BY po.assignment_id DESC`, [], 'all_orders');
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/create_order", async (req, res) => {
@@ -724,8 +882,11 @@ app.post("/api/create_order", async (req, res) => {
       `INSERT INTO purchaseorder (supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status, order_date) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,
       [supplier_id, material_id, ordered_quantity, computedTotal, expected_delivery, user_id, status || 'Pending']
     );
+    io.emit("purchase_orders:updated");
     res.json(newOrder.rows[0]);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.put("/api/orders/:id", async (req, res) => {
@@ -739,8 +900,11 @@ app.put("/api/orders/:id", async (req, res) => {
       `UPDATE purchaseorder SET supplier_id=$1, material_id=$2, ordered_quantity=$3, total_amount=$4, expected_delivery=$5, status=$6 WHERE assignment_id=$7 RETURNING *`,
       [supplier_id, material_id, ordered_quantity, computedTotal, expected_delivery, status, id]
     );
+    io.emit("purchase_orders:updated");
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.patch("/api/orders/receive/:id", async (req, res) => {
@@ -753,11 +917,15 @@ app.patch("/api/orders/receive/:id", async (req, res) => {
     await client.query("UPDATE purchaseorder SET status = 'Delivered' WHERE assignment_id = $1", [id]);
     await client.query("UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2", [order.rows[0].ordered_quantity, order.rows[0].material_id]);
     await client.query("COMMIT");
+    io.emit("purchase_orders:updated");
+    io.emit("materials:updated");
     res.send("Inventory updated successfully!");
   } catch (err) {
     await client.query("ROLLBACK");
     res.status(500).send(err.message);
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
 
 app.post("/api/procurement/approve/:id", async (req, res) => {
@@ -772,16 +940,16 @@ app.post("/api/procurement/approve/:id", async (req, res) => {
     const { material_id, requested_qty } = reqData.rows[0];
     await client.query("UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2", [requested_qty, material_id]);
     await client.query("COMMIT");
+    io.emit("purchase_orders:updated");
+    io.emit("materials:updated");
     res.send("Material stock updated via Finance approval.");
   } catch (err) {
     await client.query("ROLLBACK");
     res.status(500).send(err.message);
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
-
-// ─────────────────────────────────────────────
-// FINANCE — Variance & Low Stock Logs
-// ─────────────────────────────────────────────
 
 app.get("/api/variance_logs", async (req, res) => {
   try {
@@ -801,7 +969,6 @@ app.get("/api/variance_logs", async (req, res) => {
       ORDER BY mvl.recorded_at DESC`);
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
     res.status(500).send(err.message);
   }
 });
@@ -819,11 +986,13 @@ app.get("/api/low_stock_logs", async (req, res) => {
       FROM finishedgoods fg WHERE fg.current_stock <= fg.min_stocks
       ORDER BY stock_quantity ASC`);
     res.json(materials.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 // ─────────────────────────────────────────────
-// PRODUCTION — Materials
+// PRODUCTION
 // ─────────────────────────────────────────────
 
 app.get("/api/materials", async (req, res) => {
@@ -833,7 +1002,9 @@ app.get("/api/materials", async (req, res) => {
       LEFT JOIN supplier s ON m.supplier_id = s.supplier_id
       ORDER BY m.material_id DESC`, [], 'materials');
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/add_material", async (req, res) => {
@@ -843,8 +1014,11 @@ app.post("/api/add_material", async (req, res) => {
       `INSERT INTO material (unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name, stock_unit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [unique_code, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, material_name, stock_unit || null]
     );
+    io.emit("materials:updated");
     res.status(201).json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: "Database error: " + err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: "Database error: " + err.message });
+  }
 });
 
 app.put("/api/materials/:id", async (req, res) => {
@@ -856,13 +1030,12 @@ app.put("/api/materials/:id", async (req, res) => {
       [material_name, supplier_id, cost_per_unit, stock_quantity, reorder_threshold, material_image, stock_unit || null, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: "Material not found" });
+    io.emit("materials:updated");
     res.json({ success: true, message: "Material updated!", data: result.rows[0] });
-  } catch (err) { res.status(500).json({ error: "Server error during update: " + err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: "Server error during update: " + err.message });
+  }
 });
-
-// ─────────────────────────────────────────────
-// PRODUCTION — Finished Goods
-// ─────────────────────────────────────────────
 
 app.get("/api/finished_goods", async (req, res) => {
   try {
@@ -873,12 +1046,10 @@ app.get("/api/finished_goods", async (req, res) => {
       [], 'finishedgoods_full'
     );
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
-
-// ─────────────────────────────────────────────
-// PRODUCTION — Work Orders
-// ─────────────────────────────────────────────
 
 app.get("/api/artisan_work_orders", async (req, res) => {
   try {
@@ -890,7 +1061,9 @@ app.get("/api/artisan_work_orders", async (req, res) => {
       LEFT JOIN finishedgoods fg ON wo.sku = fg.sku
       ORDER BY wo.work_order_id DESC`, [], 'work_orders');
     res.json(result.rows);
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/artisan_work_orders", async (req, res) => {
@@ -906,8 +1079,11 @@ app.post("/api/artisan_work_orders", async (req, res) => {
       `INSERT INTO workorder (sku, quantity_needed, category, status, product_image, target_date) VALUES ($1,$2,$3,'Pending',$4,CURRENT_DATE + INTERVAL '7 days') RETURNING work_order_id`,
       [sku, quantity_needed || 1, category || null, product_image || null]
     );
+    io.emit("work_orders:updated");
     res.status(201).json({ success: true, work_order_id: result.rows[0].work_order_id });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/work_orders/trigger", async (req, res) => {
@@ -923,8 +1099,11 @@ app.post("/api/work_orders/trigger", async (req, res) => {
       `INSERT INTO workorder (sku, quantity_needed, category, status, target_date) VALUES ($1,$2,$3,'Pending',CURRENT_DATE + INTERVAL '7 days') RETURNING work_order_id`,
       [sku, quantity_needed || 10, category || null]
     );
+    io.emit("work_orders:updated");
     res.status(201).json({ message: "Work order created successfully.", work_order_id: result.rows[0].work_order_id });
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.post("/api/work_orders", async (req, res) => {
@@ -954,11 +1133,15 @@ app.post("/api/work_orders", async (req, res) => {
       }
     }
     await client.query('COMMIT');
+    io.emit("work_orders:updated");
+    io.emit("materials:updated");
     res.status(201).json({ success: true, work_order_id: newOrderId });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(400).json({ error: err.message });
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
 
 app.get('/api/work_order_materials/:id', async (req, res) => {
@@ -969,7 +1152,9 @@ app.get('/api/work_order_materials/:id', async (req, res) => {
       JOIN material m ON wom.material_id = m.material_id
       WHERE wom.work_order_id = $1`, [req.params.id]);
     res.json(result.rows);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.put('/api/work_orders/:id/complete', async (req, res) => {
@@ -1016,11 +1201,16 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
     }
     await client.query(`UPDATE finishedgoods SET current_stock = current_stock + $1 WHERE sku = $2`, [quantity_needed, sku]);
     await client.query('COMMIT');
+    io.emit("work_orders:updated");
+    io.emit("materials:updated");
+    io.emit("products:updated");
     res.json({ message: 'Work order completed, variance logged, stock updated.' });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
 
 app.put('/api/work_orders/:id', async (req, res) => {
@@ -1065,29 +1255,32 @@ app.put('/api/work_orders/:id', async (req, res) => {
       if (updateStock.rows[0].stock_quantity < 0) throw new Error(`Insufficient stock for material ID: ${m.material_id}`);
     }
     await client.query('COMMIT');
+    io.emit("work_orders:updated");
+    io.emit("materials:updated");
     res.status(200).json({ success: true, message: "Order and Stock Updated Successfully" });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
 
 app.get('/api/clear-gmail-tokens', async (req, res) => {
   try {
-    await dbQuery("DELETE FROM gmail_tokens"); 
-    
+    await dbQuery("DELETE FROM gmail_tokens");
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-        <h1 style="color: #10b981;">✅ Tokens Cleared Successfully!</h1>
+        <h1 style="color: #10b981;">Tokens Cleared Successfully!</h1>
         <p>The expired Gmail session has been removed from the database.</p>
         <p><strong>Next Step:</strong> Go back to your dashboard, refresh the page, and click the <b>Connect Gmail</b> button.</p>
       </div>
     `);
   } catch (err) {
-    console.error("Error clearing tokens:", err);
     res.status(500).send("Error clearing tokens: " + err.message);
   }
 });
+
 const { registerGmailRoutes } = require('./gmailroutes');
 registerGmailRoutes(app, dbQuery);
 
@@ -1096,11 +1289,7 @@ initDB();
 const networkInterfaces = os.networkInterfaces();
 const localIP = Object.values(networkInterfaces).flat().find(i => i.family === 'IPv4' && !i.internal)?.address || 'localhost';
 
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Local network access: http://${localIP}:${PORT}`);
 });
-
-
-
-

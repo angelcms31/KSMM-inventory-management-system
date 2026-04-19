@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Routes, Route, Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { RecoveryContext } from "./context/RecoveryContext";
 import { getHashedPath, getAuthHash } from "./utils/hash";
@@ -23,6 +23,15 @@ import Orders from "./pages/sales/Orders";
 import ProductionDashboard from "./pages/production/ProductionDashboard";
 import Artisan from "./pages/production/Artisan";
 import ProductionInventory from "./pages/production/Inventory";
+
+const RequireAuth = ({ children }) => {
+  const userId = localStorage.getItem("user_id");
+  const userRole = localStorage.getItem("userRole");
+  if (!userId || !userRole) {
+    return <Navigate to={`/auth/${getAuthHash("login")}`} replace />;
+  }
+  return children;
+};
 
 const AuthSwitcher = () => {
   const { authHash } = useParams();
@@ -61,33 +70,13 @@ const RedirectToHome = () => {
   return null;
 };
 
-const DashboardRoot = () => {
-  const navigate = useNavigate();
-  const userId = localStorage.getItem("user_id");
-  const userRole = localStorage.getItem("userRole")?.toLowerCase();
-
-  useEffect(() => {
-    if (!userId || !userRole) {
-      navigate(`/auth/${getAuthHash("login")}`, { replace: true });
-    }
-  }, []);
-
-  if (!userId || !userRole) return null;
-
-  switch (userRole) {
-    case "admin":      return <AdminLayout />;
-    case "finance":    return <FinanceLayout />;
-    case "sales":      return <SalesLayout />;
-    case "production": return <ProductionLayout />;
-    default:           return <RedirectToHome />;
-  }
-};
-
 function App() {
   const [email, setEmail] = useState("");
   const [otp, setOTP] = useState();
   const location = useLocation();
   const timerRef = useRef(null);
+
+  const isAuthPage = location.pathname.startsWith("/auth");
 
   const handleLogoutLogic = async () => {
     const userId = localStorage.getItem("user_id");
@@ -100,19 +89,22 @@ function App() {
       }
     }
     localStorage.clear();
+    window.location.href = `/auth/${getAuthHash("login")}`;
   };
 
   useEffect(() => {
-    if (!localStorage.getItem("user_id")) return;
+    if (!localStorage.getItem("user_id") || isAuthPage) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
 
     const resetTimer = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {
         if (localStorage.getItem("user_id")) {
           await handleLogoutLogic();
-          window.location.href = "/";
         }
-      }, 1800000);
+      }, 180000);
     };
 
     resetTimer();
@@ -130,7 +122,14 @@ function App() {
         <Route path="/" element={<Navigate to={`/auth/${getAuthHash("login")}`} replace />} />
         <Route path="/auth/:authHash" element={<AuthSwitcher />} />
 
-        <Route path="/dashboard/:hash" element={<DashboardRoot />}>
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <RoleLayout />
+            </RequireAuth>
+          }
+        >
           <Route path={getHashedPath("sales", "home")} element={<SalesDashboard />} />
           <Route path={getHashedPath("sales", "inventory")} element={<SalesInventory />} />
           <Route path={getHashedPath("sales", "warehouse")} element={<Warehouse />} />
@@ -139,6 +138,9 @@ function App() {
           <Route path={getHashedPath("production", "home")} element={<ProductionDashboard />} />
           <Route path={getHashedPath("production", "artisan")} element={<Artisan />} />
           <Route path={getHashedPath("production", "inventory")} element={<ProductionInventory />} />
+
+          <Route index element={<RedirectToHome />} />
+          <Route path="*" element={<RedirectToHome />} />
         </Route>
 
         <Route path="*" element={<RedirectToHome />} />
@@ -146,5 +148,17 @@ function App() {
     </RecoveryContext.Provider>
   );
 }
+
+const RoleLayout = () => {
+  const userRole = localStorage.getItem("userRole")?.toLowerCase();
+
+  switch (userRole) {
+    case "admin":      return <AdminLayout />;
+    case "finance":    return <FinanceLayout />;
+    case "sales":      return <SalesLayout />;
+    case "production": return <ProductionLayout />;
+    default:           return <RedirectToHome />;
+  }
+};
 
 export default App;

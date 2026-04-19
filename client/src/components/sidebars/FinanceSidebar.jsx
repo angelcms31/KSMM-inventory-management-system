@@ -25,6 +25,10 @@ const FinanceSidebar = ({ activeTab }) => {
     return () => clearInterval(timer);
   }, []);
 
+  const truncateName = (name) => {
+    return name.length > 12 ?  `${name.substring(0, 10)}...` : name;
+  };
+
   const menuItems = [
     { id: 'home', name: 'Home', icon: <HiOutlineHome size={20} /> },
     { id: 'inventory', name: 'Transactions', icon: <HiOutlinePresentationChartBar size={20} /> },
@@ -61,7 +65,7 @@ const FinanceSidebar = ({ activeTab }) => {
       <div className="hidden lg:flex w-[240px] h-screen bg-[#262221] text-white flex-col sticky top-0 left-0 font-sans overflow-hidden border-r border-white/5">
         <div className="pt-10 pb-8 px-6">
           <h3 className="text-[18px] font-bold leading-tight tracking-tight capitalize">
-            Welcome back,<br />{userName}!
+            Welcome back,<br />{truncateName(userName)}!
           </h3>
           <p className="text-[11px] text-gray-500 mt-4 font-light">
             Last update: Today, {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase()}

@@ -24,10 +24,11 @@ export default function Login() {
   const [defaultPassword, setDefaultPassword] = useState("");
 
   useEffect(() => {
+    sessionStorage.removeItem("recoveryEmail");
+    sessionStorage.removeItem("recoveryOTP");
+
     const savedEmail = localStorage.getItem("device_remembered_email");
-    if (savedEmail) {
-      setLocalEmail(savedEmail);
-    }
+    if (savedEmail) setLocalEmail(savedEmail);
   }, []);
 
   const handleEmailChange = (e) => {
@@ -56,10 +57,7 @@ export default function Login() {
     }
 
     axios
-      .post("http://localhost:5000/login", {
-        email: localEmail,
-        password: localPassword,
-      })
+      .post("http://localhost:5000/login", { email: localEmail, password: localPassword })
       .then((res) => {
         const { role, firstName, firstname, user_id, is_default_password, is_head_admin } = res.data;
         const nameToSave = firstName || firstname;
@@ -126,7 +124,7 @@ export default function Login() {
 
   const navigateToOtp = (e) => {
     if (e) e.preventDefault();
-    
+
     if (!localEmail) {
       navigate(`/auth/${getAuthHash("forgot")}`);
       return;
@@ -134,10 +132,7 @@ export default function Login() {
 
     const OTP = Math.floor(Math.random() * 9000 + 1000);
     axios
-      .post("http://localhost:5000/send_recovery_email", {
-        OTP,
-        recipient_email: localEmail,
-      })
+      .post("http://localhost:5000/send_recovery_email", { OTP, recipient_email: localEmail })
       .then(() => {
         setOTP(OTP);
         setEmail(localEmail);
@@ -158,9 +153,7 @@ export default function Login() {
       <div className="flex h-screen w-screen bg-white font-serif overflow-hidden">
         <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 md:px-20 text-[#262221]">
           <div className="text-center mb-10">
-            <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">
-              Matthew & Melka
-            </h1>
+            <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">Matthew & Melka</h1>
             <p className="text-[10px] tracking-[0.2em] text-gray-400 font-sans mt-2 uppercase">Ken Samudio</p>
           </div>
 
@@ -173,9 +166,7 @@ export default function Login() {
 
               <div className="space-y-7">
                 <div className="relative">
-                  <label className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] text-gray-400">
-                    New Password
-                  </label>
+                  <label className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] text-gray-400">New Password</label>
                   <input
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword}
@@ -190,9 +181,7 @@ export default function Login() {
                 </div>
 
                 <div className="relative">
-                  <label className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] text-gray-400">
-                    Confirm New Password
-                  </label>
+                  <label className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] text-gray-400">Confirm New Password</label>
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
@@ -207,9 +196,7 @@ export default function Login() {
                 </div>
 
                 {error && (
-                  <div className="text-red-500 text-[11px] italic mt-[-15px] animate-pulse">
-                    {errorMessage}
-                  </div>
+                  <div className="text-red-500 text-[11px] italic mt-[-15px] animate-pulse">{errorMessage}</div>
                 )}
 
                 <button
@@ -224,7 +211,7 @@ export default function Login() {
         </div>
 
         <div
-          className="hidden md:block w-1/2 bg-cover bg-center transition-all duration-700"
+          className="hidden md:block w-1/2 bg-cover bg-center"
           style={{ backgroundImage: "url('https://silverkris.singaporeair.com/wp-content/uploads/2019/10/Ken-Samudio.jpg')" }}
         />
       </div>
@@ -235,9 +222,7 @@ export default function Login() {
     <div className="flex h-screen w-screen bg-white font-serif overflow-hidden">
       <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 md:px-20 text-[#262221]">
         <div className="text-center mb-10">
-          <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">
-            Matthew & Melka
-          </h1>
+          <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">Matthew & Melka</h1>
           <p className="text-[10px] tracking-[0.2em] text-gray-400 font-sans mt-2 uppercase">Ken Samudio</p>
           <p className="mt-8 text-gray-500 text-xs md:text-sm italic">Inventory Management System</p>
         </div>
@@ -264,9 +249,7 @@ export default function Login() {
               </div>
 
               <div className="relative">
-                <label className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] text-gray-400">
-                  Password
-                </label>
+                <label className="absolute -top-2.5 left-3 bg-white px-1 text-[11px] text-gray-400">Password</label>
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
@@ -286,9 +269,7 @@ export default function Login() {
               </div>
 
               {error && (
-                <div className="text-red-500 text-[11px] font-bold italic mt-[-15px] animate-pulse">
-                  {errorMessage}
-                </div>
+                <div className="text-red-500 text-[11px] font-bold italic mt-[-15px] animate-pulse">{errorMessage}</div>
               )}
 
               <div className="flex justify-between items-center text-[11px] text-gray-500 pt-1">
@@ -313,7 +294,7 @@ export default function Login() {
       </div>
 
       <div
-        className="hidden md:block w-1/2 bg-cover bg-center transition-all duration-700"
+        className="hidden md:block w-1/2 bg-cover bg-center"
         style={{ backgroundImage: "url('https://silverkris.singaporeair.com/wp-content/uploads/2019/10/Ken-Samudio.jpg')" }}
       />
     </div>

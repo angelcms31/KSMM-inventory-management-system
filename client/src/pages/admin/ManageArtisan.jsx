@@ -36,20 +36,31 @@ const ManageArtisan = () => {
 
   const filteredArtisans = allArtisans.filter(a => {
     if (!searchTerm.trim()) return true;
-    const term = searchTerm.trim().toLowerCase();
+
+    const term = searchTerm.trim().toLowerCase().replace(/\s+/g, ' ');
     const firstName = (a.first_name || '').toLowerCase();
+    const middleName = (a.middle_name || '').toLowerCase();
     const lastName = (a.last_name || '').toLowerCase();
     const email = (a.email || '').toLowerCase();
     const contactNo = (a.contact_no || '').toLowerCase();
     const dept = (a.department || '').toLowerCase();
     const arId = `ar-${a.artisan_id}`;
+
+    const fullNameWithMiddle = [firstName, middleName, lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const fullNameNoMiddle = `${firstName} ${lastName}`.trim();
+    const lastFirst = `${lastName} ${firstName}`.trim();
+
     return (
-      firstName.startsWith(term) ||
-      lastName.startsWith(term) ||
-      arId.startsWith(term) ||
-      dept.startsWith(term) ||
+      firstName.includes(term) ||
+      middleName.includes(term) ||
+      lastName.includes(term) ||
       email.includes(term) ||
-      contactNo.includes(term)
+      contactNo.includes(term) ||
+      dept.includes(term) ||
+      arId.includes(term) ||
+      fullNameWithMiddle.includes(term) ||
+      fullNameNoMiddle.includes(term) ||
+      lastFirst.includes(term)
     );
   });
 
@@ -211,7 +222,7 @@ const ManageArtisan = () => {
                     <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${artisan.status === 'Deactivated' ? 'bg-red-500' : 'bg-green-500'}`}></div>
                   </div>
                   <div className="flex-1 pt-0.5 min-w-0 pr-8">
-                    <h3 className="font-bold text-sm text-black truncate">{artisan.first_name} {artisan.last_name}</h3>
+                    <h3 className="font-bold text-sm text-black truncate">{artisan.first_name} {artisan.middle_name ? `${artisan.middle_name} ` : ''}{artisan.last_name}</h3>                    
                     <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-wider truncate">{artisan.department || 'No Dept'}</p>
                   </div>
                 </div>
@@ -249,7 +260,7 @@ const ManageArtisan = () => {
             <button onClick={closeModal} className="absolute top-10 right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full"><HiX size={28}/></button>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-900 uppercase mb-6 sm:mb-10 tracking-tighter leading-none">{showAddModal ? "Add Artisan" : "Update Artisan"}</h2>
 
-            <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan}>
+            <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan} >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 mb-6 items-start">
                 <div className="space-y-5">
                   <div className="space-y-1">

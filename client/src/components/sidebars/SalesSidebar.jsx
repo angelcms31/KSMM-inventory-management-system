@@ -23,6 +23,10 @@ const SalesSidebar = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const truncateName = (name) => {
+    return name.length > 12 ? `${name.substring(0,10)}...` : name;
+  };
+
   const menuItems = [
     { name: 'Home', tab: 'home' },
     { name: 'Inventory', tab: 'inventory' },

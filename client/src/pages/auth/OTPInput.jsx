@@ -7,12 +7,12 @@ import { getAuthHash } from "../../utils/hash";
 export default function OTPInput() {
   const { email, setEmail, otp, setOTP } = useContext(RecoveryContext);
   const navigate = useNavigate();
-  
+
   const [timerCount, setTimer] = useState(60);
-  const [expireCount, setExpireCount] = useState(300); 
+  const [expireCount, setExpireCount] = useState(180);
   const [OTPinput, setOTPinput] = useState(["", "", "", ""]);
   const [canResend, setCanResend] = useState(false);
-  const [isResending, setIsResending] = useState(false); 
+  const [isResending, setIsResending] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(false);
@@ -21,28 +21,25 @@ export default function OTPInput() {
   const inputRefs = [useRef(), useRef(), useRef(), useRef()];
   const resendTimerRef = useRef(null);
   const expireTimerRef = useRef(null);
+  const redirectTimerRef = useRef(null);
 
   useEffect(() => {
     const savedEmail = sessionStorage.getItem("recoveryEmail");
     const savedOTP = sessionStorage.getItem("recoveryOTP");
 
-    if (savedEmail && !email) {
-      setEmail(savedEmail);
-    }
-    if (savedOTP && !otp) {
-      setOTP(parseInt(savedOTP));
-    }
+    if (savedEmail && !email) setEmail(savedEmail);
+    if (savedOTP && !otp) setOTP(parseInt(savedOTP));
 
     if (!savedEmail && !email) {
-      navigate("/");
+      navigate(`/auth/${getAuthHash("login")}`);
     }
   }, [email, otp, setEmail, setOTP, navigate]);
 
   const startTimers = () => {
     setTimer(60);
-    setExpireCount(300);
+    setExpireCount(180);
     setCanResend(false);
-    setIsResending(false); 
+    setIsResending(false);
     setIsExpired(false);
     setIsSubmitting(false);
     setError(false);
@@ -65,6 +62,11 @@ export default function OTPInput() {
         if (prev <= 1) {
           clearInterval(expireTimerRef.current);
           setIsExpired(true);
+          redirectTimerRef.current = setTimeout(() => {
+            sessionStorage.removeItem("recoveryEmail");
+            sessionStorage.removeItem("recoveryOTP");
+            navigate(`/auth/${getAuthHash("login")}`);
+          }, 3000);
           return 0;
         }
         return prev - 1;
@@ -77,6 +79,7 @@ export default function OTPInput() {
     return () => {
       clearInterval(resendTimerRef.current);
       clearInterval(expireTimerRef.current);
+      clearTimeout(redirectTimerRef.current);
     };
   }, []);
 
@@ -126,19 +129,15 @@ export default function OTPInput() {
     if (e.key === "Backspace" && !OTPinput[index] && index > 0) {
       inputRefs[index - 1].current.focus();
     }
-    if (e.key === "Enter") {
-      verifyOTP();
-    }
+    if (e.key === "Enter") verifyOTP();
   };
 
   const handlePaste = (e) => {
     const data = e.clipboardData.getData("text").trim();
-    if (!/^\d+$/.test(data)) return; 
-    const pasteValues = data.split("").slice(0, 4); 
+    if (!/^\d+$/.test(data)) return;
+    const pasteValues = data.split("").slice(0, 4);
     let newOtp = [...OTPinput];
-    pasteValues.forEach((char, index) => {
-      newOtp[index] = char;
-    });
+    pasteValues.forEach((char, index) => { newOtp[index] = char; });
     setOTPinput(newOtp);
     const nextFocusIndex = pasteValues.length < 4 ? pasteValues.length : 3;
     inputRefs[nextFocusIndex].current.focus();
@@ -146,7 +145,8 @@ export default function OTPInput() {
 
   const resendOTP = () => {
     if (!canResend || isResending) return;
-    setIsResending(true); 
+    setIsResending(true);
+    clearTimeout(redirectTimerRef.current);
     const newOTP = Math.floor(Math.random() * 9000 + 1000);
     axios.post("http://localhost:5000/send_recovery_email", {
       OTP: newOTP,
@@ -158,7 +158,7 @@ export default function OTPInput() {
       startTimers();
       inputRefs[0].current.focus();
     }).catch(() => {
-      setIsResending(false); 
+      setIsResending(false);
       setError(true);
       setErrorMessage("Failed to resend OTP. Please try again.");
     });
@@ -169,9 +169,9 @@ export default function OTPInput() {
       <div className="bg-white p-10 shadow-xl rounded-2xl w-full max-w-lg text-center border border-gray-100">
         <h2 className="text-3xl font-bold mb-4 uppercase tracking-widest text-stone-800">Verification</h2>
         <p className="text-sm font-medium text-gray-400 mb-2">We sent a code to {email}</p>
-        
+
         <p className={`text-xs font-bold mb-10 ${isExpired ? "text-red-500" : "text-stone-500"}`}>
-          {isExpired ? "Code Expired" : `Code expires in: ${formatExpireTimer(expireCount)}`}
+          {isExpired ? "Code Expired. Redirecting to login..." : `Code expires in: ${formatExpireTimer(expireCount)}`}
         </p>
 
         <div className="flex justify-center mb-6 space-x-4">
@@ -191,9 +191,7 @@ export default function OTPInput() {
         </div>
 
         {error && (
-          <div className="text-red-500 text-[11px] font-bold italic mb-6 animate-pulse">
-            {errorMessage}
-          </div>
+          <div className="text-red-500 text-[11px] font-bold italic mb-6 animate-pulse">{errorMessage}</div>
         )}
 
         <button
