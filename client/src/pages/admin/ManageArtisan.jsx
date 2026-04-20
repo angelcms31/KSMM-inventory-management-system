@@ -1,6 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import { HiOutlineMail, HiOutlinePhone, HiX, HiCamera, HiDotsHorizontal, HiOutlineSearch, HiChevronLeft, HiChevronRight, HiChevronDown } from "react-icons/hi";
+import { HiOutlineMail, HiOutlinePhone, HiX, HiCamera, HiDotsHorizontal, HiOutlineSearch, HiChevronLeft, HiChevronRight, HiChevronDown, HiCheckCircle, HiXCircle } from "react-icons/hi";
+
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess ? <HiCheckCircle size={44} className="text-emerald-500" /> : <HiXCircle size={44} className="text-rose-500" />}
+        </div>
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+        <p className="text-slate-800 font-black text-lg leading-snug tracking-tight mb-8">{alert.message}</p>
+        <button
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-200'}`}
+        >
+          Got it
+        </button>
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      </div>
+      <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.88) translateY(16px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
+    </div>
+  );
+};
+
+const useAlert = () => {
+  const [alert, setAlert] = useState(null);
+  const showAlert = useCallback((message, type = 'success') => setAlert({ message, type }), []);
+  const closeAlert = useCallback(() => setAlert(null), []);
+  return { alert, showAlert, closeAlert };
+};
 
 const ManageArtisan = () => {
   const [allArtisans, setAllArtisans] = useState([]);
@@ -13,6 +55,8 @@ const ManageArtisan = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const artisansPerPage = 9;
 
+  const { alert, showAlert, closeAlert } = useAlert();
+
   const initialFormState = {
     firstName: '', middleName: '', lastName: '', email: '', contactNo: '', profileImage: '', department: ''
   };
@@ -21,9 +65,7 @@ const ManageArtisan = () => {
 
   const fetchArtisans = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/artisans`, {
-        params: { page: 1, limit: 9999 }
-      });
+      const res = await axios.get(`http://localhost:5000/api/artisans`, { params: { page: 1, limit: 9999 } });
       setAllArtisans(res.data.artisans || []);
       setLoading(false);
     } catch (err) {
@@ -36,7 +78,6 @@ const ManageArtisan = () => {
 
   const filteredArtisans = allArtisans.filter(a => {
     if (!searchTerm.trim()) return true;
-
     const term = searchTerm.trim().toLowerCase().replace(/\s+/g, ' ');
     const firstName = (a.first_name || '').toLowerCase();
     const middleName = (a.middle_name || '').toLowerCase();
@@ -45,22 +86,13 @@ const ManageArtisan = () => {
     const contactNo = (a.contact_no || '').toLowerCase();
     const dept = (a.department || '').toLowerCase();
     const arId = `ar-${a.artisan_id}`;
-
     const fullNameWithMiddle = [firstName, middleName, lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
     const fullNameNoMiddle = `${firstName} ${lastName}`.trim();
     const lastFirst = `${lastName} ${firstName}`.trim();
-
     return (
-      firstName.includes(term) ||
-      middleName.includes(term) ||
-      lastName.includes(term) ||
-      email.includes(term) ||
-      contactNo.includes(term) ||
-      dept.includes(term) ||
-      arId.includes(term) ||
-      fullNameWithMiddle.includes(term) ||
-      fullNameNoMiddle.includes(term) ||
-      lastFirst.includes(term)
+      firstName.includes(term) || middleName.includes(term) || lastName.includes(term) ||
+      email.includes(term) || contactNo.includes(term) || dept.includes(term) || arId.includes(term) ||
+      fullNameWithMiddle.includes(term) || fullNameNoMiddle.includes(term) || lastFirst.includes(term)
     );
   });
 
@@ -71,7 +103,7 @@ const ManageArtisan = () => {
     const file = e.target.files[0];
     if (file) {
       const validTypes = ['image/jpeg', 'image/png'];
-      if (!validTypes.includes(file.type)) { alert("Only JPEG and PNG images are allowed"); return; }
+      if (!validTypes.includes(file.type)) { showAlert("Only JPEG and PNG images are allowed.", 'error'); return; }
       const reader = new FileReader();
       reader.onloadend = () => {
         if (isEdit) setSelectedArtisan({ ...selectedArtisan, profileImage: reader.result });
@@ -82,8 +114,7 @@ const ManageArtisan = () => {
   };
 
   const handleNameChange = (field, value, isEdit = false) => {
-    const lettersOnly = /^[a-zA-Z\s]*$/;
-    if (!lettersOnly.test(value)) return;
+    if (!/^[a-zA-Z\s]*$/.test(value)) return;
     if (isEdit) setSelectedArtisan({ ...selectedArtisan, [field]: value });
     else setFormData({ ...formData, [field]: value });
   };
@@ -97,7 +128,7 @@ const ManageArtisan = () => {
 
   const handleAddArtisan = async (e) => {
     e.preventDefault();
-    if (formData.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
+    if (formData.contactNo.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
     try {
       await axios.post("http://localhost:5000/api/add_artisan", {
         first_name: formData.firstName,
@@ -111,10 +142,9 @@ const ManageArtisan = () => {
       setShowAddModal(false);
       setFormData(initialFormState);
       fetchArtisans();
-      alert("Artisan added successfully!");
+      showAlert("Artisan added successfully!", 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || "Error adding artisan";
-      alert(msg);
+      showAlert(err.response?.data?.message || "Error adding artisan.", 'error');
     }
   };
 
@@ -136,7 +166,7 @@ const ManageArtisan = () => {
 
   const handleUpdateArtisan = async (e) => {
     e.preventDefault();
-    if (selectedArtisan.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
+    if (selectedArtisan.contactNo.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
     try {
       await axios.put(`http://localhost:5000/api/artisans/${selectedArtisan.artisan_id}`, {
         first_name: selectedArtisan.firstName,
@@ -150,10 +180,9 @@ const ManageArtisan = () => {
       });
       setShowEditModal(false);
       fetchArtisans();
-      alert("Artisan updated successfully!");
+      showAlert("Artisan updated successfully!", 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || "Update failed";
-      alert(msg);
+      showAlert(err.response?.data?.message || "Update failed.", 'error');
     }
   };
 
@@ -163,7 +192,10 @@ const ManageArtisan = () => {
       await axios.post("http://localhost:5000/api/artisan/status", { email: artisan.email, status: newStatus });
       fetchArtisans();
       setActiveMenu(null);
-    } catch (err) { alert("Error"); }
+      showAlert(`Account ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully!`, 'success');
+    } catch (err) {
+      showAlert("Error updating status.", 'error');
+    }
   };
 
   const closeModal = () => {
@@ -175,7 +207,10 @@ const ManageArtisan = () => {
   if (loading) return <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">Loading...</div>;
 
   return (
-    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden text-left">
+    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden text-left" onClick={() => setActiveMenu(null)}>
+
+      <AlertDialog alert={alert} onClose={closeAlert} />
+
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -195,22 +230,22 @@ const ManageArtisan = () => {
             <h1 className="text-2xl font-black uppercase text-slate-900 leading-none tracking-tighter">Manage Artisans</h1>
             <div className="flex items-center gap-3">
               <div className="flex gap-1 mr-2">
-                <button onClick={() => setCurrentPage(p => Math.max(p - 1, 0))} disabled={currentPage === 0} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={16}/></button>
-                <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= totalPages - 1} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 0)); }} disabled={currentPage === 0} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => p + 1); }} disabled={currentPage >= totalPages - 1} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={16}/></button>
               </div>
-              <button onClick={() => setShowAddModal(true)} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg tracking-widest hover:scale-105 transition-all">+ Add Artisan</button>
+              <button onClick={(e) => { e.stopPropagation(); setShowAddModal(true); }} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg tracking-widest hover:scale-105 transition-all">+ Add Artisan</button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {currentArtisans.map((artisan, index) => (
               <div key={artisan.artisan_id} className={`border border-gray-300 rounded-[1.5rem] p-4 relative bg-white shadow-sm flex flex-col overflow-hidden ${artisan.status === 'Deactivated' ? 'opacity-80' : ''}`}>
-                <button onClick={() => setActiveMenu(activeMenu === index ? null : index)} className="absolute top-4 right-4 text-gray-600 transition-colors hover:text-black z-10"><HiDotsHorizontal size={20} /></button>
+                <button onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === index ? null : index); }} className="absolute top-4 right-4 text-gray-600 transition-colors hover:text-black z-10"><HiDotsHorizontal size={20} /></button>
 
                 {activeMenu === index && (
-                  <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-10 w-44 py-1 text-[11px] font-bold animate-in fade-in zoom-in duration-200">
-                    <button onClick={() => handleEditClick(artisan)} className="w-full text-left px-4 py-2 hover:bg-gray-50">Update Information</button>
-                    <button onClick={() => toggleStatus(artisan)} className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${artisan.status === 'Active' ? 'text-red-500' : 'text-green-600'}`}>
+                  <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-44 py-1 text-[11px] font-bold">
+                    <button onClick={(e) => { e.stopPropagation(); handleEditClick(artisan); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">Update Information</button>
+                    <button onClick={(e) => { e.stopPropagation(); toggleStatus(artisan); }} className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${artisan.status === 'Active' ? 'text-red-500' : 'text-green-600'}`}>
                       {artisan.status === 'Active' ? 'Deactivate Account' : 'Activate Account'}
                     </button>
                   </div>
@@ -222,7 +257,7 @@ const ManageArtisan = () => {
                     <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${artisan.status === 'Deactivated' ? 'bg-red-500' : 'bg-green-500'}`}></div>
                   </div>
                   <div className="flex-1 pt-0.5 min-w-0 pr-8">
-                    <h3 className="font-bold text-sm text-black truncate">{artisan.first_name} {artisan.middle_name ? `${artisan.middle_name} ` : ''}{artisan.last_name}</h3>                    
+                    <h3 className="font-bold text-sm text-black truncate">{artisan.first_name} {artisan.middle_name ? `${artisan.middle_name} ` : ''}{artisan.last_name}</h3>
                     <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-wider truncate">{artisan.department || 'No Dept'}</p>
                   </div>
                 </div>
@@ -256,11 +291,11 @@ const ManageArtisan = () => {
 
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] w-full max-w-2xl p-6 sm:p-12 relative shadow-2xl animate-in zoom-in duration-300">
+          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] w-full max-w-2xl p-6 sm:p-12 relative shadow-2xl">
             <button onClick={closeModal} className="absolute top-10 right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full"><HiX size={28}/></button>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-900 uppercase mb-6 sm:mb-10 tracking-tighter leading-none">{showAddModal ? "Add Artisan" : "Update Artisan"}</h2>
 
-            <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan} >
+            <form onSubmit={showAddModal ? handleAddArtisan : handleUpdateArtisan}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 mb-6 items-start">
                 <div className="space-y-5">
                   <div className="space-y-1">

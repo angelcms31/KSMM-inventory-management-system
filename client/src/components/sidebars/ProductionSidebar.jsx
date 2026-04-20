@@ -5,7 +5,9 @@ import {
   HiOutlineHome,
   HiOutlineCube,
   HiOutlineTruck,
-  HiOutlineLogout
+  HiOutlineLogout,
+  HiOutlineCollection,
+  HiOutlineScissors
 } from "react-icons/hi";
 import { getHashedPath } from "../../utils/hash";
 
@@ -28,8 +30,9 @@ const ProductionSidebar = () => {
 
   const menuItems = [
     { name: 'Home', tab: 'home', icon: <HiOutlineHome size={18} /> },
+    { name: 'Raw Materials', tab: 'rawmaterials', icon: <HiOutlineScissors size={18} /> },
     { name: 'Artisan', tab: 'artisan', icon: <HiOutlineCube size={18} /> },
-    { name: 'Work Order Inventory', tab: 'inventory', icon: <HiOutlineTruck size={18} /> },
+    { name: 'Work Order Inventory', tab: 'inventory', icon: <HiOutlineCollection size={18} /> },
   ];
 
   const getPath = (tab) => `/dashboard/${getHashedPath('production', tab)}`;

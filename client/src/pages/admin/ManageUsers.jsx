@@ -1,9 +1,69 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { 
   HiOutlineMail, HiOutlinePhone, HiX, 
-  HiCamera, HiDotsHorizontal, HiChevronDown, HiOutlineSearch, HiChevronLeft, HiChevronRight
+  HiCamera, HiDotsHorizontal, HiChevronDown, HiOutlineSearch, HiChevronLeft, HiChevronRight,
+  HiCheckCircle, HiXCircle
 } from "react-icons/hi";
+
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess
+            ? <HiCheckCircle size={44} className="text-emerald-500" />
+            : <HiXCircle size={44} className="text-rose-500" />
+          }
+        </div>
+
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+
+        <p className="text-slate-800 font-black text-lg leading-snug tracking-tight mb-8">
+          {alert.message}
+        </p>
+
+        <button
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg
+            ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-200'}`}
+        >
+          Got it
+        </button>
+
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      </div>
+
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0);    }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+const useAlert = () => {
+  const [alert, setAlert] = useState(null);
+  const showAlert = useCallback((message, type = 'success') => setAlert({ message, type }), []);
+  const closeAlert = useCallback(() => setAlert(null), []);
+  return { alert, showAlert, closeAlert };
+};
 
 const ManageUsers = () => {
   const [allUsers, setAllUsers] = useState([]);
@@ -16,6 +76,8 @@ const ManageUsers = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const usersPerPage = 9;
 
+  const { alert, showAlert, closeAlert } = useAlert();
+
   const initialFormState = { 
     firstName: '', middleName: '', lastName: '', email: '', 
     contactNo: '', role: 'Sales', gender: 'Male', profileImage: '' 
@@ -25,9 +87,7 @@ const ManageUsers = () => {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/users`, {
-        params: { page: 1, limit: 9999 }
-      });
+      const res = await axios.get(`http://localhost:5000/api/users`, { params: { page: 1, limit: 9999 } });
       setAllUsers(res.data.users || []);
       setLoading(false);
     } catch (err) {
@@ -40,7 +100,6 @@ const ManageUsers = () => {
 
   const filteredUsers = allUsers.filter(u => {
     if (!searchTerm.trim()) return true;
-
     const term = searchTerm.trim().toLowerCase().replace(/\s+/g, ' ');
     const firstName = (u.firstname || '').toLowerCase();
     const middleName = (u.middlename || '').toLowerCase();
@@ -49,21 +108,13 @@ const ManageUsers = () => {
     const contactNo = (u.contact_no || '').toLowerCase();
     const idPrefix = u.is_head_admin ? "ha" : (u.user_role || "us").substring(0, 2).toLowerCase();
     const displayId = `${idPrefix}-${u.permanent_id || '0'}`;
-
     const fullNameWithMiddle = [firstName, middleName, lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
     const fullNameNoMiddle = `${firstName} ${lastName}`.trim();
     const lastFirst = `${lastName} ${firstName}`.trim();
-
     return (
-      firstName.includes(term) ||
-      middleName.includes(term) ||
-      lastName.includes(term) ||
-      email.includes(term) ||
-      contactNo.includes(term) ||
-      displayId.includes(term) ||
-      fullNameWithMiddle.includes(term) ||
-      fullNameNoMiddle.includes(term) ||
-      lastFirst.includes(term)
+      firstName.includes(term) || middleName.includes(term) || lastName.includes(term) ||
+      email.includes(term) || contactNo.includes(term) || displayId.includes(term) ||
+      fullNameWithMiddle.includes(term) || fullNameNoMiddle.includes(term) || lastFirst.includes(term)
     );
   });
 
@@ -74,7 +125,7 @@ const ManageUsers = () => {
     const file = e.target.files[0];
     if (file) {
       const validTypes = ['image/jpeg', 'image/png'];
-      if (!validTypes.includes(file.type)) { alert("Only JPEG and PNG images are allowed"); return; }
+      if (!validTypes.includes(file.type)) { showAlert("Only JPEG and PNG images are allowed.", 'error'); return; }
       if (file.size <= 10 * 1024 * 1024) {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -83,7 +134,7 @@ const ManageUsers = () => {
         };
         reader.readAsDataURL(file);
       } else {
-        alert("Max 10MB only");
+        showAlert("Image must be 10MB or less.", 'error');
       }
     }
   };
@@ -94,15 +145,14 @@ const ManageUsers = () => {
   };
 
   const handleNameChange = (field, value, isEdit = false) => {
-    const lettersOnly = /^[a-zA-Z\s]*$/;
-    if (!lettersOnly.test(value)) return;
-    if (!validateTextInput(value)) { alert("Emoticons are not allowed"); return; }
+    if (!/^[a-zA-Z\s]*$/.test(value)) return;
+    if (!validateTextInput(value)) { showAlert("Emoticons are not allowed.", 'error'); return; }
     if (isEdit) setSelectedUser({ ...selectedUser, [field]: value });
     else setFormData({ ...formData, [field]: value });
   };
 
   const handleEmailChange = (value, isEdit = false) => {
-    if (!validateTextInput(value)) { alert("Emoticons are not allowed"); return; }
+    if (!validateTextInput(value)) { showAlert("Emoticons are not allowed.", 'error'); return; }
     if (isEdit) setSelectedUser({ ...selectedUser, email: value });
     else setFormData({ ...formData, email: value });
   };
@@ -116,26 +166,21 @@ const ManageUsers = () => {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!formData.email.includes('@')) { alert("Email must contain @"); return; }
-    if (formData.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
+    if (!formData.email.includes('@')) { showAlert("Email must contain @.", 'error'); return; }
+    if (formData.contactNo.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
     try {
-      await axios.post("http://localhost:5000/api/add_user", {
-        ...formData,
-        creatorId: localStorage.getItem("user_id")
-      });
+      await axios.post("http://localhost:5000/api/add_user", { ...formData, creatorId: localStorage.getItem("user_id") });
       setShowAddModal(false);
       setFormData(initialFormState);
       fetchUsers();
-      alert("User added successfully!");
+      showAlert("User added successfully!", 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || "Error adding user";
-      alert(msg);
+      showAlert(err.response?.data?.message || "Error adding user.", 'error');
     }
   };
 
   const handleEditClick = (user) => {
     const idPrefix = user.is_head_admin ? "HA" : (user.user_role || "US").substring(0, 2).toUpperCase();
-    const displayId = `${idPrefix}-${user.permanent_id || '0'}`;
     setSelectedUser({
       ...user,
       firstName: user.firstname || '',
@@ -147,7 +192,7 @@ const ManageUsers = () => {
       gender: user.gender || 'Male',
       profileImage: user.profile_image || '',
       originalEmail: user.email || '',
-      displayId
+      displayId: `${idPrefix}-${user.permanent_id || '0'}`
     });
     setShowEditModal(true);
     setActiveMenu(null);
@@ -155,26 +200,21 @@ const ManageUsers = () => {
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
-    if (!selectedUser.email.includes('@')) { alert("Email must contain @"); return; }
-    if (selectedUser.contactNo.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
+    if (!selectedUser.email.includes('@')) { showAlert("Email must contain @.", 'error'); return; }
+    if (selectedUser.contactNo.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
     try {
       await axios.put("http://localhost:5000/api/user/update", {
-        firstName: selectedUser.firstName,
-        middleName: selectedUser.middleName,
-        lastName: selectedUser.lastName,
-        email: selectedUser.email,
-        contactNo: selectedUser.contactNo,
-        role: selectedUser.role,
-        gender: selectedUser.gender,
-        profileImage: selectedUser.profileImage,
+        firstName: selectedUser.firstName, middleName: selectedUser.middleName,
+        lastName: selectedUser.lastName, email: selectedUser.email,
+        contactNo: selectedUser.contactNo, role: selectedUser.role,
+        gender: selectedUser.gender, profileImage: selectedUser.profileImage,
         originalEmail: selectedUser.originalEmail
       });
       setShowEditModal(false);
       fetchUsers();
-      alert("User updated successfully!");
+      showAlert("User updated successfully!", 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || "Update failed";
-      alert(msg);
+      showAlert(err.response?.data?.message || "Update failed.", 'error');
     }
   };
 
@@ -187,21 +227,20 @@ const ManageUsers = () => {
       });
       fetchUsers();
       setActiveMenu(null);
-      alert("Account unlocked successfully!");
-    } catch (err) { alert("Error unlocking account"); }
+      showAlert("Account unlocked successfully!", 'success');
+    } catch (err) {
+      showAlert("Error unlocking account.", 'error');
+    }
   };
 
   const handleApproveAdmin = async (user) => {
     try {
-      await axios.put("http://localhost:5000/api/admin/approve", {
-        userId: user.user_id,
-        adminId: localStorage.getItem("user_id")
-      });
+      await axios.put("http://localhost:5000/api/admin/approve", { userId: user.user_id, adminId: localStorage.getItem("user_id") });
       fetchUsers();
       setActiveMenu(null);
-      alert("Admin account approved!");
+      showAlert("Admin account approved!", 'success');
     } catch (err) {
-      alert(err.response?.data?.message || "Approval failed");
+      showAlert(err.response?.data?.message || "Approval failed.", 'error');
     }
   };
 
@@ -210,21 +249,16 @@ const ManageUsers = () => {
     const newStatus = currentStatus === 'Active' ? 'Deactivated' : 'Active';
     const currentUserId = localStorage.getItem("user_id");
     if (newStatus === 'Deactivated' && String(user.user_id) === String(currentUserId)) {
-      alert("You cannot deactivate your own account.");
+      showAlert("You cannot deactivate your own account.", 'error');
       return;
     }
     try {
-      await axios.put("http://localhost:5000/api/user/status", { 
-        userId: user.user_id, 
-        status: newStatus,
-        adminId: currentUserId,
-        adminRole: localStorage.getItem("role")
-      });
+      await axios.put("http://localhost:5000/api/user/status", { userId: user.user_id, status: newStatus, adminId: currentUserId, adminRole: localStorage.getItem("role") });
       fetchUsers();
       setActiveMenu(null);
+      showAlert(`Account ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully!`, 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || "Error updating status";
-      alert(msg);
+      showAlert(err.response?.data?.message || "Error updating status.", 'error');
     }
   };
 
@@ -242,6 +276,9 @@ const ManageUsers = () => {
 
   return (
     <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden text-left" onClick={() => setActiveMenu(null)}>
+
+      <AlertDialog alert={alert} onClose={closeAlert} />
+
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -310,29 +347,20 @@ const ManageUsers = () => {
                   {activeMenu === index && (
                     <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-44 py-1 text-[11px] font-bold">
                       {isLocked ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleUnlock(user); }}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600"
-                        >
+                        <button onClick={(e) => { e.stopPropagation(); handleUnlock(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600">
                           Unlock & Activate
                         </button>
                       ) : (
                         <>
                           {user.user_role === 'Admin' && !isApproved && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleApproveAdmin(user); }}
-                              className="w-full text-left px-4 py-2 hover:bg-gray-50 text-blue-600"
-                            >
+                            <button onClick={(e) => { e.stopPropagation(); handleApproveAdmin(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-blue-600">
                               Approve Admin
                             </button>
                           )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleEditClick(user); }}
-                            className="w-full text-left px-4 py-2 hover:bg-gray-50"
-                          >
+                          <button onClick={(e) => { e.stopPropagation(); handleEditClick(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">
                             Update Information
                           </button>
-                          {!isHeadAdmin && isApproved && (
+                          {String(user.user_id) !== String(localStorage.getItem("user_id")) && (
                             <>
                               <div className="border-t"></div>
                               <button
@@ -408,10 +436,7 @@ const ManageUsers = () => {
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-4 lg:p-6 text-left">
           <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-3xl p-6 lg:p-12 relative shadow-2xl overflow-y-auto max-h-[90vh]">
-            <button
-              onClick={closeModal}
-              className="absolute top-5 right-5 lg:top-10 lg:right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"
-            >
+            <button onClick={closeModal} className="absolute top-5 right-5 lg:top-10 lg:right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm">
               <HiX size={22} />
             </button>
 
@@ -420,64 +445,44 @@ const ManageUsers = () => {
             </h2>
 
             <form onSubmit={showAddModal ? handleAddUser : handleUpdateUser} className="grid grid-cols-1 sm:grid-cols-5 gap-6 sm:gap-x-10">
-               <div className="sm:col-span-3 space-y-3">
+              <div className="sm:col-span-3 space-y-3">
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">First Name</label>
-                  <input
-                    required
-                    maxLength={24}
-                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                  <input required maxLength={24} className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
                     value={showAddModal ? formData.firstName : selectedUser?.firstName}
-                    onChange={e => handleNameChange('firstName', e.target.value, showEditModal)}
-                  />
+                    onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Middle Name</label>
-                  <input
-                    maxLength={24}
-                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                  <input maxLength={24} className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
                     value={showAddModal ? formData.middleName : selectedUser?.middleName}
-                    onChange={e => handleNameChange('middleName', e.target.value, showEditModal)}
-                  />
+                    onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Last Name</label>
-                  <input
-                    required
-                    maxLength={24}
-                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                  <input required maxLength={24} className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
                     value={showAddModal ? formData.lastName : selectedUser?.lastName}
-                    onChange={e => handleNameChange('lastName', e.target.value, showEditModal)}
-                  />
+                    onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
                   <div className="flex items-center bg-[#F3F4F6] rounded-xl overflow-hidden">
                     <span className="px-3 text-sm font-black text-slate-500 border-r border-slate-300 py-3 flex-shrink-0">+63</span>
-                    <input
-                      required
-                      className="flex-1 bg-transparent p-3 outline-none font-bold text-sm"
-                      placeholder="9XXXXXXXXX"
-                      maxLength={10}
+                    <input required className="flex-1 bg-transparent p-3 outline-none font-bold text-sm" placeholder="9XXXXXXXXX" maxLength={10}
                       value={showAddModal ? formData.contactNo : selectedUser?.contactNo}
-                      onChange={e => handlePhoneChange(e.target.value, showEditModal)}
-                    />
+                      onChange={e => handlePhoneChange(e.target.value, showEditModal)} />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>
-                  <input
-                    required
-                    type="email"
-                    maxLength={30}
-                    className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                  <input required type="email" maxLength={30} className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
                     value={showAddModal ? formData.email : selectedUser?.email}
-                    onChange={e => handleEmailChange(e.target.value, showEditModal)}
-                  />
+                    onChange={e => handleEmailChange(e.target.value, showEditModal)} />
                 </div>
               </div>
 
-            <div className="sm:col-span-2 flex flex-col items-center justify-between py-2 gap-4">                <div className="flex flex-col items-center w-full space-y-3">
+              <div className="sm:col-span-2 flex flex-col items-center justify-between py-2 gap-4">
+                <div className="flex flex-col items-center w-full space-y-3">
                   <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
                     {(showAddModal ? formData.profileImage : selectedUser?.profileImage) ? (
                       <img src={showAddModal ? formData.profileImage : selectedUser.profileImage} className="w-full h-full object-cover" alt="Preview" />
@@ -500,11 +505,9 @@ const ManageUsers = () => {
                   <div className="w-full space-y-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Gender</label>
                     <div className="relative">
-                      <select
-                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
+                      <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
                         value={showAddModal ? formData.gender : selectedUser?.gender}
-                        onChange={e => showAddModal ? setFormData({...formData, gender: e.target.value}) : setSelectedUser({...selectedUser, gender: e.target.value})}
-                      >
+                        onChange={e => showAddModal ? setFormData({...formData, gender: e.target.value}) : setSelectedUser({...selectedUser, gender: e.target.value})}>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
@@ -516,11 +519,9 @@ const ManageUsers = () => {
                   <div className="w-full space-y-1">
                     <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Position</label>
                     <div className="relative">
-                      <select
-                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
+                      <select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm appearance-none cursor-pointer"
                         value={showAddModal ? formData.role : selectedUser?.role}
-                        onChange={e => showAddModal ? setFormData({...formData, role: e.target.value}) : setSelectedUser({...selectedUser, role: e.target.value})}
-                      >
+                        onChange={e => showAddModal ? setFormData({...formData, role: e.target.value}) : setSelectedUser({...selectedUser, role: e.target.value})}>
                         <option value="Sales">Sales</option>
                         <option value="Admin">Admin</option>
                         <option value="Production">Production</option>
@@ -532,17 +533,10 @@ const ManageUsers = () => {
                 </div>
 
                 <div className="flex gap-3 w-full mt-2">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="flex-1 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all cursor-pointer"
-                  >
+                  <button type="button" onClick={closeModal} className="flex-1 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all cursor-pointer">
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest cursor-pointer"
-                  >
+                  <button type="submit" className="flex-1 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest cursor-pointer">
                     Confirm
                   </button>
                 </div>

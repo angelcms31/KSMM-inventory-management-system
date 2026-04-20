@@ -1,10 +1,53 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { 
   HiOutlineMail, HiOutlinePhone, HiX, HiOutlineSearch, 
   HiDotsHorizontal, HiOutlineTruck, HiOutlineClipboardList, 
-  HiOutlineClock, HiOutlineCurrencyDollar, HiChevronLeft, HiChevronRight
+  HiOutlineClock, HiOutlineCurrencyDollar, HiChevronLeft, HiChevronRight,
+  HiCheckCircle, HiXCircle
 } from "react-icons/hi";
+
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess ? <HiCheckCircle size={44} className="text-emerald-500" /> : <HiXCircle size={44} className="text-rose-500" />}
+        </div>
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+        <p className="text-slate-800 font-black text-lg leading-snug tracking-tight mb-8">{alert.message}</p>
+        <button
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-200'}`}
+        >
+          Got it
+        </button>
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      </div>
+      <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.88) translateY(16px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
+    </div>
+  );
+};
+
+const useAlert = () => {
+  const [alert, setAlert] = useState(null);
+  const showAlert = useCallback((message, type = 'success') => setAlert({ message, type }), []);
+  const closeAlert = useCallback(() => setAlert(null), []);
+  return { alert, showAlert, closeAlert };
+};
 
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -22,6 +65,8 @@ const Suppliers = () => {
   const [procurementPage, setProcurementPage] = useState(0);
   const itemsPerPage = 4;
   const procurementPerPage = 5;
+
+  const { alert, showAlert, closeAlert } = useAlert();
 
   const fetchData = async () => {
     try {
@@ -107,14 +152,15 @@ const Suppliers = () => {
       await axios.patch(`http://localhost:5000/api/suppliers/status/${sup.supplier_id}`, { status: newStatus });
       fetchData();
       setActiveMenuId(null);
+      showAlert(`Supplier ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully!`, 'success');
     } catch (err) {
-      alert("Error updating status");
+      showAlert("Error updating status.", 'error');
     }
   };
 
   const handleAddSupplier = async (e) => {
     e.preventDefault();
-    if (addFormData.contact_no.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
+    if (addFormData.contact_no.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
     try {
       await axios.post("http://localhost:5000/api/add_supplier", {
         name: addFormData.name,
@@ -124,29 +170,32 @@ const Suppliers = () => {
       setShowAddModal(false);
       setAddFormData({ name: '', email: '', contact_no: '' });
       fetchData();
+      showAlert("Supplier added successfully!", 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || "Error adding supplier";
-      alert(msg);
+      showAlert(err.response?.data?.message || "Error adding supplier.", 'error');
     }
   };
 
   const handleUpdateSupplier = async (e) => {
     e.preventDefault();
-    if (updateFormData.contact_no.length !== 10) { alert("Contact number must be exactly 10 digits."); return; }
+    if (updateFormData.contact_no.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
     try {
       await axios.put(`http://localhost:5000/api/suppliers/${selectedSupplier.supplier_id}`, updateFormData);
       setShowUpdateModal(false);
       fetchData();
+      showAlert("Supplier updated successfully!", 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || "Error updating supplier";
-      alert(msg);
+      showAlert(err.response?.data?.message || "Error updating supplier.", 'error');
     }
   };
 
   if (loading) return <div className="h-full flex items-center justify-center font-black text-gray-400 animate-pulse tracking-widest uppercase">Loading...</div>;
 
   return (
-    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden">
+    <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden" onClick={() => setActiveMenuId(null)}>
+
+      <AlertDialog alert={alert} onClose={closeAlert} />
+
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -180,10 +229,10 @@ const Suppliers = () => {
             <h1 className="text-2xl font-black uppercase text-slate-900 leading-none tracking-tighter">Manage Suppliers</h1>
             <div className="flex items-center gap-3">
               <div className="flex gap-1 mr-2">
-                <button onClick={() => setCurrentPage(p => Math.max(p - 1, 0))} disabled={currentPage === 0} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100"><HiChevronLeft size={16}/></button>
-                <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(sortedAndFilteredSuppliers.length / itemsPerPage) - 1} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100"><HiChevronRight size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => Math.max(p - 1, 0)); }} disabled={currentPage === 0} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100"><HiChevronLeft size={16}/></button>
+                <button onClick={(e) => { e.stopPropagation(); setCurrentPage(p => p + 1); }} disabled={currentPage >= Math.ceil(sortedAndFilteredSuppliers.length / itemsPerPage) - 1} className="p-1.5 rounded-full border border-slate-200 disabled:opacity-30 hover:bg-slate-100"><HiChevronRight size={16}/></button>
               </div>
-              <button onClick={() => setShowAddModal(true)} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest">+ Add Supplier</button>
+              <button onClick={(e) => { e.stopPropagation(); setShowAddModal(true); }} className="bg-black text-white px-5 py-2.5 rounded-xl text-[9px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest">+ Add Supplier</button>
             </div>
           </div>
 
@@ -194,10 +243,10 @@ const Suppliers = () => {
                   <div className="flex justify-between items-start mb-4">
                     <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 flex-shrink-0"><HiOutlineTruck size={20} /></div>
                     <div className="relative">
-                      <button onClick={() => setActiveMenuId(activeMenuId === sup.supplier_id ? null : sup.supplier_id)} className="text-slate-300 hover:text-black transition-colors"><HiDotsHorizontal size={20} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === sup.supplier_id ? null : sup.supplier_id); }} className="text-slate-300 hover:text-black transition-colors"><HiDotsHorizontal size={20} /></button>
                       {activeMenuId === sup.supplier_id && (
                         <div className="absolute right-0 mt-1 w-32 bg-white border border-slate-100 rounded-xl shadow-xl z-20 py-1.5 text-left">
-                          <button onClick={() => toggleStatus(sup)} className={`w-full text-left px-3 py-1.5 font-black text-[8px] uppercase hover:bg-gray-50 ${sup.status === 'Active' ? 'text-rose-500' : 'text-emerald-500'}`}>{sup.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
+                          <button onClick={(e) => { e.stopPropagation(); toggleStatus(sup); }} className={`w-full text-left px-3 py-1.5 font-black text-[8px] uppercase hover:bg-gray-50 ${sup.status === 'Active' ? 'text-rose-500' : 'text-emerald-500'}`}>{sup.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
                         </div>
                       )}
                     </div>
@@ -217,8 +266,8 @@ const Suppliers = () => {
                     </p>
                   </div>
                   <div className="flex gap-2 mt-auto">
-                    <button disabled={sup.status === 'Deactivated'} onClick={() => { setSelectedSupplier(sup); setShowHistoryModal(true); }} className="flex-1 text-[8px] font-black py-2 rounded-xl border border-slate-100 bg-slate-50 text-slate-400 uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50">History</button>
-                    <button disabled={sup.status === 'Deactivated'} onClick={() => { setSelectedSupplier(sup); setUpdateFormData({ name: sup.name, email: sup.email, contact_no: sup.contact_no }); setShowUpdateModal(true); }} className="flex-1 text-[8px] font-black py-2 rounded-xl border border-slate-100 bg-slate-50 text-slate-400 uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50">Edit</button>
+                    <button disabled={sup.status === 'Deactivated'} onClick={(e) => { e.stopPropagation(); setSelectedSupplier(sup); setShowHistoryModal(true); }} className="flex-1 text-[8px] font-black py-2 rounded-xl border border-slate-100 bg-slate-50 text-slate-400 uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50">History</button>
+                    <button disabled={sup.status === 'Deactivated'} onClick={(e) => { e.stopPropagation(); setSelectedSupplier(sup); setUpdateFormData({ name: sup.name, email: sup.email, contact_no: sup.contact_no }); setShowUpdateModal(true); }} className="flex-1 text-[8px] font-black py-2 rounded-xl border border-slate-100 bg-slate-50 text-slate-400 uppercase tracking-widest hover:bg-black hover:text-white transition-all disabled:opacity-50">Edit</button>
                   </div>
                 </div>
               ))
@@ -312,7 +361,7 @@ const Suppliers = () => {
 
       {(showAddModal || showUpdateModal) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-4 sm:p-6 text-left">
-          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] w-full max-w-xl p-6 sm:p-12 relative shadow-2xl animate-in zoom-in duration-300">
+          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] w-full max-w-xl p-6 sm:p-12 relative shadow-2xl">
             <button onClick={() => { setShowAddModal(false); setShowUpdateModal(false); }} className="absolute top-6 right-6 sm:top-10 sm:right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"><HiX size={24}/></button>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-900 uppercase mb-6 sm:mb-8 tracking-tighter leading-none">{showAddModal ? "Add Supplier" : "Update Supplier"}</h2>
             <form onSubmit={showAddModal ? handleAddSupplier : handleUpdateSupplier} className="space-y-6">

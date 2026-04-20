@@ -23,6 +23,8 @@ import Orders from "./pages/sales/Orders";
 import ProductionDashboard from "./pages/production/ProductionDashboard";
 import Artisan from "./pages/production/Artisan";
 import ProductionInventory from "./pages/production/Inventory";
+import RawMaterials from "./pages/production/RawMaterials";
+
 
 const RequireAuth = ({ children }) => {
   const userId = localStorage.getItem("user_id");
@@ -136,6 +138,7 @@ function App() {
           <Route path={getHashedPath("sales", "statistics")} element={<Orders />} />
 
           <Route path={getHashedPath("production", "home")} element={<ProductionDashboard />} />
+          <Route path={getHashedPath("production", "rawmaterials")} element={<RawMaterials />} />
           <Route path={getHashedPath("production", "artisan")} element={<Artisan />} />
           <Route path={getHashedPath("production", "inventory")} element={<ProductionInventory />} />
 
