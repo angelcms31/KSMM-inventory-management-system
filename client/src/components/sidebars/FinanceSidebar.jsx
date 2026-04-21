@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  HiOutlineHome, 
-  HiOutlinePresentationChartBar, 
-  HiOutlineShieldCheck, 
+import {
+  HiOutlineHome,
+  HiOutlinePresentationChartBar,
+  HiOutlineShieldCheck,
   HiOutlineLogout,
   HiOutlineShoppingCart,
-  HiChevronDown
+  HiChevronDown,
+  HiOutlineClipboardList,
+  HiOutlineBeaker,
 } from "react-icons/hi";
 import { getHashedPath } from "../../utils/hash";
 
 const FinanceSidebar = ({ activeTab }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userName, setUserName] = useState("User");
+  const [logsOpen, setLogsOpen] = useState(false);
   const [mobileLogsOpen, setMobileLogsOpen] = useState(false);
   const navigate = useNavigate();
   const role = "finance";
+
+  const logSubTabs = ['variance'];
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -25,15 +30,20 @@ const FinanceSidebar = ({ activeTab }) => {
     return () => clearInterval(timer);
   }, []);
 
-  const truncateName = (name) => {
-    return name.length > 12 ?  `${name.substring(0, 10)}...` : name;
-  };
+  useEffect(() => {
+    if (logSubTabs.includes(activeTab)) setLogsOpen(true);
+  }, [activeTab]);
+
+  const truncateName = (name) => name.length > 12 ? `${name.substring(0, 10)}...` : name;
 
   const menuItems = [
     { id: 'home', name: 'Home', icon: <HiOutlineHome size={20} /> },
     { id: 'inventory', name: 'Transactions', icon: <HiOutlinePresentationChartBar size={20} /> },
     { id: 'purchaseorder', name: 'Purchase Orders', icon: <HiOutlineShoppingCart size={20} /> },
-    { id: 'variance', name: 'Variance Logs', icon: <HiOutlineShieldCheck size={20} /> },
+  ];
+
+  const logSubItems = [
+    { id: 'variance', name: 'Variance Logs', icon: <HiOutlineBeaker size={16} /> },
   ];
 
   const handleTabClick = (tabId) => {
@@ -59,6 +69,8 @@ const FinanceSidebar = ({ activeTab }) => {
       navigate("/", { replace: true });
     }
   };
+
+  const isLogsActive = logSubTabs.includes(activeTab);
 
   return (
     <>
@@ -95,6 +107,50 @@ const FinanceSidebar = ({ activeTab }) => {
                 </li>
               );
             })}
+
+            <li className="relative pl-3">
+              <button
+                onClick={() => setLogsOpen(prev => !prev)}
+                className={`w-full group flex items-center justify-between py-2.5 px-4 transition-all duration-300 rounded-l-full cursor-pointer outline-none ${
+                  isLogsActive ? "bg-white text-black shadow-md" : "text-gray-400 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <span className={`${isLogsActive ? "text-black" : "text-gray-500 group-hover:text-white"}`}>
+                    <HiOutlineShieldCheck size={18} />
+                  </span>
+                  <span className="text-[13.5px] font-medium">Logs</span>
+                </div>
+                <HiChevronDown
+                  size={14}
+                  className={`transition-transform duration-300 mr-1 ${logsOpen ? 'rotate-180' : ''} ${isLogsActive ? 'text-black' : 'text-gray-500'}`}
+                />
+              </button>
+
+              {logsOpen && (
+                <ul className="mt-1 ml-4 space-y-0.5 border-l border-white/10 pl-3">
+                  {logSubItems.map((sub) => {
+                    const isSubActive = activeTab === sub.id;
+                    return (
+                      <li key={sub.id}>
+                        <button
+                          onClick={() => handleTabClick(sub.id)}
+                          className={`w-full flex items-center gap-2.5 py-2 px-3 rounded-lg text-[12.5px] font-medium transition-all duration-200 cursor-pointer outline-none ${
+                            isSubActive ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                          }`}
+                        >
+                          <span className={isSubActive ? 'text-white' : 'text-gray-600'}>
+                            {sub.icon}
+                          </span>
+                          {sub.name}
+                          {isSubActive && <div className="ml-auto w-1 h-1 rounded-full bg-white" />}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </li>
           </ul>
         </nav>
 
@@ -120,13 +176,33 @@ const FinanceSidebar = ({ activeTab }) => {
             boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           }}
         >
+          {mobileLogsOpen && (
+            <div className="absolute bottom-20 left-0 right-0 mx-4 bg-[#262221] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+              {logSubItems.map((sub) => (
+                <button
+                  key={sub.id}
+                  onClick={() => handleTabClick(sub.id)}
+                  className={`w-full flex items-center gap-3 p-4 text-[14px] font-medium transition-colors ${
+                    activeTab === sub.id ? 'bg-white text-black' : 'text-gray-400 hover:bg-white/5'
+                  }`}
+                >
+                  {sub.icon}
+                  {sub.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center justify-around px-2 py-2">
             {menuItems.map((item) => {
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
-                  onClick={() => handleTabClick(item.id)}
+                  onClick={() => {
+                    setMobileLogsOpen(false);
+                    handleTabClick(item.id);
+                  }}
                   className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] outline-none cursor-pointer"
                 >
                   <div className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${isActive ? 'bg-white shadow-md' : 'bg-transparent'}`}>
@@ -138,6 +214,18 @@ const FinanceSidebar = ({ activeTab }) => {
                 </button>
               );
             })}
+
+            <button
+              onClick={() => setMobileLogsOpen(!mobileLogsOpen)}
+              className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] outline-none cursor-pointer"
+            >
+              <div className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${isLogsActive ? 'bg-white shadow-md' : 'bg-transparent'}`}>
+                <span className={`transition-colors duration-300 ${isLogsActive ? 'text-[#262221]' : 'text-gray-400'}`} style={{ display: 'flex' }}>
+                  <HiOutlineShieldCheck size={22} />
+                </span>
+              </div>
+              {isLogsActive && <span className="mt-1 w-1 h-1 rounded-full bg-white block" />}
+            </button>
 
             <button
               onClick={handleLogout}

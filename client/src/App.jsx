@@ -25,6 +25,10 @@ import Artisan from "./pages/production/Artisan";
 import ProductionInventory from "./pages/production/Inventory";
 import RawMaterials from "./pages/production/RawMaterials";
 
+import FinanceDashboard from "./pages/finance/FinanceDashboard";
+import Transactions from "./pages/finance/FinanceTransaction";
+import FinanceLogs from "./pages/finance/FinanceLogs";
+import PurchaseOrder from "./pages/finance/PurchaseOrder";
 
 const RequireAuth = ({ children }) => {
   const userId = localStorage.getItem("user_id");
@@ -132,6 +136,11 @@ function App() {
             </RequireAuth>
           }
         >
+          <Route path={getHashedPath("finance", "home")} element={<FinanceDashboard />} />
+          <Route path={getHashedPath("finance", "inventory")} element={<Transactions />} />
+          <Route path={getHashedPath("finance", "variance")} element={<FinanceLogs />} />
+          <Route path={getHashedPath("finance", "purchaseorder")} element={<PurchaseOrder />} />
+
           <Route path={getHashedPath("sales", "home")} element={<SalesDashboard />} />
           <Route path={getHashedPath("sales", "inventory")} element={<SalesInventory />} />
           <Route path={getHashedPath("sales", "warehouse")} element={<Warehouse />} />
