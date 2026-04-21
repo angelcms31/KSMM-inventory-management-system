@@ -8,3 +8,5 @@ Thumbs.db
 
 .env.local
 .env.development.local
+gmail_token.json
+credentials.json
