@@ -20,16 +20,17 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Eye,
   Search,
   TrendingUp,
   Download,
+  ExternalLink,
 } from "lucide-react";
 import { HiPhoto } from "react-icons/hi2";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS_IN_MONTH = (year, month) => new Date(year, month + 1, 0).getDate();
 
 const COURIERS_ICON = {
   "J&T Express": "🟥",
@@ -39,6 +40,13 @@ const COURIERS_ICON = {
   "Grab Express": "🟨",
   "Lalamove": "🟧",
   "Self Pick-up": "⬜",
+};
+
+const formatPeso = (v) => {
+  if (v === 0) return "₱0";
+  if (v >= 1_000_000) return `₱${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `₱${(v / 1_000).toFixed(1)}K`;
+  return `₱${v.toFixed(0)}`;
 };
 
 const getStatusStyle = (status) => {
@@ -65,12 +73,13 @@ const TRACKING_STEPS = [
   { key: "Pending", label: "Order Placed", sub: "An order has been placed" },
 ];
 
-const OrderDetailModal = ({ order, onClose }) => {
+const OrderDetailModal = ({ order, onClose, products = [] }) => {
   if (!order) return null;
   const statusIndex = TRACKING_STEPS.findIndex(s => s.key === order.status);
   const activeStep = statusIndex === -1 ? 2 : statusIndex;
   const toAddress = order.address || order.delivery_address || order.client_address || null;
-  const fromAddress = order.warehouse_address || order.origin || null;
+  const matchedProduct = products.find(p => p.sku === order.sku || p.name === order.product_name);
+  const fromAddress = matchedProduct?.warehouse_location || order.warehouse_location || null;
 
   return (
     <div
@@ -86,7 +95,6 @@ const OrderDetailModal = ({ order, onClose }) => {
         <div className="flex items-start justify-between px-6 pt-6 pb-4">
           <h2 className="text-lg font-black text-gray-900 leading-tight">Real-time Delivery Tracking</h2>
           <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
-            <Eye size={18} className="text-gray-400" />
             <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors"><X size={18} /></button>
           </div>
         </div>
@@ -180,38 +188,44 @@ const OrderDetailModal = ({ order, onClose }) => {
           </div>
         </div>
 
-        <div className="px-6 pb-6 pt-2">
-          <button onClick={onClose} className="w-full py-3.5 bg-gray-900 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-gray-700 transition-all">
-            Close
-          </button>
-        </div>
       </div>
       <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.9) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
     </div>
   );
 };
 
-const DAYS_IN_MONTH = (year, month) => new Date(year, month + 1, 0).getDate();
-
 const SalesTrendModal = ({ orders, onClose }) => {
   const currentYear = new Date().getFullYear();
   const lastYear = currentYear - 1;
-
   const availableYears = [currentYear, lastYear, lastYear - 1];
 
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedDay, setSelectedDay] = useState("");
 
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [exportFormat, setExportFormat] = useState("csv");
+  const [exportFilterYear, setExportFilterYear] = useState("");
+  const [exportFilterMonth, setExportFilterMonth] = useState("");
+  const [exportFilterDay, setExportFilterDay] = useState("");
+  const [exportFilterCourier, setExportFilterCourier] = useState("");
+  const [exportFilterPlatform, setExportFilterPlatform] = useState("");
+  const [lastDownloadUrl, setLastDownloadUrl] = useState(null);
+  const [lastDownloadName, setLastDownloadName] = useState("");
+
   const daysInSelected = selectedYear && selectedMonth !== ""
     ? DAYS_IN_MONTH(Number(selectedYear), Number(selectedMonth))
     : 31;
 
-  const filterOrders = (year) =>
-    orders.filter(o => {
-      if (!o.order_date) return false;
-      return new Date(o.order_date).getFullYear() === year;
-    });
+  const exportDaysInSelected = exportFilterYear && exportFilterMonth !== ""
+    ? DAYS_IN_MONTH(Number(exportFilterYear), Number(exportFilterMonth))
+    : 31;
+
+  const allCouriers = [...new Set(orders.map(o => o.courier).filter(Boolean))];
+  const allPlatforms = [...new Set(orders.map(o => o.platform).filter(Boolean))];
+
+  const filterOrdersByYear = (year) =>
+    orders.filter(o => o.order_date && new Date(o.order_date).getFullYear() === year);
 
   const buildMonthly = (filteredOrders) => {
     const arr = Array(12).fill(0);
@@ -224,36 +238,52 @@ const SalesTrendModal = ({ orders, onClose }) => {
   const buildDaily = (filteredOrders, year, month) => {
     const days = DAYS_IN_MONTH(year, month);
     const arr = Array(days).fill(0);
-    filteredOrders
-      .filter(o => o.status === "Delivered")
-      .forEach(o => {
-        const d = new Date(o.order_date);
-        if (d.getMonth() === month) arr[d.getDate() - 1] += Number(o.total_amount || 0);
-      });
+    filteredOrders.filter(o => o.status === "Delivered").forEach(o => {
+      const d = new Date(o.order_date);
+      if (d.getMonth() === month) arr[d.getDate() - 1] += Number(o.total_amount || 0);
+    });
     return arr;
   };
 
+  const getDayOrders = (year, month, day) =>
+    orders.filter(o => {
+      if (!o.order_date) return false;
+      const d = new Date(o.order_date);
+      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+    });
+
   const getChartData = () => {
-    if (selectedYear && selectedMonth !== "" && selectedDay === "") {
-      const yr = Number(selectedYear);
+    const yr = selectedYear ? Number(selectedYear) : currentYear;
+    if (selectedYear && selectedMonth !== "") {
       const mo = Number(selectedMonth);
-      const days = DAYS_IN_MONTH(yr, mo);
-      const labels = Array.from({ length: days }, (_, i) => `${i + 1}`);
-      const thisData = buildDaily(filterOrders(yr), yr, mo);
-      const lastData = buildDaily(filterOrders(yr - 1), yr - 1, mo);
-      return { labels, thisData, lastData };
+      return {
+        labels: Array.from({ length: DAYS_IN_MONTH(yr, mo) }, (_, i) => `${i + 1}`),
+        thisData: buildDaily(filterOrdersByYear(yr), yr, mo),
+        lastData: buildDaily(filterOrdersByYear(yr - 1), yr - 1, mo),
+      };
     }
-    const labels = MONTHS;
-    const thisYr = selectedYear ? Number(selectedYear) : currentYear;
-    const thisData = buildMonthly(filterOrders(thisYr));
-    const lastData = buildMonthly(filterOrders(thisYr - 1));
-    return { labels, thisData, lastData };
+    return {
+      labels: MONTHS,
+      thisData: buildMonthly(filterOrdersByYear(yr)),
+      lastData: buildMonthly(filterOrdersByYear(yr - 1)),
+    };
   };
 
-  const { labels, thisData, lastData } = getChartData();
+  const isSingleDay = selectedYear && selectedMonth !== "" && selectedDay !== "";
+  const singleDayOrders = isSingleDay
+    ? getDayOrders(Number(selectedYear), Number(selectedMonth), Number(selectedDay))
+    : [];
+  const singleDayDelivered = singleDayOrders.filter(o => o.status === "Delivered");
+  const singleDayRevenue = singleDayDelivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+  const singleDayLastYearRevenue = isSingleDay
+    ? getDayOrders(Number(selectedYear) - 1, Number(selectedMonth), Number(selectedDay))
+        .filter(o => o.status === "Delivered")
+        .reduce((s, o) => s + Number(o.total_amount || 0), 0)
+    : 0;
 
-  const thisTotal = thisData.reduce((a, b) => a + b, 0);
-  const lastTotal = lastData.reduce((a, b) => a + b, 0);
+  const { labels, thisData, lastData } = getChartData();
+  const thisTotal = isSingleDay ? singleDayRevenue : thisData.reduce((a, b) => a + b, 0);
+  const lastTotal = isSingleDay ? singleDayLastYearRevenue : lastData.reduce((a, b) => a + b, 0);
   const pctChange = lastTotal > 0 ? (((thisTotal - lastTotal) / lastTotal) * 100).toFixed(1) : null;
 
   const chartData = {
@@ -321,7 +351,7 @@ const SalesTrendModal = ({ orders, onClose }) => {
       y: {
         grid: { color: "rgba(0,0,0,0.05)" },
         ticks: {
-          callback: v => v === 0 ? "0" : `${(v / 1000).toFixed(0)}K`,
+          callback: (v) => formatPeso(v),
           font: { size: 10 },
           color: "#94a3b8",
         },
@@ -335,20 +365,11 @@ const SalesTrendModal = ({ orders, onClose }) => {
     },
   };
 
-  const [showExportPanel, setShowExportPanel] = useState(false);
-  const [exportFormat, setExportFormat] = useState("csv");
-  const [exportFilterYear, setExportFilterYear] = useState("");
-  const [exportFilterMonth, setExportFilterMonth] = useState("");
-  const [exportFilterCourier, setExportFilterCourier] = useState("");
-  const [exportFilterPlatform, setExportFilterPlatform] = useState("");
-
-  const allCouriers = [...new Set(orders.map(o => o.courier).filter(Boolean))];
-  const allPlatforms = [...new Set(orders.map(o => o.platform).filter(Boolean))];
-
   const getExportRows = () => {
     let filtered = orders.filter(o => o.status === "Delivered" && o.order_date);
     if (exportFilterYear) filtered = filtered.filter(o => new Date(o.order_date).getFullYear() === Number(exportFilterYear));
     if (exportFilterMonth !== "") filtered = filtered.filter(o => new Date(o.order_date).getMonth() === Number(exportFilterMonth));
+    if (exportFilterDay !== "") filtered = filtered.filter(o => new Date(o.order_date).getDate() === Number(exportFilterDay));
     if (exportFilterCourier) filtered = filtered.filter(o => o.courier === exportFilterCourier);
     if (exportFilterPlatform) filtered = filtered.filter(o => o.platform === exportFilterPlatform);
     return filtered;
@@ -358,20 +379,35 @@ const SalesTrendModal = ({ orders, onClose }) => {
     const parts = [];
     if (exportFilterYear) parts.push(exportFilterYear);
     if (exportFilterMonth !== "") parts.push(MONTHS[Number(exportFilterMonth)]);
+    if (exportFilterDay !== "") parts.push(`Day${exportFilterDay}`);
     if (exportFilterCourier) parts.push(exportFilterCourier);
     if (exportFilterPlatform) parts.push(exportFilterPlatform);
     return parts.length ? parts.join("_") : "All";
   };
 
+  const downloaderName = localStorage.getItem("userName") || "Unknown User";
+
   const handleExport = () => {
     const rows = getExportRows();
     const filename = `sales_trend_${buildExportLabel()}`;
+    const filterLabel = buildExportLabel().replace(/_/g, " ");
+    const downloadTimestamp = new Date().toLocaleString("en-PH", {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
 
     if (exportFormat === "csv") {
       const header = ["Order ID", "Date", "Client", "Product", "Quantity", "Courier", "Platform", "Total Amount (₱)"];
+      const meta = [
+        [`Downloaded by: ${downloaderName}`],
+        [`Downloaded at: ${downloadTimestamp}`],
+        [`Filter: ${filterLabel}`],
+        [],
+        header,
+      ];
       const data = rows.map(o => [
-        o.order_id,
-        o.order_date,
+        `SO-${o.order_id}`,
+        o.order_date ? new Date(o.order_date).toLocaleDateString("en-PH") : "",
         o.client_name || "",
         o.product_name || o.sku || "",
         o.quantity || 0,
@@ -379,14 +415,15 @@ const SalesTrendModal = ({ orders, onClose }) => {
         o.platform || "",
         Number(o.total_amount || 0).toFixed(2),
       ]);
-      const csv = [header, ...data].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+      const csv = [...meta, ...data].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
+      setLastDownloadUrl(url);
+      setLastDownloadName(`${filename}.csv`);
       const a = document.createElement("a");
       a.href = url;
       a.download = `${filename}.csv`;
       a.click();
-      URL.revokeObjectURL(url);
     } else {
       import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(() => {
         import("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js").then(() => {
@@ -395,16 +432,17 @@ const SalesTrendModal = ({ orders, onClose }) => {
           doc.setFontSize(14);
           doc.setFont("helvetica", "bold");
           doc.text("Sales & Profit Trend Report", 14, 16);
-          doc.setFontSize(9);
+          doc.setFontSize(8);
           doc.setFont("helvetica", "normal");
-          doc.setTextColor(120);
-          doc.text(`Filter: ${buildExportLabel().replace(/_/g, " ")}   |   Generated: ${new Date().toLocaleDateString("en-PH")}`, 14, 23);
+          doc.setTextColor(100);
+          doc.text(`Filter: ${filterLabel}`, 14, 23);
+          doc.text(`Downloaded by: ${downloaderName}   |   ${downloadTimestamp}`, 14, 28);
           doc.setTextColor(0);
 
           const total = rows.reduce((s, o) => s + Number(o.total_amount || 0), 0);
 
           doc.autoTable({
-            startY: 30,
+            startY: 34,
             head: [["Order ID", "Date", "Client", "Product", "Qty", "Courier", "Platform", "Amount (₱)"]],
             body: rows.map(o => [
               `SO-${o.order_id}`,
@@ -423,6 +461,10 @@ const SalesTrendModal = ({ orders, onClose }) => {
             alternateRowStyles: { fillColor: [248, 250, 252] },
           });
 
+          const pdfBlob = doc.output("blob");
+          const url = URL.createObjectURL(pdfBlob);
+          setLastDownloadUrl(url);
+          setLastDownloadName(`${filename}.pdf`);
           doc.save(`${filename}.pdf`);
         });
       });
@@ -431,6 +473,12 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
   const selectClass = "appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all pr-8";
 
+  const Chevron = () => (
+    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </div>
+  );
+
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center p-4"
@@ -438,11 +486,11 @@ const SalesTrendModal = ({ orders, onClose }) => {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-2xl relative overflow-hidden"
+        className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-2xl relative overflow-hidden max-h-[95vh] flex flex-col"
         style={{ animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+        <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-xl font-black text-gray-900">Sales & Profit Trend</h2>
@@ -478,23 +526,29 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative">
-                  <select value={exportFilterYear} onChange={e => setExportFilterYear(e.target.value)} className={selectClass + " w-full text-xs py-2"}>
+                  <select value={exportFilterYear} onChange={e => { setExportFilterYear(e.target.value); setExportFilterMonth(""); setExportFilterDay(""); }} className={selectClass + " w-full text-xs py-2"}>
                     <option value="">All Years</option>
                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
+                  <Chevron />
                 </div>
 
                 <div className="relative">
-                  <select value={exportFilterMonth} onChange={e => setExportFilterMonth(e.target.value)} className={selectClass + " w-full text-xs py-2"}>
+                  <select value={exportFilterMonth} onChange={e => { setExportFilterMonth(e.target.value); setExportFilterDay(""); }} disabled={!exportFilterYear} className={selectClass + " w-full text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"}>
                     <option value="">All Months</option>
                     {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
+                  <Chevron />
+                </div>
+
+                <div className="relative">
+                  <select value={exportFilterDay} onChange={e => setExportFilterDay(e.target.value)} disabled={!exportFilterYear || exportFilterMonth === ""} className={selectClass + " w-full text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"}>
+                    <option value="">All Days</option>
+                    {Array.from({ length: exportDaysInSelected }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <Chevron />
                 </div>
 
                 <div className="relative">
@@ -502,42 +556,54 @@ const SalesTrendModal = ({ orders, onClose }) => {
                     <option value="">All Couriers</option>
                     {allCouriers.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
+                  <Chevron />
                 </div>
 
-                <div className="relative">
+                <div className="relative col-span-2">
                   <select value={exportFilterPlatform} onChange={e => setExportFilterPlatform(e.target.value)} className={selectClass + " w-full text-xs py-2"}>
                     <option value="">All Platforms</option>
                     {allPlatforms.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </div>
+                  <Chevron />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
                 <p className="text-[10px] text-gray-400 font-semibold">
-                  {getExportRows().length} delivered order{getExportRows().length !== 1 ? "s" : ""} matched
+                  {getExportRows().length} order{getExportRows().length !== 1 ? "s" : ""} matched
                 </p>
-                <button
-                  onClick={handleExport}
-                  disabled={getExportRows().length === 0}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-[10px] font-black uppercase tracking-wide transition-all"
-                >
-                  <Download size={11} />
-                  Download {exportFormat.toUpperCase()}
-                </button>
+                <div className="flex items-center gap-2">
+                  {lastDownloadUrl && (
+                    <a
+                      href={lastDownloadUrl}
+                      download={lastDownloadName}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all"
+                    >
+                      <ExternalLink size={11} />
+                      View Last Download
+                    </a>
+                  )}
+                  <button
+                    onClick={handleExport}
+                    disabled={getExportRows().length === 0}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-[10px] font-black uppercase tracking-wide transition-all"
+                  >
+                    <Download size={11} />
+                    Download {exportFormat.toUpperCase()}
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        <div className="px-6 pt-4 pb-1">
+        <div className="px-6 pt-4 pb-1 flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-bold text-gray-800">Overall Sales</span>
+            <span className="text-sm font-bold text-gray-800">
+              {isSingleDay
+                ? `${MONTHS[Number(selectedMonth)]} ${selectedDay}, ${selectedYear}`
+                : "Overall Sales"}
+            </span>
             {pctChange !== null && (
               <div className="flex items-center gap-1.5">
                 <TrendingUp size={13} className={Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"} />
@@ -549,12 +615,57 @@ const SalesTrendModal = ({ orders, onClose }) => {
             )}
           </div>
 
-          <div className="h-[200px]">
-            <Line data={chartData} options={chartOptions} />
-          </div>
+          {isSingleDay ? (
+            <div className="h-[200px] flex flex-col justify-center gap-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-blue-50 rounded-2xl p-4 flex flex-col justify-between">
+                  <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Revenue</p>
+                  <p className="text-xl font-black text-blue-700 leading-tight">
+                    {formatPeso(singleDayRevenue)}
+                  </p>
+                  <p className="text-[9px] text-blue-400 mt-1">{singleDayDelivered.length} delivered</p>
+                </div>
+                <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-between">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Orders</p>
+                  <p className="text-xl font-black text-gray-800 leading-tight">{singleDayOrders.length}</p>
+                  <p className="text-[9px] text-gray-400 mt-1">
+                    {singleDayOrders.filter(o => o.status === "Shipped").length} in transit
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-between">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Last Year</p>
+                  <p className="text-xl font-black text-gray-800 leading-tight">
+                    {formatPeso(singleDayLastYearRevenue)}
+                  </p>
+                  <p className="text-[9px] text-gray-400 mt-1">{selectedYear - 1} same day</p>
+                </div>
+              </div>
+              {singleDayOrders.length > 0 ? (
+                <div className="space-y-1.5 max-h-[80px] overflow-y-auto pr-1">
+                  {singleDayOrders.map(o => (
+                    <div key={o.order_id} className="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded-xl">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusStyle(o.status)}`} />
+                        <p className="text-[10px] font-bold text-gray-700 truncate">{o.client_name || `SO-${o.order_id}`}</p>
+                      </div>
+                      <p className="text-[10px] font-black text-gray-900 flex-shrink-0 ml-2">
+                        ₱{Number(o.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-[10px] font-black text-gray-300 uppercase tracking-widest py-2">No orders on this day</p>
+              )}
+            </div>
+          ) : (
+            <div className="h-[200px]">
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          )}
         </div>
 
-        <div className="px-6 pb-6 pt-4 border-t border-gray-100 mt-2">
+        <div className="px-6 pb-6 pt-4 border-t border-gray-100 mt-2 flex-shrink-0">
           <p className="text-base font-black text-gray-900 mb-3">Select Date</p>
           <div className="flex gap-3">
             <div className="relative flex-1">
@@ -658,11 +769,14 @@ const SalesDashboard = () => {
     .sort((a, b) => b.sold - a.sold)
     .slice(0, 5);
 
+  const currentYear = new Date().getFullYear();
   const monthlySales = Array(12).fill(0);
-  orders.filter(o => o.status === "Delivered").forEach(o => {
-    const month = new Date(o.order_date).getMonth();
-    monthlySales[month] += Number(o.total_amount || 0);
-  });
+  orders
+    .filter(o => o.status === "Delivered" && o.order_date && new Date(o.order_date).getFullYear() === currentYear)
+    .forEach(o => {
+      const month = new Date(o.order_date).getMonth();
+      monthlySales[month] += Number(o.total_amount || 0);
+    });
 
   const salesData = {
     labels: MONTHS,
@@ -705,7 +819,11 @@ const SalesDashboard = () => {
     scales: {
       y: {
         grid: { color: "rgba(0,0,0,0.04)" },
-        ticks: { callback: v => `₱${(v / 1000).toFixed(0)}K`, font: { size: 10 }, color: "#94a3b8" },
+        ticks: {
+          callback: (v) => formatPeso(v),
+          font: { size: 10 },
+          color: "#94a3b8",
+        },
         border: { display: false },
       },
       x: {
@@ -726,8 +844,19 @@ const SalesDashboard = () => {
 
   return (
     <div className="w-full overflow-x-hidden bg-[#fafafa] font-sans">
-      {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
-      {showTrendModal && <SalesTrendModal orders={orders} products={products} onClose={() => setShowTrendModal(false)} />}
+      {selectedOrder && (
+        <OrderDetailModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          products={products}
+        />
+      )}
+      {showTrendModal && (
+        <SalesTrendModal
+          orders={orders}
+          onClose={() => setShowTrendModal(false)}
+        />
+      )}
 
       <div className="px-4 py-6 pb-28 lg:pb-6 max-w-full">
         <div className="mb-6 mt-2">

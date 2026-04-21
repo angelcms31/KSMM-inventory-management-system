@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { HiMagnifyingGlass, HiPencil, HiPhoto } from "react-icons/hi2";
+import { HiMagnifyingGlass, HiPencil, HiPhoto, HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import AddProductModal from "../../components/modals/AddProductModal";
 
 export default function SalesInventory() {
@@ -9,6 +9,8 @@ export default function SalesInventory() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const autoCreateWorkOrders = async (productList) => {
     try {
@@ -88,6 +90,15 @@ export default function SalesInventory() {
     return matchesSearch && matchesStatus;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedProducts = filteredProducts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handlePrev = () => setCurrentPage(p => Math.max(1, p - 1));
+  const handleNext = () => setCurrentPage(p => Math.min(totalPages, p + 1));
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter]);
+
   const handleCloseModal = () => {
     setShowAddModal(false);
     setSelectedProduct(null);
@@ -99,10 +110,16 @@ export default function SalesInventory() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#F9FAFB] font-sans antialiased text-slate-900 overflow-hidden">
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden px-10 py-8">
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center flex-shrink-0">
-          <div className="relative flex-1 group">
+    <div
+      className="flex w-full bg-[#F9FAFB] font-sans antialiased text-slate-900"
+      style={{ height: "100vh", overflow: "hidden" }}
+    >
+      <div
+        className="flex-1 flex flex-col min-w-0 px-10 py-8"
+        style={{ overflow: "hidden" }}
+      >
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-6 flex gap-4 items-center flex-shrink-0">
+          <div className="relative flex-1">
             <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
@@ -114,14 +131,20 @@ export default function SalesInventory() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
-          <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 relative overflow-hidden">
-            <div className="flex justify-between items-center mb-8 px-2">
+        <div
+          className="flex-1 min-h-0"
+          style={{ overflow: "hidden" }}
+        >
+          <section
+            className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col"
+            style={{ height: "100%", overflow: "hidden" }}
+          >
+            <div className="flex justify-between items-center mb-6 px-2 flex-shrink-0">
               <div>
                 <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">
                   Finished Goods Inventory
                 </h1>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2 text-left">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">
                   Production Records
                 </p>
               </div>
@@ -148,9 +171,9 @@ export default function SalesInventory() {
               </div>
             </div>
 
-            <div className="overflow-x-auto no-scrollbar">
-              {filteredProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-300">
+            <div className="flex-1 min-h-0" style={{ overflow: "hidden" }}>
+              {pagedProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-300">
                   <HiMagnifyingGlass size={56} className="mb-4" />
                   <p className="text-base font-black uppercase tracking-widest text-slate-400">No results found</p>
                   {searchTerm && (
@@ -160,71 +183,71 @@ export default function SalesInventory() {
                   )}
                 </div>
               ) : (
-                <table className="w-full border-separate border-spacing-y-4">
+                <table className="w-full border-separate border-spacing-y-3" style={{ tableLayout: "fixed" }}>
                   <thead>
                     <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
-                      <th className="pb-2 text-left pl-6 w-[28%]">Product Details</th>
-                      <th className="pb-2 text-center w-[12%]">Category</th>
-                      <th className="pb-2 text-center w-[13%]">Stocks</th>
-                      <th className="pb-2 text-center w-[10%]">Unit</th>
-                      <th className="pb-2 text-center w-[13%]">Status</th>
-                      <th className="pb-2 text-center w-[12%]">Price</th>
-                      <th className="pb-2 text-right pr-8">Actions</th>
+                      <th className="pb-2 text-left pl-6" style={{ width: "28%" }}>Product Details</th>
+                      <th className="pb-2 text-center" style={{ width: "12%" }}>Category</th>
+                      <th className="pb-2 text-center" style={{ width: "13%" }}>Stocks</th>
+                      <th className="pb-2 text-center" style={{ width: "10%" }}>Unit</th>
+                      <th className="pb-2 text-center" style={{ width: "13%" }}>Status</th>
+                      <th className="pb-2 text-center" style={{ width: "12%" }}>Price</th>
+                      <th className="pb-2 text-right pr-8" style={{ width: "12%" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody className="font-bold text-slate-700">
-                    {filteredProducts.map(p => {
+                    {pagedProducts.map(p => {
                       const status = getStockStatus(p.current_stock, p.min_stocks);
                       return (
                         <tr key={p.sku} className="group hover:bg-slate-50/80 transition-all">
-                          <td className="py-4 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100 max-w-[280px]">
+                          <td className="py-3 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100" style={{ overflow: "hidden" }}>
                             <div className="flex items-center gap-4">
-                              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
+                              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
                                 {p.product_image ? (
                                   <img src={p.product_image} className="w-full h-full object-cover" alt="" />
                                 ) : (
-                                  <HiPhoto size={24} className="text-slate-200" />
+                                  <HiPhoto size={22} className="text-slate-200" />
                                 )}
                               </div>
-                              <div className="flex flex-col items-start min-w-0 overflow-hidden">
+                              <div className="flex flex-col items-start min-w-0">
                                 <span className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate w-full" title={p.name}>
                                   {p.name || "Unnamed"}
                                 </span>
-                                <div className="flex items-center gap-1.5 justify-start w-full overflow-hidden text-slate-400 text-[10px] font-black uppercase tracking-wider">
-                                  <span className="truncate max-w-[120px]" title={p.sku}>{p.sku}</span>
+                                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-black uppercase tracking-wider w-full overflow-hidden">
+                                  <span className="truncate max-w-[100px]" title={p.sku}>{p.sku}</span>
                                   {p.collection && (
                                     <>
                                       <span className="text-slate-300 flex-shrink-0">•</span>
-                                      <span className="truncate max-w-[100px]" title={p.collection}>{p.collection}</span>
+                                      <span className="truncate max-w-[80px]" title={p.collection}>{p.collection}</span>
                                     </>
                                   )}
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 text-center text-slate-500 text-sm border-y border-transparent group-hover:border-slate-100 max-w-[150px]">
-                            <p className="truncate w-full uppercase font-black text-[10px]" title={p.category}>{p.category || "---"}</p>
+                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100" style={{ overflow: "hidden" }}>
+                            <p className="truncate uppercase font-black text-[10px] text-slate-500" title={p.category}>{p.category || "---"}</p>
                           </td>
-                          <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100 min-w-[100px]">
+                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
                             <div className="flex flex-col items-center">
                               <span className="text-[14px] text-slate-900 font-black leading-none">{p.current_stock || 0}</span>
-                              <span className="text-[8px] text-slate-400 uppercase font-black mt-1 tracking-tight">Min: {p.min_stocks || 0}</span>
+                              <span className="text-[8px] text-slate-400 uppercase font-black mt-0.5 tracking-tight">Min: {p.min_stocks || 0}</span>
                             </div>
                           </td>
-                          <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100 min-w-[80px]">
+                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
                             <span className="text-[10px] text-slate-500 font-black uppercase tracking-wide">
                               {p.stock_unit || "---"}
                             </span>
                           </td>
-                          <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100 min-w-[120px]">
+                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
                             <span className={`px-4 py-1.5 rounded-full text-[10px] font-black shadow-sm tracking-tight inline-block whitespace-nowrap ${status.color}`}>
                               {status.label}
                             </span>
                           </td>
-                          <td className="py-4 text-center font-black text-[#10B981] border-y border-transparent group-hover:border-slate-100 whitespace-nowrap">
+                          <td className="py-3 text-center font-black text-[#10B981] border-y border-transparent group-hover:border-slate-100 whitespace-nowrap">
                             ₱{parseFloat(p.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="py-4 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
+                          <td className="py-3 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
                             <button
                               onClick={() => handleEditClick(p)}
                               className="w-10 h-10 bg-white text-slate-900 hover:shadow-md rounded-xl transition-all border border-slate-100 inline-flex items-center justify-center shadow-sm"
@@ -239,6 +262,28 @@ export default function SalesInventory() {
                 </table>
               )}
             </div>
+
+            {totalPages > 1 && (
+              <div className="flex-shrink-0 flex items-center justify-end gap-3 pt-4 mt-2 border-t border-slate-100">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  onClick={handlePrev}
+                  disabled={safePage === 1}
+                  className="w-9 h-9 rounded-full border border-slate-200 bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <HiChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={handleNext}
+                  disabled={safePage === totalPages}
+                  className="w-9 h-9 rounded-full border border-slate-200 bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <HiChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </section>
         </div>
       </div>

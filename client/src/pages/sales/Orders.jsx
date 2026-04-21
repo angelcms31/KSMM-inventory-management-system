@@ -155,7 +155,6 @@ export default function Orders() {
         <div className="flex justify-between items-center mb-10 px-2">
           <div>
             <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Sales Orders</h1>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Manual Order Management</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex gap-2">
@@ -290,7 +289,6 @@ export default function Orders() {
                   <input
                     required
                     type="text"
-                    placeholder="e.g. Maria Santos"
                     className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm"
                     value={form.client_name}
                     onChange={e => setForm({ ...form, client_name: e.target.value })}

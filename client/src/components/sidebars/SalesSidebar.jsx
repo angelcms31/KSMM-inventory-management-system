@@ -4,10 +4,9 @@ import axios from 'axios';
 import {
   HiOutlineHome,
   HiOutlineCube,
-  HiOutlinePresentationChartLine,
   HiOutlineLogout,
 } from "react-icons/hi";
-import { HiOutlineBuildingStorefront } from "react-icons/hi2";
+import { HiOutlineBuildingStorefront, HiOutlineShoppingCart } from "react-icons/hi2";
 import { getHashedPath } from "../../utils/hash";
 
 const SalesSidebar = () => {
@@ -24,14 +23,14 @@ const SalesSidebar = () => {
   }, []);
 
   const truncateName = (name) => {
-    return name.length > 12 ? `${name.substring(0,10)}...` : name;
+    return name.length > 12 ? `${name.substring(0, 10)}...` : name;
   };
 
   const menuItems = [
     { name: 'Home', tab: 'home' },
     { name: 'Inventory', tab: 'inventory' },
     { name: 'Warehouse', tab: 'warehouse' },
-    { name: 'Statistics', tab: 'statistics' },
+    { name: 'Sales Orders', tab: 'statistics' },
   ];
 
   const getMenuIcons = (name, size = 18) => {
@@ -39,7 +38,7 @@ const SalesSidebar = () => {
       case 'Home': return <HiOutlineHome size={size} />;
       case 'Inventory': return <HiOutlineCube size={size} />;
       case 'Warehouse': return <HiOutlineBuildingStorefront size={size} />;
-      case 'Statistics': return <HiOutlinePresentationChartLine size={size} />;
+      case 'Sales Orders': return <HiOutlineShoppingCart size={size} />;
       default: return null;
     }
   };

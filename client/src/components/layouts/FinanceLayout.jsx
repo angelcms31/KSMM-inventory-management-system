@@ -8,18 +8,15 @@ export default function FinanceLayout() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("home");
   const [pendingCompose, setPendingCompose] = useState(null);
-  const role = "finance";
-  const tabs = ["home", "purchaseorder", "inventory", "variance"];
 
- useEffect(() => {
-  const pathSegment = location.pathname.split("/").filter(Boolean).pop();
-  console.log("PATH:", location.pathname);
-  console.log("SEGMENT:", pathSegment);
-  console.log("HASHES:", tabs.map(t => ({ tab: t, hash: getHashedPath(role, t) })));
-  const matched = tabs.find(t => getHashedPath(role, t) === pathSegment);
-  console.log("MATCHED:", matched);
-  setActiveTab(matched || "home");
-}, [location.pathname]);
+  const tabs = ["home", "financedashboard", "purchaseorder", "inventory", "variance"];
+
+  useEffect(() => {
+    const pathSegment = location.pathname.split("/").filter(Boolean).pop();
+    const matched = tabs.find(t => getHashedPath("finance", t) === pathSegment)
+      || tabs.find(t => getHashedPath("sales", t) === pathSegment);
+    setActiveTab(matched || "home");
+  }, [location.pathname]);
 
   return (
     <div className="flex min-h-screen w-screen bg-gray-50 overflow-hidden text-left">
@@ -34,6 +31,5 @@ export default function FinanceLayout() {
         onComposeHandled={() => setPendingCompose(null)}
       />
     </div>
-    
   );
 }
