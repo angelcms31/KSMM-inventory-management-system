@@ -339,33 +339,42 @@ app.post("/api/add_user", async (req, res) => {
       [firstName, middleName || '', lastName, email, contactNo, gender, profileImage]
     );
 
-    const hashedPassword = await bcrypt.hash("password123", 10);
     const needsApproval = role === 'Admin' && !isHeadAdminCreator;
+    const hashedPassword = needsApproval ? null : await bcrypt.hash("password123", 10);
 
     await client.query(
       `INSERT INTO userlogin (user_account, password, user_role, user_id, failed_attempts, is_locked, is_default_password, is_approved, is_head_admin) 
-       VALUES ($1,$2,$3,$4,0,FALSE,TRUE,$5,FALSE)`,
-      [email, hashedPassword, role, pRes.rows[0].user_id, !needsApproval]
+       VALUES ($1,$2,$3,$4,0,FALSE,$5,$6,FALSE)`,
+      [email, hashedPassword, role, pRes.rows[0].user_id, !needsApproval, !needsApproval]
     );
 
     await client.query("COMMIT");
     io.emit("users:updated");
 
-    let mailContent = `<h3>Account Created!</h3><p>Hi ${firstName}, use these credentials:</p><p>User: ${email}<br>Pass: password123</p>`;
     if (needsApproval) {
-      mailContent += `<p><strong>Note:</strong> Your Admin account is pending approval from the Head Admin.</p>`;
-    } else {
-      mailContent += `<p>You will be required to change your password upon first login.</p>`;
+      await transporter.sendMail({
+        from: process.env.MY_EMAIL,
+        to: email,
+        subject: "Admin Account Pending Approval - Matthew & Melka",
+        html: `<h3>Admin Account Request Received</h3>
+               <p>Hi ${firstName}, your Admin account has been submitted for approval.</p>
+               <p>You will receive your login credentials once the Head Admin approves your account.</p>
+               <p>Please wait for further notification.</p>`
+      });
+      return res.status(201).send("Admin created and pending approval");
     }
 
     await transporter.sendMail({
       from: process.env.MY_EMAIL,
       to: email,
       subject: "Welcome to Matthew & Melka",
-      html: mailContent
+      html: `<h3>Account Created!</h3>
+             <p>Hi ${firstName}, use these credentials:</p>
+             <p>User: ${email}<br>Pass: password123</p>
+             <p>You will be required to change your password upon first login.</p>`
     });
 
-    res.status(201).send(needsApproval ? "Admin created and pending approval" : "User created successfully");
+    res.status(201).send("User created successfully");
   } catch (err) {
     await client.query("ROLLBACK");
     res.status(500).send(err.message);
@@ -448,17 +457,98 @@ app.put("/api/user/status", async (req, res) => {
 
 app.put("/api/admin/approve", async (req, res) => {
   const { userId, adminId } = req.body;
+  const client = await getPool().connect();
   try {
-    const adminCheck = await getPool().query('SELECT is_head_admin FROM userlogin WHERE user_id = $1', [adminId]);
+    const adminCheck = await client.query('SELECT is_head_admin FROM userlogin WHERE user_id = $1', [adminId]);
     if (!adminCheck.rows[0]?.is_head_admin) {
       return res.status(403).json({ message: 'Only the Head Admin can approve Admin accounts.' });
     }
-    await getPool().query('UPDATE userlogin SET is_approved = TRUE WHERE user_id = $1', [userId]);
+
+    const userRes = await client.query(
+      `SELECT p.firstname, p.email, u.user_account 
+       FROM personaldata p 
+       JOIN userlogin u ON p.user_id = u.user_id 
+       WHERE p.user_id = $1`,
+      [userId]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const { firstname, email } = userRes.rows[0];
+    const hashedPassword = await bcrypt.hash("password123", 10);
+
+    await client.query('BEGIN');
+    await client.query(
+      'UPDATE userlogin SET is_approved = TRUE, password = $1, is_default_password = TRUE WHERE user_id = $2',
+      [hashedPassword, userId]
+    );
     await createAuditLog(adminId, `Approved Admin Account: ID ${userId}`, 'Head Admin');
+    await client.query('COMMIT');
+
     io.emit("users:updated");
-    res.send("Admin account approved");
+
+    await transporter.sendMail({
+      from: process.env.MY_EMAIL,
+      to: email,
+      subject: "Admin Account Approved - Matthew & Melka",
+      html: `<h3>Your Admin Account Has Been Approved!</h3>
+             <p>Hi ${firstname}, your Admin account has been approved by the Head Admin.</p>
+             <p>You can now log in using the following credentials:</p>
+             <p><strong>Username:</strong> ${email}<br><strong>Password:</strong> password123</p>
+             <p>You will be required to change your password upon first login.</p>`
+    });
+
+    res.send("Admin account approved and credentials sent");
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).send(err.message);
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/api/admin/reject/:id", async (req, res) => {
+  const userId = req.params.id;
+  const { adminId } = req.body;
+  const client = await getPool().connect();
+
+  try {
+    const adminCheck = await client.query(
+      'SELECT is_head_admin FROM userlogin WHERE user_id = $1',
+      [adminId]
+    );
+
+    if (!adminCheck.rows[0]?.is_head_admin) {
+      return res.status(403).json({ message: 'Only the Head Admin can reject Admin accounts.' });
+    }
+
+    const userCheck = await client.query(
+      'SELECT firstname, lastname FROM personaldata WHERE user_id = $1',
+      [userId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const targetName = `${userCheck.rows[0].firstname} ${userCheck.rows[0].lastname}`;
+
+    await client.query('BEGIN');
+    await client.query('DELETE FROM userlogin WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM personaldata WHERE user_id = $1', [userId]);
+    await createAuditLog(adminId, `Rejected Admin Request: ${targetName} (ID ${userId})`, 'Head Admin');
+    await client.query('COMMIT');
+
+    io.emit("users:updated");
+    res.send("Admin account request rejected and deleted successfully.");
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).send(err.message);
+  } finally {
+    client.release();
   }
 });
 
@@ -474,7 +564,6 @@ app.put("/api/user/unlock", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
-
 app.get("/api/artisans", async (req, res) => {
   try {
     const { search = "", page = 1, limit = 9 } = req.query;

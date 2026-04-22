@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import {
   HiOutlineHome,
@@ -13,15 +13,18 @@ import {
 } from "react-icons/hi";
 import { getHashedPath } from "../../utils/hash";
 
-const FinanceSidebar = ({ activeTab }) => {
+const FinanceSidebar = ({ activeTab: propActiveTab }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userName, setUserName] = useState("User");
   const [logsOpen, setLogsOpen] = useState(false);
   const [mobileLogsOpen, setMobileLogsOpen] = useState(false);
+  const [internalActiveTab, setInternalActiveTab] = useState("home");
+  
   const navigate = useNavigate();
+  const { "*": splat } = useParams();
   const role = "finance";
 
-  const logSubTabs = ['variance'];
+  const logSubTabs = ['audit', 'variance'];
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -31,8 +34,16 @@ const FinanceSidebar = ({ activeTab }) => {
   }, []);
 
   useEffect(() => {
-    if (logSubTabs.includes(activeTab)) setLogsOpen(true);
-  }, [activeTab]);
+    const allTabs = ['home', 'inventory', 'purchaseorder', 'audit', 'variance'];
+    const currentTab = allTabs.find(t => getHashedPath(role, t) === splat);
+    
+    if (currentTab) {
+      setInternalActiveTab(currentTab);
+      if (logSubTabs.includes(currentTab)) setLogsOpen(true);
+    } else if (propActiveTab) {
+      setInternalActiveTab(propActiveTab);
+    }
+  }, [splat, propActiveTab]);
 
   const truncateName = (name) => name.length > 12 ? `${name.substring(0, 10)}...` : name;
 
@@ -43,6 +54,7 @@ const FinanceSidebar = ({ activeTab }) => {
   ];
 
   const logSubItems = [
+    { id: 'audit', name: 'Audit Logs', icon: <HiOutlineClipboardList size={16} /> },
     { id: 'variance', name: 'Variance Logs', icon: <HiOutlineBeaker size={16} /> },
   ];
 
@@ -60,8 +72,6 @@ const FinanceSidebar = ({ activeTab }) => {
         await axios.post("http://localhost:5000/api/logout", { userId, role: userRole });
       }
       localStorage.clear();
-      window.history.pushState(null, null, window.location.href);
-      window.onpopstate = () => window.history.go(1);
       navigate("/", { replace: true });
       window.location.reload();
     } catch (err) {
@@ -70,12 +80,12 @@ const FinanceSidebar = ({ activeTab }) => {
     }
   };
 
-  const isLogsActive = logSubTabs.includes(activeTab);
+  const isLogsActive = logSubTabs.includes(internalActiveTab);
 
   return (
     <>
       <div className="hidden lg:flex w-[240px] h-screen bg-[#262221] text-white flex-col sticky top-0 left-0 font-sans overflow-hidden border-r border-white/5">
-        <div className="pt-10 pb-8 px-6">
+        <div className="pt-10 pb-8 px-6 text-left">
           <h3 className="text-[18px] font-bold leading-tight tracking-tight capitalize">
             Welcome back,<br />{truncateName(userName)}!
           </h3>
@@ -87,7 +97,7 @@ const FinanceSidebar = ({ activeTab }) => {
         <nav className="flex-grow mt-2">
           <ul className="space-y-1">
             {menuItems.map((item) => {
-              const isActive = activeTab === item.id;
+              const isActive = internalActiveTab === item.id;
               return (
                 <li key={item.id} className="relative pl-3">
                   <button
@@ -108,7 +118,7 @@ const FinanceSidebar = ({ activeTab }) => {
               );
             })}
 
-            <li className="relative pl-3">
+            <li className="relative pl-3 text-left">
               <button
                 onClick={() => setLogsOpen(prev => !prev)}
                 className={`w-full group flex items-center justify-between py-2.5 px-4 transition-all duration-300 rounded-l-full cursor-pointer outline-none ${
@@ -130,7 +140,7 @@ const FinanceSidebar = ({ activeTab }) => {
               {logsOpen && (
                 <ul className="mt-1 ml-4 space-y-0.5 border-l border-white/10 pl-3">
                   {logSubItems.map((sub) => {
-                    const isSubActive = activeTab === sub.id;
+                    const isSubActive = internalActiveTab === sub.id;
                     return (
                       <li key={sub.id}>
                         <button
@@ -183,7 +193,7 @@ const FinanceSidebar = ({ activeTab }) => {
                   key={sub.id}
                   onClick={() => handleTabClick(sub.id)}
                   className={`w-full flex items-center gap-3 p-4 text-[14px] font-medium transition-colors ${
-                    activeTab === sub.id ? 'bg-white text-black' : 'text-gray-400 hover:bg-white/5'
+                    internalActiveTab === sub.id ? 'bg-white text-black' : 'text-gray-400 hover:bg-white/5'
                   }`}
                 >
                   {sub.icon}
@@ -195,7 +205,7 @@ const FinanceSidebar = ({ activeTab }) => {
 
           <div className="flex items-center justify-around px-2 py-2">
             {menuItems.map((item) => {
-              const isActive = activeTab === item.id;
+              const isActive = internalActiveTab === item.id;
               return (
                 <button
                   key={item.id}

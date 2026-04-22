@@ -34,33 +34,25 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
 
   useEffect(() => {
     if (!pendingCompose) return;
-
     const rawBody = pendingCompose.body || "";
     setComposeTo(pendingCompose.to || "");
     setComposeSubject(pendingCompose.subject || "");
     setShowCompose(true);
     setComposeMinimized(false);
-
     if (onComposeHandled) onComposeHandled();
-
     setTimeout(() => {
       if (bodyRef.current) {
-        const escaped = rawBody
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/\n/g, "<br>");
+        const escaped = rawBody.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
         bodyRef.current.innerHTML = escaped;
       }
     }, 80);
-  }, [pendingCompose]);
+  }, [pendingCompose, onComposeHandled]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "Just now";
     const now = new Date();
     const past = new Date(timestamp);
-    const diffInMs = now - past;
-    const diffInMins = Math.floor(diffInMs / 60000);
+    const diffInMins = Math.floor((now - past) / 60000);
     if (diffInMins < 1) return "Just now";
     if (diffInMins < 60) return `${diffInMins} mins ago`;
     const diffInHours = Math.floor(diffInMins / 60);
@@ -70,9 +62,9 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
 
   const getStatusStyle = (action) => {
     const act = action?.toLowerCase() || '';
-    if (act.includes('login') || act.includes('create') || act.includes('approve')) return "bg-green-600";
-    if (act.includes('update') || act.includes('edit')) return "bg-blue-600";
-    if (act.includes('logout') || act.includes('delete') || act.includes('deactivate')) return "bg-red-600";
+    if (act.includes('login') || act.includes('create') || act.includes('approve') || act.includes('activat')) return "bg-green-600";
+    if (act.includes('update') || act.includes('edit') || act.includes('unlock')) return "bg-blue-600";
+    if (act.includes('logout') || act.includes('delete') || act.includes('deactivate') || act.includes('reject') || act.includes('lock')) return "bg-red-600";
     return "bg-yellow-600";
   };
 
@@ -80,8 +72,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
     const now = new Date();
-    const isToday = d.toDateString() === now.toDateString();
-    if (isToday) return d.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
+    if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
     return d.toLocaleDateString("en-PH", { month: "short", day: "numeric" });
   };
 
@@ -89,6 +80,11 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     const match = from?.match(/^(.*?)\s*<(.+)>$/);
     if (match) return match[1].trim().replace(/"/g, '') || match[2];
     return from || '';
+  };
+
+  const navigateToAudit = () => {
+    const logPath = getHashedPath(userRole, 'audit');
+    navigate(`/dashboard/${logPath}`);
   };
 
   const fetchActivities = async () => {
@@ -111,23 +107,15 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           const hasActivePO = activeOrderMatIds.includes(parseInt(m.material_id));
           return isLow && !hasActivePO;
         })
-        .map(m => ({
-          id: m.material_id,
-          name: m.material_name,
-          current: m.stock_quantity,
-          threshold: m.reorder_threshold,
-        }));
+        .map(m => ({ id: m.material_id, name: m.material_name, current: m.stock_quantity, threshold: m.reorder_threshold }));
 
       setLowStockAlerts(lowStock);
-    } catch {
-      setActivities([]);
-    }
+    } catch { setActivities([]); }
   };
 
   const handleTakeAction = (materialId) => {
     setShowNotifications(false);
-    const hashedPath = getHashedPath("finance", "purchaseorder");
-    navigate(`/dashboard/${hashedPath}?material_id=${materialId}`, { replace: true });
+    navigate(`/dashboard/${getHashedPath("finance", "purchaseorder")}?material_id=${materialId}`, { replace: true });
   };
 
   const checkGmailStatus = async () => {
@@ -137,10 +125,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
       setGmailConnected(res.data.connected);
       if (res.data.connected) fetchGmailMessages();
       else setGmailLoading(false);
-    } catch {
-      setGmailConnected(false);
-      setGmailLoading(false);
-    }
+    } catch { setGmailConnected(false); setGmailLoading(false); }
   };
 
   const fetchGmailMessages = async () => {
@@ -152,10 +137,8 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
       ]);
       setMessages(inboxRes.data || []);
       setSentMessages(sentRes.data || []);
-    } catch {
-    } finally {
-      setGmailLoading(false);
-    }
+    } catch {}
+    finally { setGmailLoading(false); }
   };
 
   const handleConnect = () => {
@@ -184,16 +167,8 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   }, []);
 
   const handleAttachClick = () => fileInputRef.current?.click();
-
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    setAttachments((prev) => [...prev, ...files]);
-    e.target.value = "";
-  };
-
-  const removeAttachment = (index) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
+  const handleFileChange = (e) => { setAttachments(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = ""; };
+  const removeAttachment = (index) => setAttachments(prev => prev.filter((_, i) => i !== index));
 
   const handleDiscard = useCallback(() => {
     setShowCompose(false);
@@ -216,18 +191,13 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
       formData.append("to", composeTo);
       formData.append("subject", composeSubject);
       formData.append("body", bodyHTML);
-      attachments.forEach((file) => formData.append("attachments", file));
-      await axios.post("http://localhost:5000/api/gmail/send", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      attachments.forEach(file => formData.append("attachments", file));
+      await axios.post("http://localhost:5000/api/gmail/send", formData, { headers: { "Content-Type": "multipart/form-data" } });
       setSendSuccess(true);
       fetchGmailMessages();
       setTimeout(() => { handleDiscard(); }, 2000);
-    } catch {
-      alert("Failed to send email.");
-    } finally {
-      setSending(false);
-    }
+    } catch { alert("Failed to send email."); }
+    finally { setSending(false); }
   };
 
   useEffect(() => {
@@ -251,7 +221,6 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     <>
       <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
         <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 z-40 overflow-hidden">
-
           {showNotifications && (
             <div className="absolute inset-0 bg-[#262221] z-50 flex flex-col">
               <div className="p-5 flex items-center justify-between border-b border-white/5">
@@ -278,7 +247,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                   </div>
                 ) : (
                   <div className="p-4 space-y-3">
-                    {lowStockAlerts.map((alert) => (
+                    {lowStockAlerts.map(alert => (
                       <div
                         key={alert.id}
                         onClick={() => handleTakeAction(alert.id)}
@@ -316,7 +285,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                   src={profilePic ? (profilePic.startsWith('data:') || profilePic.startsWith('http') ? profilePic : `http://localhost:5000${profilePic}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`}
                   alt="User"
                   className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`; }}
+                  onError={e => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`; }}
                 />
               </div>
               <div>
@@ -353,7 +322,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                   <p className="text-[11px] text-gray-600 text-center py-4 italic">No activity yet</p>
                 )}
               </div>
-              <button onClick={() => navigate('/admin/audit-logs')} className="text-[10px] text-gray-500 mt-6 hover:text-white font-bold transition-colors uppercase tracking-widest">
+              <button onClick={navigateToAudit} className="text-[10px] text-gray-500 mt-6 hover:text-white font-bold transition-colors uppercase tracking-widest">
                 VIEW ALL
               </button>
             </div>
@@ -368,11 +337,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                 </div>
                 {gmailConnected && (
                   <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => { setShowCompose(true); setComposeMinimized(false); }}
-                      className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors"
-                      title="Compose"
-                    >
+                    <button onClick={() => { setShowCompose(true); setComposeMinimized(false); }} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Compose">
                       <HiOutlinePaperAirplane size={13} className="text-gray-400" />
                     </button>
                     <button onClick={fetchGmailMessages} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Refresh">
@@ -382,11 +347,11 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {gmailLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="flex flex-col items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                       <p className="text-gray-600 text-[10px] uppercase font-black tracking-widest">Loading...</p>
                     </div>
                   </div>
@@ -396,10 +361,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                       <HiOutlinePaperAirplane className="text-gray-600 rotate-90" size={20} />
                     </div>
                     <p className="text-gray-400 text-[11px] font-bold mb-1">Gmail Disconnected</p>
-                    <button
-                      onClick={handleConnect}
-                      className="w-full text-[10px] font-black uppercase tracking-widest bg-white text-black py-2.5 rounded-lg hover:bg-gray-200 transition-colors shadow-lg"
-                    >
+                    <button onClick={handleConnect} className="w-full text-[10px] font-black uppercase tracking-widest bg-white text-black py-2.5 rounded-lg hover:bg-gray-200 transition-colors shadow-lg">
                       Connect Gmail
                     </button>
                   </div>
@@ -409,14 +371,14 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {(viewMode === 'inbox' ? messages : sentMessages).map((msg) => (
+                    {(viewMode === 'inbox' ? messages : sentMessages).map(msg => (
                       <div key={msg.id} onClick={() => setSelected(msg)} className={`px-2 py-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 ${msg.isUnread ? 'bg-white/[0.03]' : ''}`}>
                         <div className="flex items-start gap-2">
                           <img
                             src={msg.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'S')}&background=random&color=fff&size=40&bold=true`}
                             alt={msg.senderName}
                             className="w-7 h-7 rounded-full shrink-0 object-cover mt-0.5"
-                            onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || '?')}&background=random&color=fff&size=40&bold=true`; }}
+                            onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || '?')}&background=random&color=fff&size=40&bold=true`; }}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-0.5">
@@ -463,74 +425,25 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                       <span className="text-gray-500 font-medium">From:</span>{' '}
                       <span className="text-white">{selected.from}</span>
                     </div>
-                    <div
-                      className="text-[12px] text-gray-300 leading-relaxed whitespace-pre-wrap"
-                      dangerouslySetInnerHTML={{ __html: selected.snippet || "(No content)" }}
-                    />
+                    <div className="text-[12px] text-gray-300 leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: selected.snippet || "(No content)" }} />
                   </div>
                 </div>
               )}
             </div>
           </div>
-
-          <style>{`
-            [contenteditable]:empty:before {
-              content: attr(data-placeholder);
-              color: #4b5563;
-              pointer-events: none;
-            }
-            .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-            .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-            .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
-          `}</style>
         </div>
       </div>
-
-      <button
-        onClick={() => { setMobileOpen(true); setShowNotifications(true); }}
-        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center shadow-lg"
-      >
-        <div className="relative">
-          <HiOutlineBell size={18} className="text-gray-300" />
-          {lowStockAlerts.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border border-[#262221] flex items-center justify-center">
-              <span className="text-[7px] font-black text-white">{lowStockAlerts.length > 9 ? '9+' : lowStockAlerts.length}</span>
-            </span>
-          )}
-        </div>
-      </button>
-
-      {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex" onClick={() => setMobileOpen(false)}>
-          <div className="flex-1 bg-black/50" />
-          <div className="w-[280px] h-full overflow-y-auto text-left" onClick={(e) => e.stopPropagation()} style={{ animation: 'slideInRight 0.25s ease-out' }}>
-            <div className="relative h-full">
-              <button onClick={() => setMobileOpen(false)} className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">
-                <HiOutlineX size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showCompose && (
         <div
           className={`fixed z-[9999] w-[310px] rounded-t-2xl overflow-hidden shadow-2xl border border-white/10 transition-all duration-300 ${composeMinimized ? 'h-12' : 'h-[450px]'}`}
           style={{ bottom: 0, right: 288, boxShadow: '0 -8px 40px rgba(0,0,0,0.6)' }}
         >
-          <div
-            className="bg-[#404040] flex items-center justify-between px-4 py-3 cursor-pointer select-none"
-            onClick={() => setComposeMinimized(m => !m)}
-          >
+          <div className="bg-[#404040] flex items-center justify-between px-4 py-3 cursor-pointer select-none" onClick={() => setComposeMinimized(m => !m)}>
             <span className="text-[13px] font-semibold text-white tracking-tight">New Message</span>
-            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => setComposeMinimized(m => !m)} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10">
-                <HiMinus size={15} />
-              </button>
-              <button onClick={handleDiscard} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10">
-                <HiOutlineX size={15} />
-              </button>
+            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setComposeMinimized(m => !m)} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiMinus size={15} /></button>
+              <button onClick={handleDiscard} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiOutlineX size={15} /></button>
             </div>
           </div>
 
@@ -538,93 +451,49 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
             <div className="bg-[#1e1b1a] flex flex-col h-[calc(100%-48px)]">
               <div className="border-b border-white/10 px-4 py-2.5 flex items-center gap-2">
                 <span className="text-[11px] text-gray-500 shrink-0">To</span>
-                <input
-                  type="text"
-                  value={composeTo}
-                  onChange={(e) => setComposeTo(e.target.value)}
-                  className="flex-1 bg-transparent text-[12px] text-gray-200 outline-none"
-                  placeholder="Recipients"
-                />
+                <input type="text" value={composeTo} onChange={e => setComposeTo(e.target.value)} className="flex-1 bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Recipients" />
               </div>
               <div className="border-b border-white/10 px-4 py-2.5">
-                <input
-                  type="text"
-                  value={composeSubject}
-                  onChange={(e) => setComposeSubject(e.target.value)}
-                  className="w-full bg-transparent text-[12px] text-gray-200 outline-none"
-                  placeholder="Subject"
-                />
+                <input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} className="w-full bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Subject" />
               </div>
-              <div
-                ref={bodyRef}
-                contentEditable
-                suppressContentEditableWarning
-                onKeyUp={handleBodyKeyUp}
-                className="flex-1 px-4 py-3 overflow-y-auto text-[12px] text-gray-300 outline-none custom-scrollbar"
-                style={{ minHeight: 0 }}
-                data-placeholder="Write your message..."
-              />
+              <div ref={bodyRef} contentEditable suppressContentEditableWarning onKeyUp={handleBodyKeyUp} className="flex-1 px-4 py-3 overflow-y-auto text-[12px] text-gray-300 outline-none custom-scrollbar" style={{ minHeight: 0 }} data-placeholder="Write your message..." />
               {attachments.length > 0 && (
                 <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-white/5 pt-2">
                   {attachments.map((file, i) => (
                     <div key={i} className="flex items-center gap-1 bg-white/10 rounded-full px-2.5 py-1 text-[10px] text-gray-300 max-w-[140px]">
                       <span className="truncate">{file.name}</span>
-                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5">
-                        <HiOutlineX size={10} />
-                      </button>
+                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5"><HiOutlineX size={10} /></button>
                     </div>
                   ))}
                 </div>
               )}
-              {sendSuccess && (
-                <div className="px-4 pb-1">
-                  <p className="text-[11px] text-green-400 font-medium">✓ Message sent!</p>
-                </div>
-              )}
+              {sendSuccess && <div className="px-4 pb-1"><p className="text-[11px] text-green-400 font-medium">✓ Message sent!</p></div>}
               <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
-                <button
-                  onClick={handleSend}
-                  disabled={sending}
-                  className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] text-white text-[12px] font-semibold px-5 py-2 rounded-full transition-colors active:scale-95 disabled:opacity-50"
-                >
+                <button onClick={handleSend} disabled={sending} className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] text-white text-[12px] font-semibold px-5 py-2 rounded-full transition-colors active:scale-95 disabled:opacity-50">
                   {sending ? "Sending..." : "Send"}
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                  </svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
                 </button>
                 <div className="flex items-center gap-0.5">
-                  <button
-                    onMouseDown={(e) => { e.preventDefault(); applyFormat('bold'); }}
-                    className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500'}`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" /></svg>
-                  </button>
-                  <button
-                    onMouseDown={(e) => { e.preventDefault(); applyFormat('italic'); }}
-                    className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500'}`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></svg>
-                  </button>
-                  <button
-                    onMouseDown={(e) => { e.preventDefault(); applyFormat('underline'); }}
-                    className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500'}`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></svg>
-                  </button>
-                  <button onClick={handleAttachClick} className="p-1.5 rounded-full text-gray-500 hover:bg-white/5 transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
-                  </button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('bold'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" /></svg></button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('italic'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></svg></button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('underline'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></svg></button>
+                  <button onClick={handleAttachClick} className="p-1.5 rounded-full text-gray-500 hover:bg-white/5 transition-colors"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg></button>
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
-                  <button onClick={handleDiscard} className="p-1.5 rounded-full text-gray-500 hover:text-red-400 transition-colors">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg>
-                  </button>
+                  <button onClick={handleDiscard} className="p-1.5 rounded-full text-gray-500 hover:text-red-400 transition-colors"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg></button>
                 </div>
               </div>
             </div>
           )}
         </div>
       )}
+
+      <style>{`
+        [contenteditable]:empty:before { content: attr(data-placeholder); color: #4b5563; pointer-events: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+      `}</style>
     </>
   );
 };

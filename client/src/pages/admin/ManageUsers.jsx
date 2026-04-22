@@ -108,14 +108,9 @@ const ManageUsers = () => {
     const contactNo = (u.contact_no || '').toLowerCase();
     const idPrefix = u.is_head_admin ? "ha" : (u.user_role || "us").substring(0, 2).toLowerCase();
     const displayId = `${idPrefix}-${u.permanent_id || '0'}`;
-    const fullNameWithMiddle = [firstName, middleName, lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
-    const fullNameNoMiddle = `${firstName} ${lastName}`.trim();
-    const lastFirst = `${lastName} ${firstName}`.trim();
-    return (
-      firstName.includes(term) || middleName.includes(term) || lastName.includes(term) ||
-      email.includes(term) || contactNo.includes(term) || displayId.includes(term) ||
-      fullNameWithMiddle.includes(term) || fullNameNoMiddle.includes(term) || lastFirst.includes(term)
-    );
+    const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
+    return firstName.includes(term) || middleName.includes(term) || lastName.includes(term) ||
+           email.includes(term) || contactNo.includes(term) || displayId.includes(term) || fullName.includes(term);
   });
 
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
@@ -139,20 +134,13 @@ const ManageUsers = () => {
     }
   };
 
-  const validateTextInput = (value) => {
-    const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F018}-\u{1F270}\u{238C}-\u{2454}\u{20D0}-\u{20FF}\u{FE0F}]/gu;
-    return !emojiRegex.test(value);
-  };
-
   const handleNameChange = (field, value, isEdit = false) => {
     if (!/^[a-zA-Z\s]*$/.test(value)) return;
-    if (!validateTextInput(value)) { showAlert("Emoticons are not allowed.", 'error'); return; }
     if (isEdit) setSelectedUser({ ...selectedUser, [field]: value });
     else setFormData({ ...formData, [field]: value });
   };
 
   const handleEmailChange = (value, isEdit = false) => {
-    if (!validateTextInput(value)) { showAlert("Emoticons are not allowed.", 'error'); return; }
     if (isEdit) setSelectedUser({ ...selectedUser, email: value });
     else setFormData({ ...formData, email: value });
   };
@@ -200,8 +188,6 @@ const ManageUsers = () => {
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
-    if (!selectedUser.email.includes('@')) { showAlert("Email must contain @.", 'error'); return; }
-    if (selectedUser.contactNo.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
     try {
       await axios.put("http://localhost:5000/api/user/update", {
         firstName: selectedUser.firstName, middleName: selectedUser.middleName,
@@ -223,7 +209,7 @@ const ManageUsers = () => {
       await axios.put("http://localhost:5000/api/user/unlock", {
         userId: user.user_id,
         adminId: localStorage.getItem("user_id"),
-        adminRole: localStorage.getItem("user_role") || localStorage.getItem("role")
+        adminRole: localStorage.getItem("userRole")
       });
       fetchUsers();
       setActiveMenu(null);
@@ -241,6 +227,19 @@ const ManageUsers = () => {
       showAlert("Admin account approved!", 'success');
     } catch (err) {
       showAlert(err.response?.data?.message || "Approval failed.", 'error');
+    }
+  };
+
+  const handleRejectAdmin = async (user) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/admin/reject/${user.user_id}`, {
+        data: { adminId: localStorage.getItem("user_id") }
+      });
+      fetchUsers();
+      setActiveMenu(null);
+      showAlert("Admin request rejected and deleted.", 'success');
+    } catch (err) {
+      showAlert("Error rejecting request.", 'error');
     }
   };
 
@@ -276,7 +275,6 @@ const ManageUsers = () => {
 
   return (
     <div className="w-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden text-left" onClick={() => setActiveMenu(null)}>
-
       <AlertDialog alert={alert} onClose={closeAlert} />
 
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 mb-3 flex gap-4 items-center">
@@ -345,30 +343,36 @@ const ManageUsers = () => {
                   </button>
 
                   {activeMenu === index && (
-                    <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-44 py-1 text-[11px] font-bold">
+                    <div className="absolute top-11 right-4 bg-white border rounded-lg shadow-xl z-30 w-48 py-2 text-[11px] font-bold overflow-hidden" 
+                         style={{ borderRadius: '1rem', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
                       {isLocked ? (
-                        <button onClick={(e) => { e.stopPropagation(); handleUnlock(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-green-600">
+                        <button onClick={(e) => { e.stopPropagation(); handleUnlock(user); }} className="w-full text-left px-4 py-2 hover:bg-emerald-50 text-emerald-600">
                           Unlock & Activate
                         </button>
                       ) : (
                         <>
-                          {user.user_role === 'Admin' && !isApproved && (
-                            <button onClick={(e) => { e.stopPropagation(); handleApproveAdmin(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-blue-600">
-                              Approve Admin
-                            </button>
-                          )}
-                          <button onClick={(e) => { e.stopPropagation(); handleEditClick(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">
-                            Update Information
-                          </button>
-                          {String(user.user_id) !== String(localStorage.getItem("user_id")) && (
+                          {user.user_role === 'Admin' && !isApproved ? (
                             <>
-                              <div className="border-t"></div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); toggleStatus(user); }}
-                                className={`w-full text-left px-4 py-2 hover:bg-gray-50 ${userStatus === 'Active' ? 'text-red-500' : 'text-green-600'}`}
-                              >
-                                {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
+                              <button onClick={(e) => { e.stopPropagation(); handleApproveAdmin(user); }} className="w-full text-left px-4 py-2 hover:bg-blue-50 text-blue-600 font-bold">
+                                Approve Admin
                               </button>
+                              <button onClick={(e) => { e.stopPropagation(); handleRejectAdmin(user); }} className="w-full text-left px-4 py-2 hover:bg-rose-50 text-rose-600 font-bold border-t border-gray-100">
+                                Reject Request
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); handleEditClick(user); }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-slate-700">
+                                Update Information
+                              </button>
+                              {String(user.user_id) !== String(localStorage.getItem("user_id")) && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleStatus(user); }}
+                                  className={`w-full text-left px-4 py-2 hover:bg-gray-50 border-t border-gray-100 ${userStatus === 'Active' ? 'text-rose-500' : 'text-emerald-600'}`}
+                                >
+                                  {userStatus === 'Active' ? 'Deactivate Account' : 'Activate Account'}
+                                </button>
+                              )}
                             </>
                           )}
                         </>
@@ -389,8 +393,6 @@ const ManageUsers = () => {
                       <h3 className="font-bold text-sm text-black truncate" title={fullName}>{fullName}</h3>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                         <p className="text-[#9CA3AF] text-[10px] font-black uppercase tracking-wider">{isHeadAdmin ? "Head Admin" : user.user_role}</p>
-                        {isLocked && <span className="bg-yellow-400 text-black text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Locked</span>}
-                        {userStatus === 'Deactivated' && <span className="bg-[#EF4444] text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">Deactivated</span>}
                         {user.user_role === 'Admin' && !isApproved && (
                           <span className="bg-blue-100 text-blue-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Pending</span>
                         )}
@@ -421,14 +423,6 @@ const ManageUsers = () => {
                 </div>
               );
             })}
-
-            {currentUsers.length === 0 && (
-              <div className="col-span-1 sm:col-span-2 lg:col-span-3 flex flex-col items-center justify-center py-20 text-gray-400">
-                <HiOutlineSearch size={48} className="mb-2 opacity-20" />
-                <p className="text-lg font-bold">No user found</p>
-                <p className="text-sm">Try searching for a different name or ID</p>
-              </div>
-            )}
           </div>
         </section>
       </div>
