@@ -14,7 +14,7 @@ export default function ProductionLayout() {
   const [activeTab, setActiveTab] = useState("home");
   const role = "production";
 
-  const tabs = ["home", "artisan", "inventory", "raw-materials"]; 
+  const tabs = ["home", "artisan", "inventory", "rawmaterials"]; 
 
   useEffect(() => {
     const cleanSplat = splat ? splat.replace(/^\/|\/$/g, '') : "";
@@ -26,7 +26,7 @@ export default function ProductionLayout() {
     switch (activeTab) {
       case "home": return <MainDashboard />;
       case "artisan": return <Artisan />;
-      case "raw-materials": return <RawMaterials />;
+      case "rawmaterials": return <RawMaterials />;
       case "inventory": return <Inventory />;
       default: return <MainDashboard />;
     }
