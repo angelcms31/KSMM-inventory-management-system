@@ -41,6 +41,14 @@ const createAuditLog = async (userId, action, role) => {
   }
 };
 
+const createTransaction = async (client, { ref, type, category, desc, amount, status, sourceTable, sourceId, userId }) => {
+    await client.query(
+        `INSERT INTO transactions (reference_no, transaction_type, category, description, amount, status, source_table, source_id, user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [ref, type, category, desc, amount, status || 'Pending', sourceTable, sourceId, userId]
+    );
+};
+
 const checkUserDuplicate = async (email, contactNo, excludeId = null) => {
   const pool = getPool();
 
@@ -891,7 +899,7 @@ app.post("/api/sales_orders", async (req, res) => {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const stockRes = await client.query("SELECT current_stock, name FROM finishedgoods WHERE sku = $1", [sku]);
+    const stockRes = await client.query("SELECT current_stock, name, selling_price FROM finishedgoods WHERE sku = $1", [sku]);
     if (stockRes.rows.length === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Product not found." });
@@ -908,9 +916,22 @@ app.post("/api/sales_orders", async (req, res) => {
       [client_name, platform, courier, sku, orderedQty, order_date, user_id]
     );
     await client.query("UPDATE finishedgoods SET current_stock = current_stock - $1 WHERE sku = $2", [orderedQty, sku]);
+    const totalAmount = orderedQty * Number(stockRes.rows[0].selling_price);
+    await createTransaction(client, {
+      ref: `SL-${orderRes.rows[0].order_id}`,
+      type: 'Revenue',
+      category: 'Product Sale',
+      desc: `Sale of ${stockRes.rows[0].name} (${orderedQty} units)`,
+      amount: totalAmount,
+      status: 'Completed',
+      sourceTable: 'sales_orders',
+      sourceId: orderRes.rows[0].order_id,
+      userId: user_id
+    });
     await client.query("COMMIT");
     io.emit("sales_orders:updated");
     io.emit("products:updated");
+    io.emit("transactions:updated");
     res.status(201).json(orderRes.rows[0]);
   } catch (err) {
     await client.query("ROLLBACK");
@@ -963,18 +984,55 @@ app.get("/api/all_orders", async (req, res) => {
 
 app.post("/api/create_order", async (req, res) => {
   const { supplier_id, material_id, ordered_quantity, expected_delivery, user_id, status } = req.body;
+  const client = await getPool().connect();
+
   try {
-    const matRes = await getPool().query('SELECT cost_per_unit FROM material WHERE material_id = $1', [material_id]);
+    await client.query("BEGIN");
+
+    const matRes = await client.query(
+      "SELECT cost_per_unit, material_name FROM material WHERE material_id = $1", 
+      [material_id]
+    );
+    
     const costPerUnit = matRes.rows.length > 0 ? Number(matRes.rows[0].cost_per_unit) : 0;
+    const materialName = matRes.rows[0]?.material_name || "Material";
     const computedTotal = costPerUnit * parseInt(ordered_quantity || 0);
-    const newOrder = await getPool().query(
-      `INSERT INTO purchaseorder (supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status, order_date) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,
+
+    const newOrder = await client.query(
+      `INSERT INTO purchaseorder (supplier_id, material_id, ordered_quantity, total_amount, expected_delivery, user_id, status, order_date) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING *`,
       [supplier_id, material_id, ordered_quantity, computedTotal, expected_delivery, user_id, status || 'Pending']
     );
+
+    const poId = newOrder.rows[0].assignment_id;
+
+    await client.query(
+      `INSERT INTO transactions (reference_no, transaction_type, category, description, amount, status, source_table, source_id, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        `PO-${poId}`, 
+        'Expense', 
+        'Material Procurement', 
+        `Purchase of ${materialName} (${ordered_quantity} units)`, 
+        computedTotal, 
+        'Pending', 
+        'purchaseorder', 
+        poId, 
+        user_id
+      ]
+    );
+
+    await client.query("COMMIT");
+
     io.emit("purchase_orders:updated");
+    io.emit("transactions:updated");
+
     res.json(newOrder.rows[0]);
   } catch (err) {
+    await client.query("ROLLBACK");
     res.status(500).send(err.message);
+  } finally {
+    client.release();
   }
 });
 
@@ -1078,6 +1136,86 @@ app.get("/api/low_stock_logs", async (req, res) => {
   } catch (err) {
     res.status(500).send(err.message);
   }
+});
+
+app.get("/api/finance/transactions", async (req, res) => {
+    try {
+        const { search, type, month, year, page = 1 } = req.query;
+        const limit = 10;
+        const offset = (page - 1) * limit;
+
+        let conditions = ["1=1"];
+        let params = [];
+        let i = 1;
+
+        if (search) {
+            conditions.push(`(t.reference_no ILIKE $${i} OR t.description ILIKE $${i})`);
+            params.push(`%${search}%`);
+            i++;
+        }
+        if (type && type !== 'All') {
+            conditions.push(`t.transaction_type = $${i}`);
+            params.push(type);
+            i++;
+        }
+        if (month && year) {
+            conditions.push(`EXTRACT(MONTH FROM t.transaction_date) = $${i} AND EXTRACT(YEAR FROM t.transaction_date) = $${i+1}`);
+            params.push(month, year);
+            i += 2;
+        }
+
+        const query = `
+            SELECT t.*, p.firstname, p.lastname 
+            FROM transactions t
+            LEFT JOIN personal_data p ON t.user_id = p.user_id
+            WHERE ${conditions.join(" AND ")}
+            ORDER BY t.transaction_date DESC
+            LIMIT $${i} OFFSET $${i+1}
+        `;
+
+        const result = await getPool().query(query, [...params, limit, offset]);
+        
+        const stats = await getPool().query(`
+            SELECT 
+                SUM(CASE WHEN transaction_type = 'Revenue' THEN amount ELSE 0 END) as total_revenue,
+                SUM(CASE WHEN transaction_type = 'Expense' THEN amount ELSE 0 END) as total_expense
+            FROM transactions WHERE status = 'Completed'
+        `);
+
+        res.json({
+            transactions: result.rows,
+            stats: stats.rows[0]
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.patch("/api/purchase_orders/:id/verify", async (req, res) => {
+    const poId = req.params.id;
+    const { adminId, amount, supplierName } = req.body;
+    const client = await getPool().connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('UPDATE purchaseorder SET status = $1 WHERE assignment_id = $2', ['Paid', poId]);
+        await createTransaction(client, {
+            ref: `PO-${poId}`,
+            type: 'Expense',
+            category: 'Material Procurement',
+            desc: `Payment to ${supplierName}`,
+            amount: amount,
+            status: 'Completed',
+            sourceTable: 'purchaseorder',
+            sourceId: poId,
+            userId: adminId
+        });
+        await client.query('COMMIT');
+        io.emit("transactions:updated");
+        res.send("Transaction recorded");
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).send(err.message);
+    } finally { client.release(); }
 });
 
 // ─────────────────────────────────────────────
@@ -1253,7 +1391,7 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
   try {
     await client.query('BEGIN');
     const woResult = await client.query(
-      'SELECT sku, quantity_needed, artisan_id, status FROM workorder WHERE work_order_id = $1', [id]
+      'SELECT sku, quantity_needed, artisan_id, status, total_cost FROM workorder WHERE work_order_id = $1', [id]
     );
     if (woResult.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -1263,7 +1401,7 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Work order is already completed.' });
     }
-    const { sku, quantity_needed, artisan_id } = woResult.rows[0];
+    const { sku, quantity_needed, artisan_id, total_cost } = woResult.rows[0];
     await client.query(`UPDATE workorder SET status = 'Complete' WHERE work_order_id = $1`, [id]);
     for (const mat of actualMaterials) {
       const { material_id, expected_qty, actual_qty } = mat;
@@ -1289,10 +1427,24 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
       );
     }
     await client.query(`UPDATE finishedgoods SET current_stock = current_stock + $1 WHERE sku = $2`, [quantity_needed, sku]);
+    if (total_cost > 0) {
+      await createTransaction(client, {
+        ref: `WO-${id}`,
+        type: 'Expense',
+        category: 'Labor Pay',
+        desc: `Production labor for Work Order #${id}`,
+        amount: total_cost,
+        status: 'Pending',
+        sourceTable: 'workorder',
+        sourceId: id,
+        userId: artisan_id
+      });
+    }
     await client.query('COMMIT');
     io.emit("work_orders:updated");
     io.emit("materials:updated");
     io.emit("products:updated");
+    io.emit("transactions:updated");
     res.json({ message: 'Work order completed, variance logged, stock updated.' });
   } catch (err) {
     await client.query('ROLLBACK');

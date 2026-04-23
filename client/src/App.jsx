@@ -116,7 +116,6 @@ function App() {
         <Route path="/" element={<Navigate to={`/auth/${getAuthHash("login")}`} replace />} />
         <Route path="/auth/:authHash" element={<AuthSwitcher />} />
 
-        {/* Eto ang pinaka-importanteng change: path="/dashboard/*" */}
         <Route 
           path="/dashboard/*" 
           element={
