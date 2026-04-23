@@ -30,7 +30,7 @@ const SalesSidebar = () => {
     { name: 'Home', tab: 'home' },
     { name: 'Inventory', tab: 'inventory' },
     { name: 'Warehouse', tab: 'warehouse' },
-    { name: 'Sales Orders', tab: 'statistics' },
+    { name: 'Sales Orders', tab: 'salesorders' },
   ];
 
   const getMenuIcons = (name, size = 18) => {

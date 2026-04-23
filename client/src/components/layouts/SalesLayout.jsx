@@ -14,7 +14,7 @@ export default function SalesLayout() {
   const [activeTab, setActiveTab] = useState("home");
   const role = "sales";
 
-  const tabs = ["home", "orders", "inventory", "warehouse"];
+  const tabs = ["home", "salesorders", "inventory", "warehouse"];
 
   useEffect(() => {
     const cleanSplat = splat ? splat.replace(/^\/|\/$/g, '') : "";
@@ -25,7 +25,7 @@ export default function SalesLayout() {
   const renderContent = () => {
     switch (activeTab) {
       case "home":      return <MainDashboard />;
-      case "orders":    return <Orders />;
+      case "salesorders":    return <Orders />;
       case "inventory": return <SalesInventory />;
       case "warehouse": return <Warehouse />;
       default:          return <MainDashboard />;
