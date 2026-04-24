@@ -943,19 +943,69 @@ app.post("/api/sales_orders", async (req, res) => {
 
 app.patch("/api/sales_orders/:id/status", async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, user_id } = req.body;
   const validStatuses = ["Pending", "Shipped", "Delivered"];
-  if (!validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status." });
+
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status." });
+  }
+
+  const client = await getPool().connect();
+
   try {
-    const result = await getPool().query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       "UPDATE sales_orders SET status = $1 WHERE order_id = $2 RETURNING *",
       [status, id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ message: "Order not found." });
+
+    if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Order not found." });
+    }
+
+    const order = result.rows[0];
+
+    if (status === "Delivered") {
+      const productRes = await client.query(
+        "SELECT name, selling_price FROM finishedgoods WHERE sku = $1",
+        [order.sku]
+      );
+      
+      const productName = productRes.rows[0]?.name || "Product";
+      const sellingPrice = productRes.rows[0]?.selling_price || 0;
+      const totalRevenue = order.quantity * sellingPrice;
+
+      await client.query(
+        `INSERT INTO transactions (
+          reference_no, transaction_type, category, description, 
+          amount, status, source_table, source_id, user_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          `SO-${id}`,
+          'Revenue',
+          'Product Sale',
+          `Sold ${order.quantity} units of ${productName}`,
+          totalRevenue,
+          'Completed',
+          'sales_orders',
+          id,
+          user_id || order.user_id
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
     io.emit("sales_orders:updated");
+    io.emit("transactions:updated");
+
     res.json(result.rows[0]);
   } catch (err) {
+    await client.query("ROLLBACK");
     res.status(500).send(err.message);
+  } finally {
+    client.release();
   }
 });
 
@@ -1023,10 +1073,8 @@ app.post("/api/create_order", async (req, res) => {
     );
 
     await client.query("COMMIT");
-
     io.emit("purchase_orders:updated");
     io.emit("transactions:updated");
-
     res.json(newOrder.rows[0]);
   } catch (err) {
     await client.query("ROLLBACK");
@@ -1059,19 +1107,63 @@ app.patch("/api/orders/receive/:id", async (req, res) => {
   const client = await getPool().connect();
   try {
     const order = await client.query("SELECT * FROM purchaseorder WHERE assignment_id = $1", [id]);
+    
+    if (order.rows.length === 0) return res.status(404).send("Order not found.");
     if (order.rows[0].status === 'Delivered') return res.status(400).send("Order already received.");
+
     await client.query("BEGIN");
+
     await client.query("UPDATE purchaseorder SET status = 'Delivered' WHERE assignment_id = $1", [id]);
-    await client.query("UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2", [order.rows[0].ordered_quantity, order.rows[0].material_id]);
+
+    await client.query(
+      "UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2", 
+      [order.rows[0].ordered_quantity, order.rows[0].material_id]
+    );
+
+    await client.query(
+      "UPDATE transactions SET status = 'Completed' WHERE source_id = $1 AND source_table = 'purchaseorder'", 
+      [id]
+    );
+
     await client.query("COMMIT");
+
     io.emit("purchase_orders:updated");
     io.emit("materials:updated");
-    res.send("Inventory updated successfully!");
+    io.emit("transactions:updated");
+
+    res.send("Inventory and Ledger updated successfully!");
   } catch (err) {
     await client.query("ROLLBACK");
     res.status(500).send(err.message);
   } finally {
     client.release();
+  }
+});
+
+app.patch("/api/transactions/:id/status", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const valid = ["Pending", "Completed", "Cancelled"];
+
+  if (!valid.includes(status)) {
+    return res.status(400).json({ message: "Invalid status." });
+  }
+
+  try {
+    const result = await getPool().query(
+      "UPDATE transactions SET status = $1 WHERE transaction_id = $2 RETURNING *",
+      [status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Transaction not found." });
+    }
+    io.emit("transactions:updated"); 
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Update status error:", err.message);
+    res.status(500).json({ message: "Server error during update." });
   }
 });
 
@@ -1140,16 +1232,17 @@ app.get("/api/low_stock_logs", async (req, res) => {
 
 app.get("/api/finance/transactions", async (req, res) => {
     try {
-        const { search, type, month, year, page = 1 } = req.query;
+        const page = parseInt(req.query.page) || 1;
         const limit = 10;
         const offset = (page - 1) * limit;
+        const { search, type, month, year } = req.query;
 
         let conditions = ["1=1"];
         let params = [];
         let i = 1;
 
         if (search) {
-            conditions.push(`(t.reference_no ILIKE $${i} OR t.description ILIKE $${i})`);
+            conditions.push(`(t.reference_no ILIKE $${i} OR t.description ILIKE $${i} OR t.category ILIKE $${i})`);
             params.push(`%${search}%`);
             i++;
         }
@@ -1158,35 +1251,44 @@ app.get("/api/finance/transactions", async (req, res) => {
             params.push(type);
             i++;
         }
-        if (month && year) {
-            conditions.push(`EXTRACT(MONTH FROM t.transaction_date) = $${i} AND EXTRACT(YEAR FROM t.transaction_date) = $${i+1}`);
-            params.push(month, year);
-            i += 2;
+        if (year) {
+            conditions.push(`EXTRACT(YEAR FROM t.transaction_date) = $${i}`);
+            params.push(parseInt(year));
+            i++;
+        }
+        if (month) {
+            conditions.push(`EXTRACT(MONTH FROM t.transaction_date) = $${i}`);
+            params.push(parseInt(month));
+            i++;
         }
 
+        const dataParams = [...params, limit, offset];
         const query = `
-            SELECT t.*, p.firstname, p.lastname 
+            SELECT t.*, p.firstname, p.lastname, COUNT(*) OVER() AS total_count
             FROM transactions t
-            LEFT JOIN personal_data p ON t.user_id = p.user_id
+            LEFT JOIN personaldata p ON t.user_id = p.user_id
             WHERE ${conditions.join(" AND ")}
             ORDER BY t.transaction_date DESC
             LIMIT $${i} OFFSET $${i+1}
         `;
 
-        const result = await getPool().query(query, [...params, limit, offset]);
+        const result = await getPool().query(query, dataParams);
         
         const stats = await getPool().query(`
             SELECT 
-                SUM(CASE WHEN transaction_type = 'Revenue' THEN amount ELSE 0 END) as total_revenue,
-                SUM(CASE WHEN transaction_type = 'Expense' THEN amount ELSE 0 END) as total_expense
-            FROM transactions WHERE status = 'Completed'
+                COALESCE(SUM(CASE WHEN transaction_type = 'Revenue' THEN amount ELSE 0 END), 0) as total_revenue,
+                COALESCE(SUM(CASE WHEN transaction_type = 'Expense' THEN amount ELSE 0 END), 0) as total_expense
+            FROM transactions 
+            WHERE status = 'Completed'
         `);
 
         res.json({
             transactions: result.rows,
+            total: result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0,
             stats: stats.rows[0]
         });
     } catch (err) {
+        console.error("Finance API Error:", err.message);
         res.status(500).send(err.message);
     }
 });

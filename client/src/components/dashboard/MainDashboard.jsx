@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Line } from "react-chartjs-2";
 import axios from "axios";
 import {
@@ -24,6 +24,11 @@ import {
   TrendingUp,
   Download,
   ExternalLink,
+  CheckCircle,
+  XCircle,
+  Eye,
+  User,
+  Clock,
 } from "lucide-react";
 import { HiPhoto } from "react-icons/hi2";
 
@@ -73,6 +78,65 @@ const TRACKING_STEPS = [
   { key: "Pending", label: "Order Placed", sub: "An order has been placed" },
 ];
 
+function Toast({ message, type, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  const styles = {
+    success: "bg-emerald-600 text-white",
+    error: "bg-red-600 text-white",
+    info: "bg-gray-900 text-white",
+  };
+
+  return (
+    <div className={`fixed bottom-6 right-6 z-[300] px-5 py-3 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-3 ${styles[type]}`}
+      style={{ animation: "slideUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}>
+      {type === "success" && <CheckCircle className="w-4 h-4" />}
+      {type === "error" && <XCircle className="w-4 h-4" />}
+      {message}
+      <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }`}</style>
+    </div>
+  );
+}
+
+function NotifModal({ title, message, type, onClose, actionLabel, onAction }) {
+  return (
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 relative"
+        style={{ animation: "popIn 0.25s cubic-bezier(0.16,1,0.3,1) forwards" }}>
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 ${type === "success" ? "bg-emerald-50" : "bg-red-50"}`}>
+          {type === "success"
+            ? <CheckCircle className="w-7 h-7 text-emerald-500" />
+            : <XCircle className="w-7 h-7 text-red-500" />}
+        </div>
+        <h3 className="text-lg font-black text-gray-900 text-center mb-2">{title}</h3>
+        <p className="text-sm text-gray-400 text-center mb-7">{message}</p>
+        <div className="flex flex-col gap-2">
+          {onAction && (
+            <button onClick={onAction} className="w-full py-3 bg-black text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+              <Eye className="w-4 h-4" /> {actionLabel}
+            </button>
+          )}
+          <button onClick={onClose} className="w-full py-3 text-gray-400 text-sm font-bold hover:text-black transition-colors">
+            Close
+          </button>
+        </div>
+        <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.9) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
+      </div>
+    </div>
+  );
+}
+
+const fmtDateTime = (d) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-PH", {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+};
+
 const OrderDetailModal = ({ order, onClose, products = [] }) => {
   if (!order) return null;
   const statusIndex = TRACKING_STEPS.findIndex(s => s.key === order.status);
@@ -94,9 +158,7 @@ const OrderDetailModal = ({ order, onClose, products = [] }) => {
       >
         <div className="flex items-start justify-between px-6 pt-6 pb-4">
           <h2 className="text-lg font-black text-gray-900 leading-tight">Real-time Delivery Tracking</h2>
-          <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors"><X size={18} /></button>
-          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors mt-0.5"><X size={18} /></button>
         </div>
 
         <div className="px-6 pb-4">
@@ -187,7 +249,6 @@ const OrderDetailModal = ({ order, onClose, products = [] }) => {
             </div>
           </div>
         </div>
-
       </div>
       <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.9) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
     </div>
@@ -210,8 +271,14 @@ const SalesTrendModal = ({ orders, onClose }) => {
   const [exportFilterDay, setExportFilterDay] = useState("");
   const [exportFilterCourier, setExportFilterCourier] = useState("");
   const [exportFilterPlatform, setExportFilterPlatform] = useState("");
-  const [lastDownloadUrl, setLastDownloadUrl] = useState(null);
+  const [exporterName, setExporterName] = useState("");
+  const [lastDownloadBlob, setLastDownloadBlob] = useState(null);
   const [lastDownloadName, setLastDownloadName] = useState("");
+
+  const [toast, setToast] = useState(null);
+  const [notifModal, setNotifModal] = useState(null);
+
+  const showToast = (message, type = "info") => setToast({ message, type });
 
   const daysInSelected = selectedYear && selectedMonth !== ""
     ? DAYS_IN_MONTH(Number(selectedYear), Number(selectedMonth))
@@ -385,21 +452,27 @@ const SalesTrendModal = ({ orders, onClose }) => {
     return parts.length ? parts.join("_") : "All";
   };
 
-  const downloaderName = localStorage.getItem("userName") || "Unknown User";
-
   const handleExport = () => {
+    if (!exporterName.trim()) {
+      showToast("Please enter your name before exporting.", "error");
+      return;
+    }
     const rows = getExportRows();
-    const filename = `sales_trend_${buildExportLabel()}`;
+    if (rows.length === 0) {
+      showToast("No records matched the selected filters.", "error");
+      return;
+    }
+
     const filterLabel = buildExportLabel().replace(/_/g, " ");
-    const downloadTimestamp = new Date().toLocaleString("en-PH", {
-      year: "numeric", month: "short", day: "numeric",
-      hour: "2-digit", minute: "2-digit", second: "2-digit",
-    });
+    const downloadTimestamp = fmtDateTime(new Date());
+    const safeExporterName = exporterName.trim().replace(/\s+/g, "-");
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const filename = `sales_trend_${buildExportLabel()}_by-${safeExporterName}_${ts}`;
 
     if (exportFormat === "csv") {
       const header = ["Order ID", "Date", "Client", "Product", "Quantity", "Courier", "Platform", "Total Amount (₱)"];
       const meta = [
-        [`Downloaded by: ${downloaderName}`],
+        [`Downloaded by: ${exporterName.trim()}`],
         [`Downloaded at: ${downloadTimestamp}`],
         [`Filter: ${filterLabel}`],
         [],
@@ -418,12 +491,25 @@ const SalesTrendModal = ({ orders, onClose }) => {
       const csv = [...meta, ...data].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
-      setLastDownloadUrl(url);
-      setLastDownloadName(`${filename}.csv`);
       const a = document.createElement("a");
       a.href = url;
       a.download = `${filename}.csv`;
       a.click();
+
+      setLastDownloadBlob(blob);
+      setLastDownloadName(`${filename}.csv`);
+      setNotifModal({
+        title: "Export Successful",
+        message: `CSV saved as "${filename}.csv"`,
+        type: "success",
+        actionLabel: "View Downloaded File",
+        onAction: () => {
+          const u = URL.createObjectURL(blob);
+          window.open(u, "_blank");
+          setNotifModal(null);
+        },
+      });
+
     } else {
       import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(() => {
         import("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js").then(() => {
@@ -436,7 +522,7 @@ const SalesTrendModal = ({ orders, onClose }) => {
           doc.setFont("helvetica", "normal");
           doc.setTextColor(100);
           doc.text(`Filter: ${filterLabel}`, 14, 23);
-          doc.text(`Downloaded by: ${downloaderName}   |   ${downloadTimestamp}`, 14, 28);
+          doc.text(`Downloaded by: ${exporterName.trim()}   |   ${downloadTimestamp}`, 14, 28);
           doc.setTextColor(0);
 
           const total = rows.reduce((s, o) => s + Number(o.total_amount || 0), 0);
@@ -463,12 +549,33 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
           const pdfBlob = doc.output("blob");
           const url = URL.createObjectURL(pdfBlob);
-          setLastDownloadUrl(url);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${filename}.pdf`;
+          a.click();
+
+          setLastDownloadBlob(pdfBlob);
           setLastDownloadName(`${filename}.pdf`);
-          doc.save(`${filename}.pdf`);
+          setNotifModal({
+            title: "Export Successful",
+            message: `PDF saved as "${filename}.pdf"`,
+            type: "success",
+            actionLabel: "View Downloaded File",
+            onAction: () => {
+              const u = URL.createObjectURL(pdfBlob);
+              window.open(u, "_blank");
+              setNotifModal(null);
+            },
+          });
         });
       });
     }
+  };
+
+  const viewLastDownload = () => {
+    if (!lastDownloadBlob) return;
+    const url = URL.createObjectURL(lastDownloadBlob);
+    window.open(url, "_blank");
   };
 
   const selectClass = "appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all pr-8";
@@ -512,6 +619,26 @@ const SalesTrendModal = ({ orders, onClose }) => {
             <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
               <p className="text-[11px] font-black text-gray-700 uppercase tracking-widest">Export Options</p>
 
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 flex items-center gap-1">
+                  <User className="w-3 h-3" /> Exported By
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter your full name..."
+                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 ring-blue-100 focus:border-blue-300 transition-all"
+                  value={exporterName}
+                  onChange={e => setExporterName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Download Timestamp
+                </label>
+                <p className="text-[10px] font-semibold text-gray-500 bg-white border border-gray-200 px-3 py-2 rounded-xl">{fmtDateTime(new Date())}</p>
+              </div>
+
               <div className="flex gap-2">
                 {["csv", "pdf"].map(fmt => (
                   <button
@@ -532,7 +659,6 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   </select>
                   <Chevron />
                 </div>
-
                 <div className="relative">
                   <select value={exportFilterMonth} onChange={e => { setExportFilterMonth(e.target.value); setExportFilterDay(""); }} disabled={!exportFilterYear} className={selectClass + " w-full text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"}>
                     <option value="">All Months</option>
@@ -540,7 +666,6 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   </select>
                   <Chevron />
                 </div>
-
                 <div className="relative">
                   <select value={exportFilterDay} onChange={e => setExportFilterDay(e.target.value)} disabled={!exportFilterYear || exportFilterMonth === ""} className={selectClass + " w-full text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"}>
                     <option value="">All Days</option>
@@ -550,7 +675,6 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   </select>
                   <Chevron />
                 </div>
-
                 <div className="relative">
                   <select value={exportFilterCourier} onChange={e => setExportFilterCourier(e.target.value)} className={selectClass + " w-full text-xs py-2"}>
                     <option value="">All Couriers</option>
@@ -558,7 +682,6 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   </select>
                   <Chevron />
                 </div>
-
                 <div className="relative col-span-2">
                   <select value={exportFilterPlatform} onChange={e => setExportFilterPlatform(e.target.value)} className={selectClass + " w-full text-xs py-2"}>
                     <option value="">All Platforms</option>
@@ -573,15 +696,14 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   {getExportRows().length} order{getExportRows().length !== 1 ? "s" : ""} matched
                 </p>
                 <div className="flex items-center gap-2">
-                  {lastDownloadUrl && (
-                    <a
-                      href={lastDownloadUrl}
-                      download={lastDownloadName}
+                  {lastDownloadBlob && (
+                    <button
+                      onClick={viewLastDownload}
                       className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all"
                     >
-                      <ExternalLink size={11} />
+                      <Eye size={11} />
                       View Last Download
-                    </a>
+                    </button>
                   )}
                   <button
                     onClick={handleExport}
@@ -608,7 +730,7 @@ const SalesTrendModal = ({ orders, onClose }) => {
               <div className="flex items-center gap-1.5">
                 <TrendingUp size={13} className={Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"} />
                 <span className={`text-xs font-black ${Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  {Number(pctChange) >= 0 ? "+" : ""}{pctChange}%
+                  {Number(pctChange) >= 0 ? "" : ""}{pctChange}%
                 </span>
                 <span className="text-[10px] text-gray-400 font-semibold">vs last year</span>
               </div>
@@ -620,23 +742,17 @@ const SalesTrendModal = ({ orders, onClose }) => {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-blue-50 rounded-2xl p-4 flex flex-col justify-between">
                   <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Revenue</p>
-                  <p className="text-xl font-black text-blue-700 leading-tight">
-                    {formatPeso(singleDayRevenue)}
-                  </p>
+                  <p className="text-xl font-black text-blue-700 leading-tight">{formatPeso(singleDayRevenue)}</p>
                   <p className="text-[9px] text-blue-400 mt-1">{singleDayDelivered.length} delivered</p>
                 </div>
                 <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-between">
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Orders</p>
                   <p className="text-xl font-black text-gray-800 leading-tight">{singleDayOrders.length}</p>
-                  <p className="text-[9px] text-gray-400 mt-1">
-                    {singleDayOrders.filter(o => o.status === "Shipped").length} in transit
-                  </p>
+                  <p className="text-[9px] text-gray-400 mt-1">{singleDayOrders.filter(o => o.status === "Shipped").length} in transit</p>
                 </div>
                 <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-between">
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Last Year</p>
-                  <p className="text-xl font-black text-gray-800 leading-tight">
-                    {formatPeso(singleDayLastYearRevenue)}
-                  </p>
+                  <p className="text-xl font-black text-gray-800 leading-tight">{formatPeso(singleDayLastYearRevenue)}</p>
                   <p className="text-[9px] text-gray-400 mt-1">{selectedYear - 1} same day</p>
                 </div>
               </div>
@@ -668,60 +784,73 @@ const SalesTrendModal = ({ orders, onClose }) => {
         <div className="px-6 pb-6 pt-4 border-t border-gray-100 mt-2 flex-shrink-0">
           <p className="text-base font-black text-gray-900 mb-3">Select Date</p>
           <div className="flex gap-3">
-            <div className="relative flex-1">
-              <select
-                value={selectedYear}
-                onChange={e => { setSelectedYear(e.target.value); setSelectedMonth(""); setSelectedDay(""); }}
-                className={selectClass + " w-full"}
-              >
-                <option value="">Year</option>
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            {[
+              {
+                value: selectedYear,
+                onChange: e => { setSelectedYear(e.target.value); setSelectedMonth(""); setSelectedDay(""); },
+                disabled: false,
+                placeholder: "Year",
+                options: availableYears.map(y => ({ value: y, label: y })),
+              },
+              {
+                value: selectedMonth,
+                onChange: e => { setSelectedMonth(e.target.value); setSelectedDay(""); },
+                disabled: !selectedYear,
+                placeholder: "Month",
+                options: MONTHS.map((m, i) => ({ value: i, label: m })),
+              },
+              {
+                value: selectedDay,
+                onChange: e => setSelectedDay(e.target.value),
+                disabled: !selectedYear || selectedMonth === "",
+                placeholder: "Day",
+                options: Array.from({ length: daysInSelected }, (_, i) => ({ value: i + 1, label: i + 1 })),
+              },
+            ].map((sel, idx) => (
+              <div key={idx} className="relative flex-1">
+                <select
+                  value={sel.value}
+                  onChange={sel.onChange}
+                  disabled={sel.disabled}
+                  className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed"}
+                >
+                  <option value="">{sel.placeholder}</option>
+                  {sel.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
               </div>
-            </div>
-
-            <div className="relative flex-1">
-              <select
-                value={selectedMonth}
-                onChange={e => { setSelectedMonth(e.target.value); setSelectedDay(""); }}
-                disabled={!selectedYear}
-                className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed"}
-              >
-                <option value="">Month</option>
-                {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-            </div>
-
-            <div className="relative flex-1">
-              <select
-                value={selectedDay}
-                onChange={e => setSelectedDay(e.target.value)}
-                disabled={!selectedYear || selectedMonth === ""}
-                className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed"}
-              >
-                <option value="">Day</option>
-                {Array.from({ length: daysInSelected }, (_, i) => i + 1).map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
+
+      {notifModal && (
+        <NotifModal
+          title={notifModal.title}
+          message={notifModal.message}
+          type={notifModal.type}
+          actionLabel={notifModal.actionLabel}
+          onAction={notifModal.onAction}
+          onClose={() => setNotifModal(null)}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
     </div>
   );
 };
 
-const SalesDashboard = () => {
+const MainDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [deliveryPage, setDeliveryPage] = useState(0);
@@ -912,7 +1041,7 @@ const SalesDashboard = () => {
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <p className="text-sm font-semibold text-gray-900">₱{Number(p.revenue).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</p>
-                    <p className="text-[9px] text-emerald-600">+₱{Math.round(p.revenue * 0.2).toLocaleString()} profit</p>
+                    <p className="text-[9px] text-emerald-600">₱{Math.round(p.revenue * 0.2).toLocaleString()} profit</p>
                   </div>
                 </div>
               ))}
@@ -1012,4 +1141,4 @@ const SalesDashboard = () => {
   );
 };
 
-export default SalesDashboard;
+export default MainDashboard;
