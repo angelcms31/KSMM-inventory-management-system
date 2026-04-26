@@ -711,9 +711,9 @@ app.get("/api/audit_logs", async (req, res) => {
     const result = await getPool().query(`
       SELECT l.log_id, l.user_id, l.action, l.role, l.timestamp,
         COALESCE(
-          (SELECT CONCAT(firstname, ' ', middlename, ' ', lastname) FROM personaldata WHERE user_id = l.user_id),
-          (SELECT CONCAT(first_name, ' ', middle_name, ' ', last_name) FROM artisan WHERE artisan_id = l.user_id)
-        ) as merged_name
+        (SELECT TRIM(CONCAT_WS(' ', firstname, NULLIF(TRIM(middlename), ''), lastname)) FROM personaldata WHERE user_id = l.user_id),
+        (SELECT TRIM(CONCAT_WS(' ', first_name, NULLIF(TRIM(middle_name), ''), last_name)) FROM artisan WHERE artisan_id = l.user_id)
+      ) as merged_name
       FROM audit_logs l ORDER BY l.timestamp DESC`);
     res.json(result.rows);
   } catch (err) {
@@ -1220,16 +1220,18 @@ app.get("/api/variance_logs", async (req, res) => {
         mvl.work_order_id, mvl.material_id, mvl.artisan_id,
         mvl.expected_qty, mvl.actual_qty, mvl.variance, mvl.recorded_at AS timestamp,
         m.material_name, m.stock_quantity AS current_stock, m.reorder_threshold,
+        CASE WHEN m.stock_quantity <= m.reorder_threshold THEN true ELSE false END AS is_low_stock,
         COALESCE(
-          (SELECT CONCAT(firstname, ' ', middlename, ' ', lastname) FROM personaldata WHERE user_id = mvl.artisan_id),
-          (SELECT CONCAT(first_name, ' ', middle_name, ' ', last_name) FROM artisan WHERE artisan_id = mvl.artisan_id)
-        ) AS merged_name,
-        CASE WHEN m.stock_quantity <= m.reorder_threshold THEN true ELSE false END AS is_low_stock
+          (SELECT firstname || ' ' || lastname FROM personaldata WHERE user_id = mvl.artisan_id),
+          (SELECT first_name || ' ' || last_name FROM artisan WHERE artisan_id = mvl.artisan_id),
+          'Unknown'
+        ) AS merged_name
       FROM material_variance_logs mvl
       LEFT JOIN material m ON mvl.material_id = m.material_id
       ORDER BY mvl.recorded_at DESC`);
     res.json(result.rows);
   } catch (err) {
+    console.error("variance_logs error:", err.message);
     res.status(500).send(err.message);
   }
 });
