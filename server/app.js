@@ -1143,27 +1143,49 @@ app.patch("/api/orders/receive/:id", async (req, res) => {
 app.patch("/api/transactions/:id/status", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  const valid = ["Pending", "Completed", "Cancelled"];
-
-  if (!valid.includes(status)) {
-    return res.status(400).json({ message: "Invalid status." });
-  }
+  const client = await getPool().connect();
 
   try {
-    const result = await getPool().query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       "UPDATE transactions SET status = $1 WHERE transaction_id = $2 RETURNING *",
       [status, id]
     );
 
     if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ message: "Transaction not found." });
     }
-    io.emit("transactions:updated"); 
 
-    res.json(result.rows[0]);
+    const tx = result.rows[0];
+
+    if (status === "Cancelled" && tx.source_table && tx.source_id) {
+      if (tx.source_table === 'purchaseorder') {
+        await client.query(
+          "UPDATE purchaseorder SET status = 'Cancelled' WHERE assignment_id = $1",
+          [tx.source_id]
+        );
+      } else if (tx.source_table === 'sales_orders') {
+        await client.query(
+          "UPDATE sales_orders SET status = 'Cancelled' WHERE order_id = $1",
+          [tx.source_id]
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+
+    io.emit("transactions:updated");
+    io.emit("purchase_orders:updated");
+    io.emit("sales_orders:updated");
+
+    res.json(tx);
   } catch (err) {
-    console.error("Update status error:", err.message);
-    res.status(500).json({ message: "Server error during update." });
+    await client.query("ROLLBACK");
+    res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
   }
 });
 
