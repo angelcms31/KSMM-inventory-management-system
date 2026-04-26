@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import axios from "axios";
 import { RecoveryContext } from "../../context/RecoveryContext";
 import { useNavigate } from "react-router-dom";
+import { HiOutlineEye, HiOutlineEyeOff, HiChevronLeft } from "react-icons/hi";
 import { getAuthHash } from "../../utils/hash";
 
 export default function OTPInput() {
@@ -24,16 +25,20 @@ export default function OTPInput() {
   const redirectTimerRef = useRef(null);
 
   useEffect(() => {
-    const savedEmail = sessionStorage.getItem("recoveryEmail");
-    const savedOTP = sessionStorage.getItem("recoveryOTP");
-
-    if (savedEmail && !email) setEmail(savedEmail);
-    if (savedOTP && !otp) setOTP(parseInt(savedOTP));
-
-    if (!savedEmail && !email) {
-      navigate(`/auth/${getAuthHash("login")}`);
+    if (!email) {
+      navigate(`/auth/${getAuthHash("login")}`, { replace: true });
     }
-  }, [email, otp, setEmail, setOTP, navigate]);
+
+    window.history.pushState(null, null, window.location.href);
+    const handlePopState = () => {
+      window.history.pushState(null, null, window.location.href);
+    };
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [email, navigate]);
 
   const startTimers = () => {
     setTimer(60);
@@ -63,9 +68,10 @@ export default function OTPInput() {
           clearInterval(expireTimerRef.current);
           setIsExpired(true);
           redirectTimerRef.current = setTimeout(() => {
-            sessionStorage.removeItem("recoveryEmail");
-            sessionStorage.removeItem("recoveryOTP");
-            navigate(`/auth/${getAuthHash("login")}`);
+            sessionStorage.clear();
+            setEmail("");
+            setOTP(null);
+            navigate(`/auth/${getAuthHash("login")}`, { replace: true });
           }, 3000);
           return 0;
         }
@@ -75,13 +81,13 @@ export default function OTPInput() {
   };
 
   useEffect(() => {
-    startTimers();
+    if (email) startTimers();
     return () => {
       clearInterval(resendTimerRef.current);
       clearInterval(expireTimerRef.current);
       clearTimeout(redirectTimerRef.current);
     };
-  }, []);
+  }, [email]);
 
   const formatExpireTimer = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -104,9 +110,7 @@ export default function OTPInput() {
     }
 
     setIsSubmitting(true);
-    const currentOTP = otp || parseInt(sessionStorage.getItem("recoveryOTP"));
-
-    if (parseInt(inputCode) === currentOTP) {
+    if (parseInt(inputCode) === otp) {
       navigate(`/auth/${getAuthHash("reset")}`);
     } else {
       setError(true);
@@ -118,7 +122,7 @@ export default function OTPInput() {
   const handleChange = (value, index) => {
     if (error) setError(false);
     let newOtp = [...OTPinput];
-    newOtp[index] = value.substring(value.length - 1);
+    newOtp[index] = value.substring(value.length - 1).replace(/[^0-9]/g, "");
     setOTPinput(newOtp);
     if (value && index < 3) {
       inputRefs[index + 1].current.focus();
@@ -153,7 +157,6 @@ export default function OTPInput() {
       recipient_email: email,
     }).then(() => {
       setOTP(newOTP);
-      sessionStorage.setItem("recoveryOTP", newOTP);
       setOTPinput(["", "", "", ""]);
       startTimers();
       inputRefs[0].current.focus();
@@ -164,53 +167,71 @@ export default function OTPInput() {
     });
   };
 
+  const handleBack = () => {
+    setEmail("");
+    setOTP(null);
+    sessionStorage.clear();
+    navigate(`/auth/${getAuthHash("forgotpassword")}`, { replace: true });
+  };
+
   return (
-    <div className="flex justify-center items-center w-screen h-screen font-serif bg-gray-50 overflow-hidden">
-      <div className="bg-white p-10 shadow-xl rounded-2xl w-full max-w-lg text-center border border-gray-100">
-        <h2 className="text-3xl font-bold mb-4 uppercase tracking-widest text-stone-800">Verification</h2>
-        <p className="text-sm font-medium text-gray-400 mb-2">We sent a code to {email}</p>
-
-        <p className={`text-xs font-bold mb-10 ${isExpired ? "text-red-500" : "text-stone-500"}`}>
-          {isExpired ? "Code Expired. Redirecting to login..." : `Code expires in: ${formatExpireTimer(expireCount)}`}
-        </p>
-
-        <div className="flex justify-center mb-6 space-x-4">
-          {OTPinput.map((data, index) => (
-            <input
-              key={index}
-              ref={inputRefs[index]}
-              type="text"
-              className={`w-16 h-16 border text-center rounded-xl text-2xl bg-white outline-none transition-all disabled:opacity-50 ${error ? "border-red-400 ring-1 ring-red-100" : "border-gray-200 focus:ring-1 focus:ring-stone-800 focus:bg-gray-50"}`}
-              value={data}
-              disabled={isExpired}
-              onChange={(e) => handleChange(e.target.value, index)}
-              onKeyDown={(e) => handleKeyDown(e, index)}
-              onPaste={handlePaste}
-            />
-          ))}
-        </div>
-
-        {error && (
-          <div className="text-red-500 text-[11px] font-bold italic mb-6 animate-pulse">{errorMessage}</div>
-        )}
-
-        <button
-          onClick={verifyOTP}
-          disabled={isExpired || isSubmitting}
-          className="w-full bg-stone-800 text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-black transition-colors mb-6 disabled:bg-gray-400 disabled:cursor-not-allowed cursor-pointer"
+    <div className="flex justify-center items-center w-screen h-screen font-serif bg-white overflow-hidden px-4">
+      <div className="bg-white p-10 shadow-2xl rounded-[2.5rem] w-full max-w-md text-center border border-gray-100 relative">
+        <button 
+          onClick={handleBack}
+          className="absolute top-8 left-8 text-gray-400 hover:text-stone-800 transition-colors flex items-center gap-1 text-xs font-bold uppercase tracking-widest cursor-pointer"
         >
-          {isSubmitting ? "Verifying..." : "Verify Account"}
+          <HiChevronLeft size={20} />
+          Back
         </button>
 
-        <div className="text-center text-sm">
-          <p className="text-gray-500 mb-2">Didn't receive code?</p>
+        <div className="mt-8">
+          <h2 className="text-3xl font-black mb-4 uppercase tracking-tighter text-[#8B6B4A]">Verification</h2>
+          <p className="text-sm font-medium text-gray-400 mb-2 font-sans">We sent a code to {email}</p>
+
+          <p className={`text-[10px] font-black uppercase tracking-widest mb-10 font-sans ${isExpired ? "text-red-500" : "text-stone-400"}`}>
+            {isExpired ? "Code Expired. Redirecting..." : `Valid for: ${formatExpireTimer(expireCount)}`}
+          </p>
+
+          <div className="flex justify-center mb-8 space-x-3">
+            {OTPinput.map((data, index) => (
+              <input
+                key={index}
+                ref={inputRefs[index]}
+                type="text"
+                maxLength="1"
+                className={`w-14 h-16 border text-center rounded-xl text-2xl font-black outline-none transition-all font-sans disabled:opacity-50 ${error ? "border-red-400 ring-1 ring-red-100" : "border-gray-200 focus:border-stone-800 focus:bg-gray-50"}`}
+                value={data}
+                disabled={isExpired}
+                onChange={(e) => handleChange(e.target.value, index)}
+                onKeyDown={(e) => handleKeyDown(e, index)}
+                onPaste={handlePaste}
+              />
+            ))}
+          </div>
+
+          {error && (
+            <div className="text-red-500 text-[11px] font-bold italic mb-6 animate-pulse font-sans">{errorMessage}</div>
+          )}
+
           <button
-            onClick={resendOTP}
-            disabled={!canResend || isResending}
-            className={`font-bold transition-colors ${(!canResend || isResending) ? "text-gray-300 cursor-not-allowed" : "text-stone-800 underline cursor-pointer"}`}
+            onClick={verifyOTP}
+            disabled={isExpired || isSubmitting}
+            className="w-full bg-[#262221] text-white py-4 rounded-xl font-bold uppercase tracking-[0.2em] text-xs shadow-lg hover:bg-black transition-all active:scale-[0.98] mb-8 disabled:bg-gray-300 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isResending ? "Sending..." : (!canResend ? `Resend OTP in ${timerCount}s` : "Resend OTP")}
+            {isSubmitting ? "Verifying..." : "Verify Account"}
           </button>
+
+          <div className="text-center text-xs font-sans">
+            <p className="text-gray-400 mb-2 uppercase tracking-widest text-[9px] font-black">Didn't receive code?</p>
+            <button
+              onClick={resendOTP}
+              disabled={!canResend || isResending}
+              className={`font-black uppercase tracking-widest transition-all ${(!canResend || isResending) ? "text-gray-200 cursor-not-allowed" : "text-stone-800 hover:text-black cursor-pointer underline"}`}
+            >
+              {isResending ? "Sending..." : (!canResend ? `Resend in ${timerCount}s` : "Resend OTP")}
+            </button>
+          </div>
         </div>
       </div>
     </div>
