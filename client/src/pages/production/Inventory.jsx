@@ -83,27 +83,34 @@ export default function Inventory() {
     setShowCompleteModal(true);
   };
 
-  const handleCompleteSubmit = async (e) => {
+const handleCompleteSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
+
     if (completeActuals.length === 0) {
       alert('No materials found for this work order.');
       return;
     }
+
     const hasInvalid = completeActuals.some(m => !m.actual_qty || parseInt(m.actual_qty) < 1);
     if (hasInvalid) {
       alert('All actual quantities must be at least 1.');
       return;
     }
+
+    const currentUserId = localStorage.getItem("user_id");
+
     setSubmitting(true);
     try {
       await axios.put(`http://localhost:5000/api/work_orders/${completeOrder.work_order_id}/complete`, {
-        actualMaterials: completeActuals.map(m => ({
-          material_id: m.material_id,
-          expected_qty: Number(m.expected_qty),
-          actual_qty: parseInt(m.actual_qty)
-        }))
-      });
+          actualMaterials: completeActuals.map(m => ({
+            material_id: m.material_id,
+            expected_qty: Number(m.expected_qty),
+            actual_qty: parseInt(m.actual_qty)
+          })),
+          userId: currentUserId 
+        });
+      
       setShowCompleteModal(false);
       setCompleteOrder(null);
       setCompleteActuals([]);
@@ -171,31 +178,50 @@ export default function Inventory() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    const validMaterials = editForm.selectedMaterials.filter(m => m.material_id !== '' && Number(m.qty) > 0);
+
+    const validMaterials = editForm.selectedMaterials.filter(
+      (m) => m.material_id !== '' && Number(m.qty) > 0
+    );
+
     if (validMaterials.length === 0) {
       alert('Please add at least one raw material with a valid quantity.');
       return;
     }
+
     const payload = {
-      ...editForm,
+      status: editForm.status,
       artisan_id: parseInt(editForm.artisan_id),
       quantity: parseInt(editForm.quantity),
-      total_cost: calculateSubtotal(),
-      selectedMaterials: validMaterials.map(m => ({
+      sku: editForm.sku,
+      target_date: editForm.target_date,
+      product_image: editForm.product_image,
+      selectedMaterials: validMaterials.map((m) => ({
         material_id: parseInt(m.material_id),
-        qty: parseInt(m.qty) || 0,
-        cost: Number(m.cost) || 0,
-        total: (parseInt(m.qty) || 0) * (Number(m.cost) || 0)
-      }))
+        qty: Number(m.qty),
+        cost: Number(m.cost),
+      })),
     };
+
     try {
-      await axios.put(`http://localhost:5000/api/work_orders/${selectedOrder.work_order_id}`, payload);
-      setShowEditModal(false);
-      fetchData();
+      const res = await axios.put(
+        `http://localhost:5000/api/work_orders/${selectedOrder.work_order_id}`,
+        payload
+      );
+
+      if (res.data.success) {
+        setShowEditModal(false);
+        fetchData();
+      }
     } catch (err) {
-      alert('Update failed: ' + (err.response?.data?.error || err.message));
-    }
+  const raw = err.response?.data?.error || err.message || '';
+  if (raw.startsWith('INSUFFICIENT_STOCK::')) {
+    const [, name, needed, available] = raw.split('::');
+    alert(`Not enough stock for "${name}".\nNeeded: ${needed} | Available: ${available}`);
+  } else {
+    alert('Update failed: ' + raw);
+  }
   };
+} 
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -412,7 +438,6 @@ export default function Inventory() {
                         const expectedQty = Number(item.expected_qty) || 0;
                         const variance = actualQty - expectedQty;
                         const isOver = variance > 0;
-                        const isUnder = variance < 0;
                         return (
                           <tr key={index} className="text-slate-700 font-bold hover:bg-slate-50 transition-colors">
                             <td className="p-3 font-black text-slate-900 text-[11px]">{item.material_name}</td>
