@@ -448,7 +448,7 @@ const FinanceVariance = ({ userId }) => {
           <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-[150] p-4">
             <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 w-full max-w-xl relative shadow-2xl max-h-[90vh] overflow-y-auto">
               <button className="absolute top-6 right-6 sm:top-8 sm:right-8 text-slate-300 hover:text-black transition-all" onClick={() => setSortModalOpen(false)}><HiX size={24}/></button>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase mb-4 tracking-tighter">Export Config</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase mb-4 tracking-tighter">Export</h2>
 
               <div className="mb-6 p-5 bg-gray-50 rounded-2xl border border-gray-100">
                 <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-black mb-1">Operator Signature</p>

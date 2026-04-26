@@ -356,7 +356,7 @@ const FinanceLogs = ({ userId }) => {
             onClick={() => setSortModalOpen(true)}
           >
             <HiOutlineDownload size={14} />
-            Export Data
+            Export
           </button>
         </div>
 
