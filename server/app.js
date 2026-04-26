@@ -1514,45 +1514,72 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
   const { id } = req.params;
   const { actualMaterials = [] } = req.body;
   const client = await getPool().connect();
+
   try {
     await client.query('BEGIN');
+
     const woResult = await client.query(
-      'SELECT sku, quantity_needed, artisan_id, status, total_cost FROM workorder WHERE work_order_id = $1', [id]
+      'SELECT sku, quantity_needed, artisan_id, status, total_cost FROM workorder WHERE work_order_id = $1',
+      [id]
     );
+
     if (woResult.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Work order not found.' });
     }
+
     if (woResult.rows[0].status === 'Complete') {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Work order is already completed.' });
     }
+
     const { sku, quantity_needed, artisan_id, total_cost } = woResult.rows[0];
-    await client.query(`UPDATE workorder SET status = 'Complete' WHERE work_order_id = $1`, [id]);
+
+    const userRes = await client.query(
+      'SELECT user_id FROM userlogin WHERE user_id = (SELECT user_id FROM personaldata LIMIT 1) LIMIT 1'
+    );
+    const fallbackUserId = userRes.rows[0]?.user_id || null;
+
+    await client.query(
+      `UPDATE workorder SET status = 'Complete' WHERE work_order_id = $1`,
+      [id]
+    );
+
     for (const mat of actualMaterials) {
       const { material_id, expected_qty, actual_qty } = mat;
       const variance = Number(actual_qty) - Number(expected_qty);
+
       await client.query(
-        `UPDATE work_order_materials SET actual_qty_used=$1, variance_qty=$2 WHERE work_order_id=$3 AND material_id=$4`,
+        `UPDATE work_order_materials
+         SET actual_qty_used = $1, variance_qty = $2
+         WHERE work_order_id = $3 AND material_id = $4`,
         [actual_qty, variance, id, material_id]
       );
+
       if (variance !== 0) {
         await client.query(
           `UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2`,
           [variance, material_id]
         );
       }
+
       await client.query(
-        `INSERT INTO material_variance_logs (work_order_id, material_id, artisan_id, expected_qty, actual_qty, variance, recorded_at)
+        `INSERT INTO material_variance_logs
+           (work_order_id, material_id, artisan_id, expected_qty, actual_qty, variance, recorded_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())
          ON CONFLICT (work_order_id, material_id) DO UPDATE SET
-         actual_qty = EXCLUDED.actual_qty,
-         variance = EXCLUDED.variance,
-         recorded_at = NOW()`,
+           actual_qty  = EXCLUDED.actual_qty,
+           variance    = EXCLUDED.variance,
+           recorded_at = NOW()`,
         [id, material_id, artisan_id, expected_qty, actual_qty, variance]
       );
     }
-    await client.query(`UPDATE finishedgoods SET current_stock = current_stock + $1 WHERE sku = $2`, [quantity_needed, sku]);
+
+    await client.query(
+      `UPDATE finishedgoods SET current_stock = current_stock + $1 WHERE sku = $2`,
+      [quantity_needed, sku]
+    );
+
     if (total_cost > 0) {
       await createTransaction(client, {
         ref: `WO-${id}`,
@@ -1563,14 +1590,17 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
         status: 'Pending',
         sourceTable: 'workorder',
         sourceId: id,
-        userId: artisan_id
+        userId: fallbackUserId
       });
     }
+
     await client.query('COMMIT');
-    io.emit("work_orders:updated");
-    io.emit("materials:updated");
-    io.emit("products:updated");
-    io.emit("transactions:updated");
+
+    io.emit('work_orders:updated');
+    io.emit('materials:updated');
+    io.emit('products:updated');
+    io.emit('transactions:updated');
+
     res.json({ message: 'Work order completed, variance logged, stock updated.' });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -1583,48 +1613,109 @@ app.put('/api/work_orders/:id/complete', async (req, res) => {
 app.put('/api/work_orders/:id', async (req, res) => {
   const { id } = req.params;
   const { status, artisan_id, quantity, sku, target_date, selectedMaterials, product_image } = req.body;
+
+  const parsedArtisanId = artisan_id ? parseInt(artisan_id) : null;
+
   const rawList = selectedMaterials || [];
   const materialsMap = new Map();
+
   for (const m of rawList) {
     const matId = parseInt(m.material_id);
     if (!matId) continue;
+
     if (materialsMap.has(matId)) {
       const existing = materialsMap.get(matId);
       existing.qty += Number(m.qty) || 0;
       existing.total = existing.qty * existing.cost;
     } else {
-      materialsMap.set(matId, { material_id: matId, qty: Number(m.qty) || 0, cost: Number(m.cost) || 0, total: (Number(m.qty) || 0) * (Number(m.cost) || 0) });
+      materialsMap.set(matId, {
+        material_id: matId,
+        qty: Number(m.qty) || 0,
+        cost: Number(m.cost) || 0,
+        total: (Number(m.qty) || 0) * (Number(m.cost) || 0)
+      });
     }
   }
+
   const materialsList = Array.from(materialsMap.values());
-  const calculatedTotalCost = materialsList.reduce((sum, m) => sum + m.qty * m.cost, 0);
+
   const client = await getPool().connect();
   try {
     await client.query('BEGIN');
-    const oldMaterials = await client.query('SELECT material_id, material_qty FROM work_order_materials WHERE work_order_id = $1', [id]);
-    for (const oldMat of oldMaterials.rows) {
-      await client.query('UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2', [oldMat.material_qty, oldMat.material_id]);
-    }
-    await client.query('DELETE FROM work_order_materials WHERE work_order_id = $1', [id]);
-    await client.query(
-      'UPDATE workorder SET status=$1, artisan_id=$2, quantity_needed=$3, sku=$4, target_date=$5, total_cost=$6, product_image=$7 WHERE work_order_id=$8',
-      [status, artisan_id, quantity, sku, target_date, calculatedTotalCost, product_image, id]
+
+    const exists = await client.query(
+      'SELECT work_order_id, artisan_id, total_cost FROM workorder WHERE work_order_id = $1',
+      [id]
     );
-    for (const m of materialsList) {
-      await client.query(
-        'INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) VALUES ($1,$2,$3,$4)',
-        [id, m.material_id, m.qty, m.total]
-      );
-      const updateStock = await client.query(
-        'UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2 RETURNING stock_quantity',
-        [m.qty, m.material_id]
-      );
-      if (updateStock.rows[0].stock_quantity < 0) throw new Error(`Insufficient stock for material ID: ${m.material_id}`);
+    if (exists.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: `Work order ${id} not found.` });
     }
+
+    const currentArtisanId = exists.rows[0].artisan_id;
+    const currentTotalCost = exists.rows[0].total_cost;
+    const resolvedArtisanId = parsedArtisanId || currentArtisanId || null;
+
+    if (resolvedArtisanId) {
+      const artisanExists = await client.query(
+        'SELECT artisan_id FROM artisan WHERE artisan_id = $1',
+        [resolvedArtisanId]
+      );
+      if (artisanExists.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: `Artisan not found. Please select a valid artisan.` });
+      }
+    }
+
+    const calculatedTotalCost = materialsList.length > 0
+      ? materialsList.reduce((sum, m) => sum + m.qty * m.cost, 0)
+      : currentTotalCost;
+
+    await client.query(
+      `UPDATE workorder
+       SET status=$1, artisan_id=$2, quantity_needed=$3, sku=$4,
+           target_date=$5, total_cost=$6, product_image=$7
+       WHERE work_order_id=$8`,
+      [status, resolvedArtisanId, quantity, sku, target_date, calculatedTotalCost, product_image, id]
+    );
+
+    if (materialsList.length > 0) {
+      const oldMaterials = await client.query(
+        'SELECT material_id, material_qty FROM work_order_materials WHERE work_order_id = $1',
+        [id]
+      );
+      for (const oldMat of oldMaterials.rows) {
+        await client.query(
+          'UPDATE material SET stock_quantity = stock_quantity + $1 WHERE material_id = $2',
+          [oldMat.material_qty, oldMat.material_id]
+        );
+      }
+
+      await client.query('DELETE FROM work_order_materials WHERE work_order_id = $1', [id]);
+
+      for (const m of materialsList) {
+        await client.query(
+          'INSERT INTO work_order_materials (work_order_id, material_id, material_qty, subtotal) VALUES ($1,$2,$3,$4)',
+          [id, m.material_id, m.qty, m.total]
+        );
+
+        const updateStock = await client.query(
+          'UPDATE material SET stock_quantity = stock_quantity - $1 WHERE material_id = $2 RETURNING stock_quantity, material_name',
+          [m.qty, m.material_id]
+        );
+
+        if (updateStock.rows[0].stock_quantity < 0) {
+          throw new Error(`INSUFFICIENT_STOCK::${updateStock.rows[0].material_name}::${m.qty}::${updateStock.rows[0].stock_quantity + m.qty}`);
+        }
+      }
+    }
+
     await client.query('COMMIT');
-    io.emit("work_orders:updated");
-    io.emit("materials:updated");
-    res.status(200).json({ success: true, message: "Order and Stock Updated Successfully" });
+
+    io.emit('work_orders:updated');
+    io.emit('materials:updated');
+
+    res.status(200).json({ success: true, message: 'Order and Stock Updated Successfully' });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });

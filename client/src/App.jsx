@@ -6,7 +6,6 @@ import { getHashedPath, getAuthHash } from "./utils/hash";
 
 import Login from "./pages/auth/Login";
 import OTPInput from "./pages/auth/OTPInput";
-import Recovered from "./pages/auth/Recovered";
 import Reset from "./pages/auth/Reset";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 
@@ -40,7 +39,6 @@ const AuthSwitcher = () => {
   if (authHash === getAuthHash("otp")) return <OTPInput />;
   if (authHash === getAuthHash("forgot")) return <ForgotPassword />;
   if (authHash === getAuthHash("reset")) return <Reset />;
-  if (authHash === getAuthHash("recovered")) return <Recovered />;
   return <Navigate to={`/auth/${getAuthHash("login")}`} replace />;
 };
 
