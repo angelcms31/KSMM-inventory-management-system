@@ -721,6 +721,29 @@ app.get("/api/audit_logs", async (req, res) => {
   }
 });
 
+app.post("/api/audit_logs", async (req, res) => {
+  try {
+    const { user_id, action } = req.body; 
+
+    const userResult = await getPool().query(
+      "SELECT user_role FROM userlogin WHERE user_id = $1",
+      [user_id]
+    );
+    const userRole = userResult.rows[0]?.user_role || 'User';
+
+    const result = await getPool().query(
+      `INSERT INTO audit_logs (user_id, action, role, timestamp) 
+       VALUES ($1, $2, $3, NOW()) 
+       RETURNING *`,
+      [user_id, action, userRole]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 // ─────────────────────────────────────────────
 // SALES
 // ─────────────────────────────────────────────

@@ -197,15 +197,15 @@ const registerGmailRoutes = (app, dbQuery) => {
 
             const boundary = `boundary_${Date.now()}`;
             const files = req.files || [];
-            const normalizedBody = body.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n");
-            const bodyB64 = Buffer.from(normalizedBody, 'utf-8').toString('base64');
+            const htmlBody = body.includes('<br') ? body : body.replace(/\r\n|\n/g, '<br>');
+            const bodyB64 = Buffer.from(htmlBody, 'utf-8').toString('base64');
 
             let rawEmail;
             if (files.length === 0) {
                 rawEmail = [
                     `To: ${to}`,
                     'MIME-Version: 1.0',
-                    'Content-Type: text/plain; charset=utf-8',
+                    'Content-Type: text/html; charset=utf-8',
                     'Content-Transfer-Encoding: base64',
                     `Subject: ${subject}`,
                     '',
@@ -219,7 +219,7 @@ const registerGmailRoutes = (app, dbQuery) => {
                     `Subject: ${subject}`,
                     '',
                     `--${boundary}`,
-                    'Content-Type: text/plain; charset=utf-8',
+                    'Content-Type: text/html; charset=utf-8',
                     'Content-Transfer-Encoding: base64',
                     '',
                     bodyB64,
