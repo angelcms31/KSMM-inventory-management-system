@@ -21,7 +21,7 @@ const MONTHS = [
   { value: 11, label: "November" }, { value: 12, label: "December" }
 ];
 
-const TYPE_OPTIONS = ["All", "Revenue", "Expense", "Adjustment"];
+const TYPE_OPTIONS = ["All", "Revenue", "Expense"];
 
 const STATUS_META = {
   Pending: { color: "bg-amber-50 text-amber-700 border border-amber-200", dot: "bg-amber-400" },
@@ -32,7 +32,6 @@ const STATUS_META = {
 const TYPE_META = {
   Revenue: { color: "text-emerald-600", bg: "bg-emerald-50", icon: <ArrowUpRight className="w-3 h-3" /> },
   Expense: { color: "text-red-500", bg: "bg-red-50", icon: <ArrowDownRight className="w-3 h-3" /> },
-  Adjustment: { color: "text-blue-500", bg: "bg-blue-50", icon: <Activity className="w-3 h-3" /> }
 };
 
 const fmt = (n) =>
@@ -387,9 +386,6 @@ export default function FinanceTransactions({ socket }) {
             <h1 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Financial Ledger</h1>
             <p className="text-gray-500 text-sm font-bold">Automated tracking of material procurement and sales revenue.</p>
           </div>
-          <button onClick={fetchData} className="flex items-center gap-2 text-xs font-black text-gray-400 hover:text-black uppercase tracking-widest">
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

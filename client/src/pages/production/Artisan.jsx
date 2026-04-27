@@ -368,8 +368,14 @@ export default function Artisan() {
                             <td className="p-3 text-left">
                               <select className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-[11px] border-none" value={item.material_id} onChange={e => handleAssignMaterialChange(index, 'material_id', e.target.value)}>
                                 <option value="">Select Resource...</option>
-                                {materials.map(m => <option key={m.material_id} value={m.material_id}>{m.material_name}</option>)}
-                              </select>
+                                    {materials
+                                      .sort((a, b) => (a.material_name || "").localeCompare(b.material_name || ""))
+                                      .map(m => (
+                                        <option key={m.material_id} value={m.material_id}>
+                                          {m.material_name}
+                                        </option>
+                                    ))}                              
+                                    </select>
                             </td>
                             <td className="p-3 text-center">
                               <input type="number" min="1" step="1" className="w-12 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 font-black text-[11px]" value={item.qty} onChange={e => handleAssignMaterialChange(index, 'qty', e.target.value)} />

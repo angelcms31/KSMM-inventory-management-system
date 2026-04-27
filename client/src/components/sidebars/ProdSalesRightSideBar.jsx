@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { HiOutlineBell, HiOutlineX } from "react-icons/hi";
+import { HiOutlineMenuAlt3, HiOutlineX } from "react-icons/hi";
 
 const ProdSalesRightSidebar = () => {
   const [lowStockLogs, setLowStockLogs] = useState([]);
@@ -87,11 +87,6 @@ const ProdSalesRightSidebar = () => {
             <p className="text-[10px] text-gray-500 mt-1 tracking-tighter">{userRole}</p>
           </div>
         </div>
-
-        <div className="relative cursor-pointer group p-1.5 rounded-full hover:bg-white/5 transition-all duration-200 active:scale-90">
-          <HiOutlineBell size={20} className="text-gray-400 group-hover:text-white transition-colors duration-200" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#262221]"></span>
-        </div>
       </div>
 
       <div className="px-6 pb-6 flex-shrink-0">
@@ -165,7 +160,7 @@ const ProdSalesRightSidebar = () => {
         style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
       >
         <div className="relative">
-          <HiOutlineBell size={18} className="text-gray-300" />
+          <HiOutlineMenuAlt3 size={20} className="text-gray-300" />
           {lowStockLogs.length > 0 && (
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]"></span>
           )}

@@ -59,10 +59,14 @@ export default function Reset() {
     navigate(`/auth/${getAuthHash("login")}`, { replace: true });
   };
 
-  const closeAlert = () => {
+const closeAlert = () => {
     if (alert?.type === 'success') {
+      localStorage.clear(); 
+      sessionStorage.clear();
+
       setEmail("");
       setOTP(null);
+
       navigate(`/auth/${getAuthHash("login")}`, { replace: true });
     }
     setAlert(null);

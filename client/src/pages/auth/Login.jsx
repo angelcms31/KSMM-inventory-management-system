@@ -2,8 +2,29 @@ import axios from "axios";
 import React, { useState, useContext, useEffect } from "react";
 import { RecoveryContext } from "../../context/RecoveryContext";
 import { useNavigate } from "react-router-dom";
-import { HiOutlineEye, HiOutlineEyeOff } from "react-icons/hi";
-import { getHashedRole, getAuthHash } from "../../utils/hash";
+import { HiOutlineEye, HiOutlineEyeOff, HiChevronLeft } from "react-icons/hi";import { getHashedRole, getAuthHash } from "../../utils/hash";
+import { HiCheckCircle, HiXCircle } from "react-icons/hi";
+
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+  return (
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/20 backdrop-blur-md">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in duration-300">
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess ? <HiCheckCircle size={44} className="text-emerald-500" /> : <HiXCircle size={44} className="text-rose-500" />}
+        </div>
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+        <p className="text-slate-800 font-bold text-lg leading-snug tracking-tight mb-8">{alert.message}</p>
+        <button onClick={onClose} className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] shadow-lg ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'}`}>
+          {isSuccess ? 'Back to Login' : 'Try Again'}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default function Login() {
   const { setEmail, setOTP } = useContext(RecoveryContext);
@@ -23,14 +44,49 @@ export default function Login() {
   const [pendingRole, setPendingRole] = useState(null);
   const [defaultPassword, setDefaultPassword] = useState("");
 
-  useEffect(() => {
-    sessionStorage.removeItem("recoveryEmail");
-    sessionStorage.removeItem("recoveryOTP");
+ const [alert, setAlert] = useState(null);
+  const [lastActivity, setLastActivity] = useState(Date.now());
 
-    const savedEmail = localStorage.getItem("device_remembered_email");
-    if (savedEmail) setLocalEmail(savedEmail);
-  }, []);
+useEffect(() => {
+    if (!showChangePassword) return;
 
+    const timeout = 5 * 60 * 1000;
+    
+    const checkInactivity = setInterval(() => {
+      if (Date.now() - lastActivity > timeout) {
+        localStorage.clear();
+        window.location.reload();
+      }
+    }, 1000);
+
+    const handleBeforeUnload = () => {
+      localStorage.removeItem("userName");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("user_id");
+      localStorage.removeItem("is_head_admin");
+    };
+
+    const updateActivity = () => setLastActivity(Date.now());
+
+    window.addEventListener("mousemove", updateActivity);
+    window.addEventListener("keypress", updateActivity);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      clearInterval(checkInactivity);
+      window.removeEventListener("mousemove", updateActivity);
+      window.removeEventListener("keypress", updateActivity);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [showChangePassword, lastActivity]);
+
+  const closeAlert = () => {
+    if (alert?.type === 'success') {
+      localStorage.clear();
+      window.location.reload();
+    }
+    setAlert(null);
+  };
   const handleEmailChange = (e) => {
     const val = e.target.value;
     setLocalEmail(val);
@@ -88,37 +144,32 @@ export default function Login() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-
     if (newPassword === defaultPassword) {
       setError(true);
       setErrorMessage("Please enter a different password.");
       return;
     }
-
     if (newPassword.length < 8) {
       setError(true);
       setErrorMessage("Password must be at least 8 characters.");
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setError(true);
       setErrorMessage("Passwords do not match.");
       return;
     }
-
     try {
       await axios.post("http://localhost:5000/api/change_password", {
         user_id: pendingUserId,
         new_password: newPassword,
       });
       setError(false);
-      setShowChangePassword(false);
-      redirectByRole(pendingRole);
+      setAlert({ message: "Password reset successfully!", type: "success" });
     } catch (err) {
       setError(true);
       const backendMessage = err.response?.data?.message || err.response?.data;
-      setErrorMessage(typeof backendMessage === "string" ? backendMessage : "Failed to update password. Please try again.");
+      setErrorMessage(typeof backendMessage === "string" ? backendMessage : "Failed to update password.");
     }
   };
 
@@ -148,10 +199,23 @@ export default function Login() {
       });
   };
 
-  if (showChangePassword) {
+ if (showChangePassword) {
     return (
       <div className="flex h-screen w-screen bg-white font-serif overflow-hidden">
-        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 md:px-20 text-[#262221]">
+        <AlertDialog alert={alert} onClose={closeAlert} />
+        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 md:px-20 text-[#262221] relative">
+          
+          <button 
+            onClick={() => {
+              setShowChangePassword(false);
+              localStorage.clear();
+              window.location.reload();
+            }}
+            className="absolute top-8 left-8 text-gray-400 hover:text-stone-800 transition-colors flex items-center gap-1 text-xs font-bold uppercase tracking-widest cursor-pointer font-sans"
+          >
+            <HiChevronLeft size={20} /> Back to Login
+          </button>
+
           <div className="text-center mb-10">
             <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">Matthew & Melka</h1>
             <p className="text-[10px] tracking-[0.2em] text-gray-400 font-sans mt-2 uppercase">Ken Samudio</p>
@@ -220,6 +284,7 @@ export default function Login() {
 
   return (
     <div className="flex h-screen w-screen bg-white font-serif overflow-hidden">
+      <AlertDialog alert={alert} onClose={closeAlert} /> 
       <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 md:px-20 text-[#262221]">
         <div className="text-center mb-10">
           <h1 className="text-2xl md:text-3xl uppercase tracking-[0.3em] font-bold text-[#8B6B4A]">Matthew & Melka</h1>
