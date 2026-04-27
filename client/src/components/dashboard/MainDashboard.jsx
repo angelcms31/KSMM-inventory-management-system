@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { 
+  useState, 
+  useEffect, 
+  useCallback 
+} from "react";
 import { Line } from "react-chartjs-2";
 import axios from "axios";
 import {
@@ -22,13 +26,29 @@ import {
 } from "lucide-react";
 import { HiPhoto } from "react-icons/hi2";
 import {
-  HiCheckCircle, HiXCircle, HiOutlineEye, HiOutlineDownload, HiX,
+  HiCheckCircle, 
+  HiXCircle, 
+  HiOutlineEye, 
+  HiOutlineDownload, 
+  HiX,
 } from "react-icons/hi";
 import { FaRegFilePdf, FaRegFileExcel } from "react-icons/fa";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
+ChartJS.register(
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  Tooltip, 
+  Legend, 
+  Filler
+);
 
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
 const DAYS_IN_MONTH = (year, month) => new Date(year, month + 1, 0).getDate();
 
 const COURIERS_ICON = {
@@ -75,6 +95,7 @@ const TRACKING_STEPS = [
 const AlertDialog = ({ alert, onClose }) => {
   if (!alert) return null;
   const isSuccess = alert.type === 'success';
+  
   return (
     <div
       className="fixed inset-0 z-[500] flex items-center justify-center p-6"
@@ -86,14 +107,21 @@ const AlertDialog = ({ alert, onClose }) => {
         onClick={e => e.stopPropagation()}
       >
         <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-          {isSuccess ? <HiCheckCircle size={44} className="text-emerald-500" /> : <HiXCircle size={44} className="text-rose-500" />}
+          {isSuccess ? (
+            <HiCheckCircle size={44} className="text-emerald-500" />
+          ) : (
+            <HiXCircle size={44} className="text-rose-500" />
+          )}
         </div>
+        
         <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
           {isSuccess ? 'Success' : 'Error'}
         </p>
+        
         <p className="text-slate-800 font-black text-lg leading-snug tracking-tight mb-8">
           {alert.message}
         </p>
+        
         <div className="flex flex-col gap-2 w-full">
           {isSuccess && alert.fileUrl && !alert.isExcel && (
             <button
@@ -108,7 +136,7 @@ const AlertDialog = ({ alert, onClose }) => {
             className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]
               ${isSuccess ? 'text-emerald-600 bg-emerald-50' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}
           >
-            {isSuccess ? (alert.isExcel ? 'Close' : 'Close') : 'Try Again'}
+            Close
           </button>
         </div>
         <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
@@ -145,14 +173,14 @@ const OrderDetailModal = ({ order, onClose, products = [] }) => {
           <div className="flex items-start justify-between gap-4 py-4 border-t border-b border-gray-100">
             <div className="flex-1 min-w-0">
               <p className="text-gray-400 text-xs font-semibold mb-1">From</p>
-              <p className="text-sm font-bold text-gray-700 leading-snug">{fromAddress || "Warehouse / Origin"}</p>
+              <p className="text-sm font-bold text-gray-700 leading-snug truncate">{fromAddress || "Warehouse / Origin"}</p>
             </div>
             <div className="flex items-center gap-1 pt-3 flex-shrink-0 px-1">
               {[...Array(6)].map((_, i) => <div key={i} className="w-1.5 h-px bg-gray-300" />)}
             </div>
             <div className="flex-1 min-w-0 text-right">
               <p className="text-gray-400 text-xs font-semibold mb-1">To</p>
-              <p className="text-sm font-bold text-gray-700 leading-snug">{toAddress || order.client_name || "Customer"}</p>
+              <p className="text-sm font-bold text-gray-700 leading-snug truncate">{toAddress || order.client_name || "Customer"}</p>
             </div>
           </div>
 
@@ -248,6 +276,7 @@ const SalesTrendModal = ({ orders, onClose }) => {
   const [exportedByName, setExportedByName] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [alert, setAlert] = useState(null);
+  const [previewRows, setPreviewRows] = useState([]);
 
   const [exportFilterYear, setExportFilterYear] = useState("");
   const [exportFilterMonth, setExportFilterMonth] = useState("");
@@ -283,10 +312,13 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
   useEffect(() => { fetchExporterInfo(); }, [fetchExporterInfo]);
 
-  const daysInSelected = selectedYear && selectedMonth !== ""
-    ? DAYS_IN_MONTH(Number(selectedYear), Number(selectedMonth)) : 31;
+  const daysInSelected = (selectedYear && selectedMonth !== "")
+    ? new Date(Number(selectedYear), Number(selectedMonth) + 1, 0).getDate()
+    : 31;
+
   const exportDaysInSelected = exportFilterYear && exportFilterMonth !== ""
-    ? DAYS_IN_MONTH(Number(exportFilterYear), Number(exportFilterMonth)) : 31;
+    ? new Date(Number(exportFilterYear), Number(exportFilterMonth) + 1, 0).getDate()
+    : 31;
 
   const allCouriers = [...new Set(orders.map(o => o.courier).filter(Boolean))];
   const allPlatforms = [...new Set(orders.map(o => o.platform).filter(Boolean))];
@@ -294,7 +326,6 @@ const SalesTrendModal = ({ orders, onClose }) => {
   const getChartData = () => {
     const yr = selectedYear ? Number(selectedYear) : currentYear;
     const mo = selectedMonth !== "" ? Number(selectedMonth) : -1;
-    const filterByYear = (y) => orders.filter(o => o.order_date && new Date(o.order_date).getFullYear() === y);
 
     if (selectedYear && selectedMonth !== "") {
       const dInM = DAYS_IN_MONTH(yr, mo);
@@ -319,18 +350,55 @@ const SalesTrendModal = ({ orders, onClose }) => {
     return { labels: MONTHS, thisData: buildM(yr), lastData: buildM(yr - 1) };
   };
 
+  const { labels, thisData, lastData } = getChartData();
+  
   const isSingleDay = selectedYear && selectedMonth !== "" && selectedDay !== "";
+
   const singleDayOrders = isSingleDay ? orders.filter(o => {
     const d = new Date(o.order_date);
-    return d.getFullYear() === Number(selectedYear) && d.getMonth() === Number(selectedMonth) && d.getDate() === Number(selectedDay);
+    return d.getFullYear() === Number(selectedYear) && 
+           d.getMonth() === Number(selectedMonth) && 
+           d.getDate() === Number(selectedDay);
   }) : [];
-  const singleDayRevenue = singleDayOrders.filter(o => o.status === "Delivered").reduce((s, o) => s + Number(o.total_amount || 0), 0);
+
+  const singleDayDelivered = singleDayOrders.filter(o => o.status === "Delivered");
+
+  const singleDayRevenue = singleDayDelivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+  
   const singleDayLYRev = isSingleDay ? orders.filter(o => {
     const d = new Date(o.order_date);
-    return d.getFullYear() === (Number(selectedYear) - 1) && d.getMonth() === Number(selectedMonth) && d.getDate() === Number(selectedDay) && o.status === "Delivered";
+    return d.getFullYear() === (Number(selectedYear) - 1) && 
+           d.getMonth() === Number(selectedMonth) && 
+           d.getDate() === Number(selectedDay) && 
+           o.status === "Delivered";
   }).reduce((s, o) => s + Number(o.total_amount || 0), 0) : 0;
 
-  const { labels, thisData, lastData } = getChartData();
+  const getExportRows = useCallback(() => {
+    let filtered = orders.filter(o => o.status === "Delivered" && o.order_date);
+    if (exportFilterYear) filtered = filtered.filter(o => new Date(o.order_date).getFullYear() === Number(exportFilterYear));
+    if (exportFilterMonth !== "") filtered = filtered.filter(o => new Date(o.order_date).getMonth() === Number(exportFilterMonth));
+    if (exportFilterDay !== "") filtered = filtered.filter(o => new Date(o.order_date).getDate() === Number(exportFilterDay));
+    if (exportFilterCourier) filtered = filtered.filter(o => o.courier === exportFilterCourier);
+    if (exportFilterPlatform) filtered = filtered.filter(o => o.platform === exportFilterPlatform);
+    filtered.sort((a, b) => sortOrder === "asc" ? new Date(a.order_date) - new Date(b.order_date) : new Date(b.order_date) - new Date(a.order_date));
+    return filtered.map(o => ({
+      "Order ID": `SO-${o.order_id}`,
+      Date: o.order_date ? new Date(o.order_date).toLocaleDateString("en-PH") : "N/A",
+      Client: o.client_name || "N/A",
+      Product: o.product_name || o.sku || "N/A",
+      Quantity: o.quantity || 0,
+      Courier: o.courier || "N/A",
+      Platform: o.platform || "N/A",
+      "Total Amount (₱)": Number(o.total_amount || 0).toFixed(2),
+    }));
+  }, [orders, exportFilterYear, exportFilterMonth, exportFilterDay, exportFilterCourier, exportFilterPlatform, sortOrder]);
+
+  useEffect(() => {
+    if (previewOpen || sortModalOpen) {
+      setPreviewRows(getExportRows());
+    }
+  }, [previewOpen, sortModalOpen, getExportRows]);
+
   const thisTotal = isSingleDay ? singleDayRevenue : thisData.reduce((a, b) => a + b, 0);
   const lastTotal = isSingleDay ? singleDayLYRev : lastData.reduce((a, b) => a + b, 0);
   const pctChange = lastTotal > 0 ? (((thisTotal - lastTotal) / lastTotal) * 100).toFixed(1) : null;
@@ -354,26 +422,6 @@ const SalesTrendModal = ({ orders, onClose }) => {
       y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
       x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
     },
-  };
-
-  const getExportRows = () => {
-    let filtered = orders.filter(o => o.status === "Delivered" && o.order_date);
-    if (exportFilterYear) filtered = filtered.filter(o => new Date(o.order_date).getFullYear() === Number(exportFilterYear));
-    if (exportFilterMonth !== "") filtered = filtered.filter(o => new Date(o.order_date).getMonth() === Number(exportFilterMonth));
-    if (exportFilterDay !== "") filtered = filtered.filter(o => new Date(o.order_date).getDate() === Number(exportFilterDay));
-    if (exportFilterCourier) filtered = filtered.filter(o => o.courier === exportFilterCourier);
-    if (exportFilterPlatform) filtered = filtered.filter(o => o.platform === exportFilterPlatform);
-    filtered.sort((a, b) => sortOrder === "asc" ? new Date(a.order_date) - new Date(b.order_date) : new Date(b.order_date) - new Date(a.order_date));
-    return filtered.map(o => ({
-      "Order ID": `SO-${o.order_id}`,
-      Date: o.order_date ? new Date(o.order_date).toLocaleDateString("en-PH") : "N/A",
-      Client: o.client_name || "N/A",
-      Product: o.product_name || o.sku || "N/A",
-      Quantity: o.quantity || 0,
-      Courier: o.courier || "N/A",
-      Platform: o.platform || "N/A",
-      "Total Amount (₱)": Number(o.total_amount || 0).toFixed(2),
-    }));
   };
 
   const exportToExcel = async () => {
@@ -437,6 +485,7 @@ const SalesTrendModal = ({ orders, onClose }) => {
   };
 
   const selectClass = "appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all pr-8";
+  
   const Chevron = () => (
     <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
       <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -507,7 +556,11 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   <p className="text-[9px] text-gray-400 mt-1">{selectedYear - 1} comparison</p>
                 </div>
               </div>
-            ) : <Line data={chartData} options={chartOptions} />}
+            ) : (
+              <div className="h-full relative">
+                <Line data={chartData} options={chartOptions} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -515,12 +568,35 @@ const SalesTrendModal = ({ orders, onClose }) => {
           <p className="text-base font-black text-gray-900 mb-3">Select Timeline</p>
           <div className="flex gap-3">
             {[
-              { value: selectedYear, onChange: e => { setSelectedYear(e.target.value); setSelectedMonth(""); setSelectedDay(""); }, disabled: false, placeholder: "Year", options: availableYears.map(y => ({ value: y, label: y })) },
-              { value: selectedMonth, onChange: e => { setSelectedMonth(e.target.value); setSelectedDay(""); }, disabled: !selectedYear, placeholder: "Month", options: MONTHS.map((m, i) => ({ value: i, label: m })) },
-              { value: selectedDay, onChange: e => setSelectedDay(e.target.value), disabled: !selectedYear || selectedMonth === "", placeholder: "Day", options: Array.from({ length: daysInSelected }, (_, i) => ({ value: i + 1, label: i + 1 })) },
+              { 
+                value: selectedYear, 
+                onChange: e => { setSelectedYear(e.target.value); setSelectedMonth(""); setSelectedDay(""); }, 
+                disabled: false, 
+                placeholder: "Year", 
+                options: availableYears.map(y => ({ value: y, label: y })) 
+              },
+              { 
+                value: selectedMonth, 
+                onChange: e => { setSelectedMonth(e.target.value); setSelectedDay(""); }, 
+                disabled: !selectedYear, 
+                placeholder: "Month", 
+                options: MONTHS.map((m, i) => ({ value: i, label: m })) 
+              },
+              { 
+                value: selectedDay, 
+                onChange: e => setSelectedDay(e.target.value), 
+                disabled: !selectedYear || selectedMonth === "", 
+                placeholder: "Day", 
+                options: Array.from({ length: daysInSelected }, (_, i) => ({ value: i + 1, label: i + 1 })) 
+              },
             ].map((sel, idx) => (
               <div key={idx} className="relative flex-1">
-                <select value={sel.value} onChange={sel.onChange} disabled={sel.disabled} className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-black uppercase tracking-widest"}>
+                <select 
+                  value={sel.value} 
+                  onChange={sel.onChange} 
+                  disabled={sel.disabled} 
+                  className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-black uppercase tracking-widest"}
+                >
                   <option value="">{sel.placeholder}</option>
                   {sel.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -620,26 +696,30 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   <tr>{["Order ID", "Date", "Client", "Product", "Quantity", "Courier", "Total"].map(h => <th key={h} className="px-5 py-4">{h}</th>)}</tr>
                 </thead>
                 <tbody className="bg-white text-[10px] font-bold text-gray-700">
-                  {previewRows.map((row, i) => (
-                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-5 py-4 font-black">{row["Order ID"]}</td>
-                      <td className="px-5 py-4">{row.Date}</td>
-                      <td className="px-5 py-4 truncate max-w-[120px]">{row.Client}</td>
-                      <td className="px-5 py-4 truncate max-w-[150px]">{row.Product}</td>
-                      <td className="px-5 py-4">{row.Quantity}</td>
-                      <td className="px-5 py-4">{row.Courier}</td>
-                      <td className="px-5 py-4 font-black text-gray-900">₱{row["Total Amount (₱)"]}</td>
-                    </tr>
-                  ))}
+                  {previewRows.length > 0 ? (
+                    previewRows.map((row, i) => (
+                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="px-5 py-4 font-black">{row["Order ID"]}</td>
+                        <td className="px-5 py-4">{row.Date}</td>
+                        <td className="px-5 py-4 truncate max-w-[120px]">{row.Client}</td>
+                        <td className="px-5 py-4 truncate max-w-[150px]">{row.Product}</td>
+                        <td className="px-5 py-4">{row.Quantity}</td>
+                        <td className="px-5 py-4">{row.Courier}</td>
+                        <td className="px-5 py-4 font-black text-gray-900">₱{row["Total Amount (₱)"]}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="7" className="px-5 py-10 text-center text-gray-400">No data available for the selected filters</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
             <div className="flex gap-4 mt-6">
               <button className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-black/10" onClick={exportToPDF}>
-                <FaRegFilePdf size={18} /> Download Document (PDF)
+                <FaRegFilePdf size={18} /> Download PDF
               </button>
               <button className="flex-1 bg-white border-2 border-black text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all" onClick={exportToExcel}>
-                <FaRegFileExcel size={18} /> Download Sheet (Excel)
+                <FaRegFileExcel size={18} /> Download Excel
               </button>
             </div>
           </div>
@@ -666,17 +746,31 @@ const MainDashboard = () => {
         ]);
         setOrders(ordersRes.data || []);
         setProducts(productsRes.data || []);
-      } catch {}
+      } catch (err) {
+        console.error("API Error:", err);
+      }
     };
     fetchAll();
   }, []);
 
-  const totalRevenue = orders.filter(o => o.status === "Delivered").reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+  const totalRevenue = orders
+    .filter(o => o.status === "Delivered")
+    .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    
   const totalOrders = orders.length;
-  const lowStockProducts = products.filter(p => Number(p.current_stock) <= Number(p.min_stocks));
+  
+  const lowStockProducts = products.filter(
+    p => Number(p.current_stock) <= Number(p.min_stocks)
+  );
+  
   const inTransitOrders = orders.filter(o => o.status === "Shipped");
+  
   const totalDeliveryPages = Math.ceil(inTransitOrders.length / deliveryPerPage);
-  const currentDeliveryOrders = inTransitOrders.slice(deliveryPage * deliveryPerPage, (deliveryPage + 1) * deliveryPerPage);
+  
+  const currentDeliveryOrders = inTransitOrders.slice(
+    deliveryPage * deliveryPerPage, 
+    (deliveryPage + 1) * deliveryPerPage
+  );
 
   const topProducts = [...products]
     .map(p => ({
@@ -685,16 +779,28 @@ const MainDashboard = () => {
       revenue: orders.filter(o => o.status === "Delivered" && (o.product_name === p.name || o.sku === p.sku)).reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
     }))
     .filter(p => p.sold > 0)
-    .sort((a, b) => b.sold - a.sold).slice(0, 5);
+    .sort((a, b) => b.sold - a.sold)
+    .slice(0, 5);
 
   const currentYear = new Date().getFullYear();
   const monthlySales = Array(12).fill(0);
-  orders.filter(o => o.status === "Delivered" && o.order_date && new Date(o.order_date).getFullYear() === currentYear)
+  orders
+    .filter(o => o.status === "Delivered" && o.order_date && new Date(o.order_date).getFullYear() === currentYear)
     .forEach(o => { monthlySales[new Date(o.order_date).getMonth()] += Number(o.total_amount || 0); });
 
   const salesData = {
     labels: MONTHS,
-    datasets: [{ label: "Revenue (₱)", data: monthlySales, borderColor: "#1d4ed8", backgroundColor: "rgba(29,78,216,0.07)", tension: 0.4, pointRadius: 0, pointHoverRadius: 0, fill: true, borderWidth: 2 }],
+    datasets: [{ 
+      label: "Revenue (₱)", 
+      data: monthlySales, 
+      borderColor: "#1d4ed8", 
+      backgroundColor: "rgba(29,78,216,0.07)", 
+      tension: 0.4, 
+      pointRadius: 0, 
+      pointHoverRadius: 0, 
+      fill: true, 
+      borderWidth: 2 
+    }],
   };
 
   const chartOptions = {
@@ -702,7 +808,21 @@ const MainDashboard = () => {
     interaction: { mode: "index", intersect: false },
     plugins: {
       legend: { display: false },
-      tooltip: { enabled: true, backgroundColor: "#0f172a", titleColor: "#94a3b8", bodyColor: "#f1f5f9", padding: 12, cornerRadius: 12, titleFont: { size: 10, weight: "bold" }, bodyFont: { size: 13, weight: "bold" }, displayColors: false, callbacks: { title: (items) => items[0]?.label || "", label: (item) => `₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` } },
+      tooltip: { 
+        enabled: true, 
+        backgroundColor: "#0f172a", 
+        titleColor: "#94a3b8", 
+        bodyColor: "#f1f5f9", 
+        padding: 12, 
+        cornerRadius: 12, 
+        titleFont: { size: 10, weight: "bold" }, 
+        bodyFont: { size: 13, weight: "bold" }, 
+        displayColors: false, 
+        callbacks: { 
+          title: (items) => items[0]?.label || "", 
+          label: (item) => `₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` 
+        } 
+      },
     },
     scales: {
       y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
@@ -719,9 +839,21 @@ const MainDashboard = () => {
   ];
 
   return (
-    <div className="w-full overflow-x-hidden bg-[#fafafa] font-sans text-left">
-      {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} products={products} />}
-      {showTrendModal && <SalesTrendModal orders={orders} onClose={() => setShowTrendModal(false)} />}
+    <div className="w-full overflow-x-hidden bg-[#fafafa] font-sans text-left min-h-screen">
+      {selectedOrder && (
+        <OrderDetailModal 
+          order={selectedOrder} 
+          onClose={() => setSelectedOrder(null)} 
+          products={products} 
+        />
+      )}
+      
+      {showTrendModal && (
+        <SalesTrendModal 
+          orders={orders} 
+          onClose={() => setShowTrendModal(false)} 
+        />
+      )}
 
       <div className="px-4 py-6 pb-28 lg:pb-6 max-w-full text-left uppercase font-black">
         <div className="mb-6 mt-2 text-left leading-none uppercase tracking-tighter font-black">
@@ -753,7 +885,9 @@ const MainDashboard = () => {
                 <Search size={12} /> Detail
               </button>
             </div>
-            <div className="h-[250px] uppercase font-black"><Line data={salesData} options={chartOptions} /></div>
+            <div className="h-[250px] uppercase font-black">
+              <Line data={salesData} options={chartOptions} />
+            </div>
           </div>
 
           <div className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col min-w-0 text-left uppercase font-black leading-none">
@@ -763,7 +897,11 @@ const MainDashboard = () => {
                 <div key={p.sku} className="flex justify-between items-center p-3 rounded-2xl border border-gray-50 hover:bg-gray-50 transition-all text-left uppercase">
                   <div className="flex items-center gap-3 min-w-0 text-left uppercase leading-none font-black">
                     <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 leading-none">
-                      {p.product_image ? <img src={p.product_image} className="w-full h-full object-cover" alt="" /> : <HiPhoto size={20} className="text-gray-300" />}
+                      {p.product_image ? (
+                        <img src={p.product_image} className="w-full h-full object-cover" alt="" />
+                      ) : (
+                        <HiPhoto size={20} className="text-gray-300" />
+                      )}
                     </div>
                     <div className="min-w-0 text-left leading-none font-black">
                       <p className="text-[11px] font-black text-gray-900 truncate tracking-tight leading-none uppercase">{p.name}</p>
@@ -786,18 +924,33 @@ const MainDashboard = () => {
             <div className="space-y-4 font-black leading-none uppercase">
               {lowStockProducts.length === 0 ? (
                 <p className="text-gray-300 text-center py-10 font-black uppercase text-[10px] italic">Resources stabilized</p>
-              ) : lowStockProducts.slice(0, 5).map((item) => (
-                <div key={item.sku} className="flex items-center gap-4 text-left font-black uppercase leading-none">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">{item.product_image ? <img src={item.product_image} className="w-full h-full object-cover rounded-xl" alt="" /> : <Package size={18} className="text-gray-200" />}</div>
-                  <div className="flex-1 min-w-0 text-left leading-none uppercase font-black">
-                    <div className="flex justify-between items-center mb-1.5 text-left leading-none uppercase font-black">
-                      <p className="text-[10px] text-gray-800 truncate tracking-tighter uppercase font-black leading-none">{item.name}</p>
-                      <span className={`text-[8px] px-2 py-0.5 rounded-full text-white uppercase font-black ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-500'}`}>{Number(item.current_stock) === 0 ? "Void" : "Low"}</span>
+              ) : (
+                lowStockProducts.slice(0, 5).map((item) => (
+                  <div key={item.sku} className="flex items-center gap-4 text-left font-black uppercase leading-none">
+                    <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">
+                      {item.product_image ? (
+                        <img src={item.product_image} className="w-full h-full object-cover rounded-xl" alt="" />
+                      ) : (
+                        <Package size={18} className="text-gray-200" />
+                      )}
                     </div>
-                    <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden leading-none"><div className={`h-full transition-all duration-700 ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${Math.max((item.current_stock / item.min_stocks) * 100, 5)}%` }} /></div>
+                    <div className="flex-1 min-w-0 text-left leading-none uppercase font-black">
+                      <div className="flex justify-between items-center mb-1.5 text-left leading-none uppercase font-black">
+                        <p className="text-[10px] text-gray-800 truncate tracking-tighter uppercase font-black leading-none">{item.name}</p>
+                        <span className={`text-[8px] px-2 py-0.5 rounded-full text-white uppercase font-black ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
+                          {Number(item.current_stock) === 0 ? "Void" : "Low"}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden leading-none">
+                        <div 
+                          className={`h-full transition-all duration-700 ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-500'}`} 
+                          style={{ width: `${Math.max((item.current_stock / (item.min_stocks || 1)) * 100, 5)}%` }} 
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -805,24 +958,52 @@ const MainDashboard = () => {
             <div className="flex justify-between items-center mb-6 text-left leading-none uppercase font-black">
               <h3 className="text-sm font-black text-gray-900 tracking-widest uppercase font-black">Delivery Tracking</h3>
               <div className="flex gap-2">
-                <button onClick={() => setDeliveryPage(p => Math.max(p - 1, 0))} disabled={deliveryPage === 0} className="p-1.5 rounded-full border border-gray-200 disabled:opacity-20 transition-all active:scale-90 leading-none"><ChevronLeft size={14}/></button>
-                <button onClick={() => setDeliveryPage(p => p + 1)} disabled={deliveryPage >= totalDeliveryPages - 1} className="p-1.5 rounded-full border border-gray-100 disabled:opacity-20 transition-all active:scale-90 leading-none"><ChevronRight size={14}/></button>
+                <button 
+                  onClick={() => setDeliveryPage(p => Math.max(p - 1, 0))} 
+                  disabled={deliveryPage === 0} 
+                  className="p-1.5 rounded-full border border-gray-200 disabled:opacity-20 transition-all active:scale-90 leading-none"
+                >
+                  <ChevronLeft size={14}/>
+                </button>
+                <button 
+                  onClick={() => setDeliveryPage(p => p + 1)} 
+                  disabled={deliveryPage >= totalDeliveryPages - 1} 
+                  className="p-1.5 rounded-full border border-gray-100 disabled:opacity-20 transition-all active:scale-90 leading-none"
+                >
+                  <ChevronRight size={14}/>
+                </button>
               </div>
             </div>
             <div className="space-y-3 font-black uppercase text-left">
-              {currentDeliveryOrders.map(order => (
-                <button key={order.order_id} onClick={() => setSelectedOrder(order)} className="w-full p-4 border border-gray-50 rounded-[1.5rem] hover:bg-gray-50 text-left transition-all group flex items-center justify-between gap-4 uppercase font-black shadow-sm leading-none">
-                  <div className="min-w-0 text-left leading-none uppercase font-black">
-                    <p className="text-[11px] font-black text-gray-900 truncate tracking-tighter group-hover:text-blue-600 uppercase font-black leading-none">{order.client_name}</p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-2 uppercase font-black leading-none">SO-{order.order_id} · {order.courier}</p>
-                  </div>
-                  <span className="text-[8px] px-3 py-1 bg-blue-500 text-white rounded-full tracking-widest uppercase font-black shadow-sm leading-none">SHIPPED</span>
-                </button>
-              ))}
+              {currentDeliveryOrders.length > 0 ? (
+                currentDeliveryOrders.map(order => (
+                  <button 
+                    key={order.order_id} 
+                    onClick={() => setSelectedOrder(order)} 
+                    className="w-full p-4 border border-gray-50 rounded-[1.5rem] hover:bg-gray-50 text-left transition-all group flex items-center justify-between gap-4 uppercase font-black shadow-sm leading-none"
+                  >
+                    <div className="min-w-0 text-left leading-none uppercase font-black">
+                      <p className="text-[11px] font-black text-gray-900 truncate tracking-tighter group-hover:text-blue-600 uppercase font-black leading-none">{order.client_name}</p>
+                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-2 uppercase font-black leading-none">SO-{order.order_id} · {order.courier}</p>
+                    </div>
+                    <span className="text-[8px] px-3 py-1 bg-blue-500 text-white rounded-full tracking-widest uppercase font-black shadow-sm leading-none">SHIPPED</span>
+                  </button>
+                ))
+              ) : (
+                <p className="text-gray-300 text-center py-10 font-black uppercase text-[10px] italic">No active deliveries</p>
+              )}
             </div>
           </div>
         </div>
       </div>
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes popIn { 
+          from { opacity: 0; transform: scale(0.9) translateY(20px); } 
+          to { opacity: 1; transform: scale(1) translateY(0); } 
+        }
+      `}</style>
     </div>
   );
 };
