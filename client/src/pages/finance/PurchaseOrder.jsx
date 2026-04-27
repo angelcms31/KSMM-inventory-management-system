@@ -277,118 +277,74 @@ export default function PurchaseOrder({ onCompose }) {
   const generatePDFReceipt = async (order) => {
     try {
       const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+      const { default: autoTable } = await import('jspdf-autotable');
+      
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      
+      // Filename Format: PO_72_2026-04-27.pdf
+      const dateStr = new Date().toISOString().split('T')[0];
+      const filename = `PO_${order.assignment_id}_${dateStr}.pdf`;
 
-      doc.setFillColor(248, 248, 248);
-      doc.rect(0, 0, 148, 210, 'F');
-
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(10, 10, 128, 190, 8, 8, 'F');
-
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(10, 10, 128, 190, 8, 8, 'S');
-
-      doc.setFillColor(15, 15, 15);
-      doc.roundedRect(18, 18, 112, 48, 6, 6, 'F');
-
-      const statusColor = order.status === 'Delivered'
-        ? [16, 185, 129]
-        : order.status === 'Ongoing'
-          ? [37, 99, 235]
-          : [245, 158, 11];
-
-      doc.setFillColor(...statusColor);
-      doc.circle(114, 24, 3, 'F');
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(6);
+      // --- PDF DESIGN START ---
+      doc.setFontSize(20);
       doc.setFont(undefined, 'bold');
-      doc.text('MATTHEW & MELKA', 22, 28);
-
-      doc.setTextColor(150, 150, 150);
-      doc.setFontSize(5.5);
+      doc.text("MATTHEW & MELKA", 14, 20);
+      
+      doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
-      doc.text('PURCHASE ORDER RECEIPT', 22, 34);
+      doc.setTextColor(100);
+      doc.text("Inventory Management System - Purchase Order Receipt", 14, 26);
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
-      doc.setFont(undefined, 'bold');
-      doc.text(`PO-${order.assignment_id}`, 22, 52);
+      autoTable(doc, {
+        startY: 35,
+        theme: 'plain',
+        styles: { fontSize: 10, cellPadding: 2 },
+        columnStyles: { 0: { fontStyle: 'bold', width: 45 } },
+        body: [
+          ['PURCHASE ORDER NO:', `PO-${order.assignment_id}`],
+          ['STATUS:', order.status?.toUpperCase() || 'N/A'],
+          ['DATE ISSUED:', order.order_date ? new Date(order.order_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'],
+          ['REQUISITIONER:', order.requisitioner_name || 'Admin'],
+          ['SUPPLIER:', order.supplier_name || '—'],
+        ],
+      });
 
-      doc.setTextColor(...statusColor);
-      doc.setFontSize(6);
-      doc.setFont(undefined, 'bold');
-      doc.text(order.status.toUpperCase(), 22, 60);
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 10,
+        theme: 'striped',
+        headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255] },
+        head: [['Material Description', 'Quantity Ordered', 'Total Amount']],
+        body: [
+          [
+            order.material_name || '—', 
+            `${order.ordered_quantity} units`, 
+            `PHP ${Number(order.total_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+          ]
+        ],
+      });
 
-      let y = 80;
+      const finalY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Printed on: ${new Date().toLocaleString('en-PH')}`, 14, finalY);
+      doc.text("This serves as an official record of the procurement transaction.", 14, finalY + 5);
+      // --- PDF DESIGN END ---
 
-      const drawField = (label, value) => {
-        doc.setTextColor(160, 160, 160);
-        doc.setFontSize(6);
-        doc.setFont(undefined, 'normal');
-        doc.text(label, 22, y);
+      // 1. AUTO-DOWNLOAD LOGIC
+      doc.save(filename); 
 
-        doc.setTextColor(15, 15, 15);
-        doc.setFontSize(8.5);
-        doc.setFont(undefined, 'bold');
-        const truncated = (value || '—').length > 28 ? (value || '—').substring(0, 28) + '…' : (value || '—');
-        doc.text(truncated, 22, y + 6);
-
-        doc.setDrawColor(240, 240, 240);
-        doc.setLineWidth(0.2);
-        doc.line(18, y + 11, 130, y + 11);
-
-        y += 18;
-      };
-
-      drawField('DATE ISSUED', order.order_date
-        ? new Date(order.order_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
-        : '—');
-      drawField('REQUISITIONER', order.requisitioner_name || 'Admin');
-      drawField('SUPPLIER', order.supplier_name || '—');
-      drawField('MATERIAL', order.material_name || '—');
-      drawField('QUANTITY ORDERED', `${order.ordered_quantity} units`);
-
-      y += 2;
-      doc.setFillColor(15, 15, 15);
-      doc.roundedRect(18, y, 112, 24, 5, 5, 'F');
-
-      doc.setTextColor(120, 120, 120);
-      doc.setFontSize(6);
-      doc.setFont(undefined, 'normal');
-      doc.text('TOTAL AMOUNT', 24, y + 9);
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(15);
-      doc.setFont(undefined, 'bold');
-      doc.text(
-        `₱${Number(order.total_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
-        128, y + 16,
-        { align: 'right' }
-      );
-
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.3);
-      doc.line(18, 188, 130, 188);
-
-      doc.setTextColor(190, 190, 190);
-      doc.setFontSize(5.5);
-      doc.setFont(undefined, 'normal');
-      doc.text(
-        `Printed ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}  ·  Matthew & Melka Inventory System`,
-        74, 194,
-        { align: 'center' }
-      );
-
+      // 2. VIEW DOCUMENT LOGIC (Blob for the alert button)
       const blob = doc.output('blob');
       const url = URL.createObjectURL(blob);
-      showAlert('Receipt generated successfully!', 'success', url);
-    } catch {
+      
+      showAlert('Receipt downloaded and generated successfully!', 'success', url);
+
+    } catch (err) {
+      console.error(err);
       showAlert('Failed to generate receipt.', 'error');
     }
   };
-
+  
   const handleEditClick = (order) => {
     setIsEdit(true);
     setSelectedOrderId(order.assignment_id);
