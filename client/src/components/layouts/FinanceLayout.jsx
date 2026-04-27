@@ -8,7 +8,7 @@ import MainDashboard from "../../components/dashboard/MainDashboard";
 import Transactions from "../../pages/finance/FinanceTransaction";
 import PurchaseOrder from "../../pages/finance/PurchaseOrder";
 import AuditLogs from "../../pages/finance/FinanceLogs";
-import FinanceVarianceLogs from "../../pages/finance/FinanceVariance"; 
+import FinanceVarianceLogs from "../../pages/finance/FinanceVariance";
 
 export default function FinanceLayout() {
   const { "*": splat } = useParams();
@@ -28,9 +28,8 @@ export default function FinanceLayout() {
     switch (activeTab) {
       case "home": return <MainDashboard />;
       case "inventory": return <Transactions />;
-      case "purchaseorder": return <PurchaseOrder />;
-      case "variance": return <FinanceVarianceLogs />; 
-      
+      case "purchaseorder": return <PurchaseOrder onCompose={setPendingCompose} />;
+      case "variance": return <FinanceVarianceLogs />;
       case "audit": return <AuditLogs />;
       default: return <MainDashboard />;
     }

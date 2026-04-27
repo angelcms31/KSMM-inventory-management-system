@@ -1,15 +1,152 @@
-import React, { useState, useEffect } from 'react';
-import { useOutletContext, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
   HiOutlineSearch, HiOutlinePencil, HiOutlineClipboardList,
   HiOutlinePhotograph, HiChevronLeft, HiChevronRight, HiX,
-  HiOutlinePrinter, HiOutlineCheck
+  HiOutlineCheck, HiCheckCircle, HiXCircle, HiOutlineDownload,
+  HiOutlineTruck
 } from 'react-icons/hi';
+import { FaRegFilePdf } from 'react-icons/fa';
 
-export default function PurchaseOrder() {
-  const outletContext = useOutletContext() || {};
-  const { onCompose } = outletContext;
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess
+            ? <HiCheckCircle size={44} className="text-emerald-500" />
+            : <HiXCircle size={44} className="text-rose-500" />
+          }
+        </div>
+
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+
+        <p className="text-slate-800 font-bold text-lg leading-tight tracking-tight mb-8">
+          {alert.message}
+        </p>
+
+        <div className="flex flex-col gap-2 w-full relative z-10">
+          {isSuccess && alert.fileUrl && (
+            <button
+              onClick={() => { window.open(alert.fileUrl, '_blank'); onClose(); }}
+              className="w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all bg-black hover:bg-stone-800 shadow-xl shadow-stone-200 flex items-center justify-center gap-2 active:scale-95"
+            >
+              <FaRegFilePdf size={14} /> View Receipt
+            </button>
+          )}
+
+          <button
+            onClick={onClose}
+            className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]
+              ${isSuccess
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-100'
+                : 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-100'}`}
+          >
+            {isSuccess ? 'CLOSE' : 'GOT IT'}
+          </button>
+        </div>
+
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      </div>
+
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1)     translateY(0);    }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+const DeliveryConfirmDialog = ({ open, order, onConfirm, onCancel }) => {
+  if (!open || !order) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.3)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 bg-emerald-50">
+          <HiOutlineTruck size={36} className="text-emerald-500" />
+        </div>
+        <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-2 text-emerald-500">
+          Delivery Update
+        </p>
+        <p className="text-slate-800 font-black text-base leading-snug tracking-tight mb-1">
+          Has PO-{order.assignment_id} been delivered?
+        </p>
+        <p className="text-slate-400 text-xs mb-8 font-bold leading-relaxed">
+          Marking as delivered will update inventory stock. This cannot be undone.
+        </p>
+        <div className="flex gap-3 w-full">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-4 border-2 border-slate-100 rounded-2xl text-slate-500 uppercase text-[11px] font-black hover:bg-slate-50 transition-all tracking-wider"
+          >
+            Not Yet
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-4 rounded-2xl uppercase text-[11px] font-black shadow-xl transition-all tracking-widest text-white bg-emerald-500 hover:bg-emerald-600 active:scale-[0.97] flex items-center justify-center gap-2"
+          >
+            <HiOutlineCheck size={14} /> Delivered
+          </button>
+        </div>
+        <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.04] bg-emerald-500" />
+      </div>
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0);    }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+const useAlert = () => {
+  const [alert, setAlert] = useState(null);
+
+  const showAlert = useCallback((message, type = 'success', fileUrl = null, onFinish = null) => {
+    setAlert({ message, type, fileUrl, onFinish });
+  }, []);
+
+  const closeAlert = useCallback(() => {
+    if (!alert) return;
+
+    const callback = alert.onFinish;
+    setAlert(null);
+
+    if (callback && typeof callback === 'function') {
+      callback();
+    }
+  }, [alert]);
+
+  return { alert, showAlert, closeAlert };
+};
+
+export default function PurchaseOrder({ onCompose }) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -25,6 +162,9 @@ export default function PurchaseOrder() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [userName, setUserName] = useState('');
   const [suggestedQty, setSuggestedQty] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, order: null });
+
+  const { alert, showAlert, closeAlert } = useAlert();
 
   const itemsPerPage = 5;
   const lowStockPerPage = 4;
@@ -118,68 +258,135 @@ export default function PurchaseOrder() {
     (currentPage + 1) * itemsPerPage
   );
 
-  const handleMarkDelivered = async (orderId) => {
-    if (!window.confirm('Mark this order as Delivered?')) return;
-    try {
-      await axios.patch(`http://localhost:5000/api/orders/receive/${orderId}`);
-      fetchData();
-    } catch { alert('Failed to mark as delivered.'); }
+  const handleMarkDeliveredClick = (order) => {
+    setConfirmDialog({ open: true, order });
   };
 
-  const handlePrintReceipt = (order) => {
-    const win = window.open('', '_blank', 'width=600,height=700');
-    if (!win) { alert('Please allow popups to print the receipt.'); return; }
-    win.document.write(`
-      <html>
-        <head>
-          <title>Purchase Order Receipt - PO-${order.assignment_id}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Courier New', monospace; padding: 32px; color: #111; font-size: 13px; }
-            .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 16px; margin-bottom: 16px; }
-            .company { font-size: 22px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
-            .subtitle { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-            .po-num { font-size: 16px; font-weight: 700; margin-top: 8px; }
-            .section { margin-bottom: 14px; }
-            .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dotted #ddd; }
-            .row:last-child { border-bottom: none; }
-            .label { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-            .value { font-weight: 700; text-align: right; }
-            .total-row { display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px dashed #111; margin-top: 8px; font-size: 16px; font-weight: 900; }
-            .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 2px dashed #ccc; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-            .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; background: ${order.status === 'Delivered' ? '#10b981' : order.status === 'Ongoing' ? '#2563eb' : '#f59e0b'}; color: white; margin-top: 4px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="company">Matthew & Melka</div>
-            <div class="subtitle">Purchase Order Receipt</div>
-            <div class="po-num">PO-${order.assignment_id}</div>
-            <div class="status-badge">${order.status}</div>
-          </div>
-          <div class="section">
-            <div class="row"><span class="label">Date Issued</span><span class="value">${order.order_date ? new Date(order.order_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</span></div>
-            <div class="row"><span class="label">Requisitioner</span><span class="value">${order.requisitioner_name || 'Admin'}</span></div>
-          </div>
-          <div class="section">
-            <div class="row"><span class="label">Supplier</span><span class="value">${order.supplier_name || '—'}</span></div>
-            <div class="row"><span class="label">Material</span><span class="value">${order.material_name || '—'}</span></div>
-            <div class="row"><span class="label">Quantity Ordered</span><span class="value">${order.ordered_quantity} units</span></div>
-          </div>
-          <div class="total-row">
-            <span>Total Amount</span>
-            <span>₱${Number(order.total_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div class="footer">
-            <p>Printed on ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p style="margin-top:4px;">Matthew & Melka Inventory System</p>
-          </div>
-        </body>
-      </html>
-    `);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 300);
+  const handleConfirmDelivered = async () => {
+    const order = confirmDialog.order;
+    setConfirmDialog({ open: false, order: null });
+    try {
+      await axios.patch(`http://localhost:5000/api/orders/receive/${order.assignment_id}`);
+      fetchData();
+      showAlert('Order marked as delivered!', 'success');
+    } catch {
+      showAlert('Failed to mark as delivered.', 'error');
+    }
+  };
+
+  const generatePDFReceipt = async (order) => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+
+      doc.setFillColor(248, 248, 248);
+      doc.rect(0, 0, 148, 210, 'F');
+
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(10, 10, 128, 190, 8, 8, 'F');
+
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(10, 10, 128, 190, 8, 8, 'S');
+
+      doc.setFillColor(15, 15, 15);
+      doc.roundedRect(18, 18, 112, 48, 6, 6, 'F');
+
+      const statusColor = order.status === 'Delivered'
+        ? [16, 185, 129]
+        : order.status === 'Ongoing'
+          ? [37, 99, 235]
+          : [245, 158, 11];
+
+      doc.setFillColor(...statusColor);
+      doc.circle(114, 24, 3, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(6);
+      doc.setFont(undefined, 'bold');
+      doc.text('MATTHEW & MELKA', 22, 28);
+
+      doc.setTextColor(150, 150, 150);
+      doc.setFontSize(5.5);
+      doc.setFont(undefined, 'normal');
+      doc.text('PURCHASE ORDER RECEIPT', 22, 34);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont(undefined, 'bold');
+      doc.text(`PO-${order.assignment_id}`, 22, 52);
+
+      doc.setTextColor(...statusColor);
+      doc.setFontSize(6);
+      doc.setFont(undefined, 'bold');
+      doc.text(order.status.toUpperCase(), 22, 60);
+
+      let y = 80;
+
+      const drawField = (label, value) => {
+        doc.setTextColor(160, 160, 160);
+        doc.setFontSize(6);
+        doc.setFont(undefined, 'normal');
+        doc.text(label, 22, y);
+
+        doc.setTextColor(15, 15, 15);
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, 'bold');
+        const truncated = (value || '—').length > 28 ? (value || '—').substring(0, 28) + '…' : (value || '—');
+        doc.text(truncated, 22, y + 6);
+
+        doc.setDrawColor(240, 240, 240);
+        doc.setLineWidth(0.2);
+        doc.line(18, y + 11, 130, y + 11);
+
+        y += 18;
+      };
+
+      drawField('DATE ISSUED', order.order_date
+        ? new Date(order.order_date).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '—');
+      drawField('REQUISITIONER', order.requisitioner_name || 'Admin');
+      drawField('SUPPLIER', order.supplier_name || '—');
+      drawField('MATERIAL', order.material_name || '—');
+      drawField('QUANTITY ORDERED', `${order.ordered_quantity} units`);
+
+      y += 2;
+      doc.setFillColor(15, 15, 15);
+      doc.roundedRect(18, y, 112, 24, 5, 5, 'F');
+
+      doc.setTextColor(120, 120, 120);
+      doc.setFontSize(6);
+      doc.setFont(undefined, 'normal');
+      doc.text('TOTAL AMOUNT', 24, y + 9);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(15);
+      doc.setFont(undefined, 'bold');
+      doc.text(
+        `₱${Number(order.total_amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+        128, y + 16,
+        { align: 'right' }
+      );
+
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.3);
+      doc.line(18, 188, 130, 188);
+
+      doc.setTextColor(190, 190, 190);
+      doc.setFontSize(5.5);
+      doc.setFont(undefined, 'normal');
+      doc.text(
+        `Printed ${new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })}  ·  Matthew & Melka Inventory System`,
+        74, 194,
+        { align: 'center' }
+      );
+
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      showAlert('Receipt generated successfully!', 'success', url);
+    } catch {
+      showAlert('Failed to generate receipt.', 'error');
+    }
   };
 
   const handleEditClick = (order) => {
@@ -195,45 +402,44 @@ export default function PurchaseOrder() {
     setShowModal(true);
   };
 
-  const triggerComposeEmail = (supplierId, materialId, quantity) => {
-    const supplier = suppliers.find(s => parseInt(s.supplier_id) === parseInt(supplierId));
-    const material = materials.find(m => parseInt(m.material_id) === parseInt(materialId));
-    if (!supplier?.email || !onCompose) return;
-    const body =
-      `Dear ${supplier.name},\n\n` +
-      `We would like to place the following purchase order:\n\n` +
-      `Material: ${material?.material_name || '—'}\n` +
-      `Quantity: ${quantity}\n\n` +
-      `Please confirm receipt of this order.\n\n` +
-      `Best regards,\n` +
-      `Matthew & Melka Team`;
-    onCompose({
-      to: supplier.email,
-      subject: `Purchase Order - Matthew & Melka`,
-      body,
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...formData, user_id: loggedInUserId };
+
+    const qtyToOrder = formData.ordered_quantity;
+    const selectedSup = suppliers.find(s => Number(s.supplier_id) === Number(formData.supplier_id));
+    const selectedMat = materials.find(m => Number(m.material_id) === Number(formData.material_id));
+
     try {
       if (isEdit) {
-        await axios.put(`http://localhost:5000/api/orders/${selectedOrderId}`, payload);
+        await axios.put(`http://localhost:5000/api/orders/${selectedOrderId}`, { ...formData, user_id: loggedInUserId });
         setShowModal(false);
-        resetForm();
-        fetchData();
+        await fetchData();
+        showAlert('Order updated successfully!', 'success');
       } else {
-        const snapshotSupplierId = formData.supplier_id;
-        const snapshotMaterialId = formData.material_id;
-        const snapshotQty = formData.ordered_quantity;
-        await axios.post('http://localhost:5000/api/create_order', { ...payload, status: 'Ongoing' });
+        const response = await axios.post('http://localhost:5000/api/create_order', {
+          ...formData,
+          user_id: loggedInUserId,
+          status: 'Ongoing'
+        });
+
+        const assignmentId = response.data?.assignment_id || 'New';
+
         setShowModal(false);
-        resetForm();
-        fetchData();
-        triggerComposeEmail(snapshotSupplierId, snapshotMaterialId, snapshotQty);
+        await fetchData();
+
+        if (onCompose && selectedSup?.email) {
+          onCompose({
+            to: selectedSup.email,
+            subject: `Purchase Order Request #PO-${assignmentId}`,
+            body: `Dear ${selectedSup.name},\n\nWe would like to place a purchase order for:\n\nOrder ID: PO-${assignmentId}\nMaterial: ${selectedMat?.material_name || 'N/A'}\nQuantity: ${qtyToOrder}\n\nPlease confirm receipt of this order.\n\nBest regards,\n${userName}\nMatthew & Melka`
+          });
+        }
       }
-    } catch { alert('Action failed.'); }
+      resetForm();
+    } catch (err) {
+      console.error(err);
+      showAlert('Failed to process order.', 'error');
+    }
   };
 
   const resetForm = () => {
@@ -245,19 +451,27 @@ export default function PurchaseOrder() {
 
   return (
     <div className="w-full flex flex-col font-sans antialiased text-slate-900 text-left">
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
+      <AlertDialog alert={alert} onClose={closeAlert} />
+      <DeliveryConfirmDialog
+        open={confirmDialog.open}
+        order={confirmDialog.order}
+        onConfirm={handleConfirmDelivered}
+        onCancel={() => setConfirmDialog({ open: false, order: null })}
+      />
+
+      <div className="bg-white p-4 sm:p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-6 sm:mb-8 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <div className="relative flex-1">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input
             type="text"
             placeholder="Search records..."
-            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700"
+            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 sm:py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700 text-sm"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(0); }}
           />
         </div>
         <select
-          className="bg-[#F8F9FA] border-none rounded-2xl py-3.5 px-6 font-bold text-slate-600 outline-none cursor-pointer min-w-[180px] text-xs uppercase tracking-wider"
+          className="bg-[#F8F9FA] border-none rounded-2xl py-3 sm:py-3.5 px-4 sm:px-6 font-bold text-slate-600 outline-none cursor-pointer text-xs uppercase tracking-wider"
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(0); }}
         >
@@ -268,11 +482,11 @@ export default function PurchaseOrder() {
         </select>
       </div>
 
-      <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 mb-8">
-        <div className="flex justify-between items-center mb-8 px-2">
+      <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-5 sm:p-8 mb-6 sm:mb-8">
+        <div className="flex justify-between items-center mb-6 sm:mb-8 px-1 sm:px-2">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Restock Queue</h1>
+              <h1 className="text-2xl sm:text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Restock Queue</h1>
               {lowStockMaterials.length > 0 && (
                 <span className="bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
                   {lowStockMaterials.length} Critical
@@ -282,8 +496,8 @@ export default function PurchaseOrder() {
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Materials requiring immediate replenishment</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setLowStockPage(p => Math.max(p - 1, 0))} disabled={lowStockPage === 0} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={20} /></button>
-            <button onClick={() => setLowStockPage(p => p + 1)} disabled={lowStockPage >= Math.ceil(lowStockMaterials.length / lowStockPerPage) - 1} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={20} /></button>
+            <button onClick={() => setLowStockPage(p => Math.max(p - 1, 0))} disabled={lowStockPage === 0} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={18} /></button>
+            <button onClick={() => setLowStockPage(p => p + 1)} disabled={lowStockPage >= Math.ceil(lowStockMaterials.length / lowStockPerPage) - 1} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={18} /></button>
           </div>
         </div>
 
@@ -293,7 +507,7 @@ export default function PurchaseOrder() {
             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Inventory is healthy. No low stock materials.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {lowStockMaterials.slice(lowStockPage * lowStockPerPage, (lowStockPage + 1) * lowStockPerPage).map(m => {
               const suggested = Math.max(m.reorder_threshold * 2 - m.stock_quantity, m.reorder_threshold);
               return (
@@ -339,20 +553,30 @@ export default function PurchaseOrder() {
         )}
       </section>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col mb-10">
-        <div className="flex justify-between items-center mb-10 px-2">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-5 sm:p-8 flex flex-col mb-10">
+        <div className="flex justify-between items-center mb-6 sm:mb-10 px-1 sm:px-2">
           <div>
-            <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Procurement List</h1>
+            <h1 className="text-2xl sm:text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Procurement List</h1>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Active and Completed POs</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setCurrentPage(p => Math.max(p - 1, 0))} disabled={currentPage === 0} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={20} /></button>
-            <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(filteredOrders.length / itemsPerPage) - 1} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={20} /></button>
+            <button onClick={() => setCurrentPage(p => Math.max(p - 1, 0))} disabled={currentPage === 0} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronLeft size={18} /></button>
+            <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage >= Math.ceil(filteredOrders.length / itemsPerPage) - 1} className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"><HiChevronRight size={18} /></button>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-center border-separate border-spacing-y-1">
+        <div className="overflow-x-auto -mx-5 sm:mx-0 px-5 sm:px-0">
+          <table className="w-full text-center border-separate border-spacing-y-1.5 min-w-[700px]" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '90px' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '70px' }} />
+              <col style={{ width: '120px' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '100px' }} />
+              <col style={{ width: '200px' }} />
+            </colgroup>
             <thead>
               <tr className="text-[10px] font-black text-slate-300 uppercase tracking-widest border-b">
                 <th className="pb-4 text-left pl-4">PO ID</th>
@@ -371,37 +595,63 @@ export default function PurchaseOrder() {
                 const mat = materials.find(m => parseInt(m.material_id) === parseInt(order.material_id));
                 return (
                   <tr key={order.assignment_id} className="hover:bg-slate-50 transition-all group">
-                    <td className="py-4 pl-4 rounded-l-2xl border-y border-l border-transparent group-hover:border-slate-100 text-sm font-black text-slate-900 uppercase text-left">PO-{order.assignment_id}</td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 truncate max-w-[140px] uppercase text-xs text-left">{order.supplier_name || 'N/A'}</td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 truncate max-w-[140px] uppercase text-xs text-left">{order.material_name || 'N/A'}</td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center">
+                    <td className="py-2.5 pl-4 rounded-l-2xl border-y border-l border-transparent group-hover:border-slate-100 text-sm font-black text-slate-900 uppercase text-left">PO-{order.assignment_id}</td>
+                    <td className="py-2.5 border-y border-transparent group-hover:border-slate-100 text-left">
+                      <span className="block truncate max-w-[120px] uppercase text-xs" title={order.supplier_name}>{order.supplier_name || 'N/A'}</span>
+                    </td>
+                    <td className="py-2.5 border-y border-transparent group-hover:border-slate-100 text-left">
+                      <span className="block truncate max-w-[120px] uppercase text-xs" title={order.material_name}>{order.material_name || 'N/A'}</span>
+                    </td>
+                    <td className="py-2.5 border-y border-transparent group-hover:border-slate-100 text-center">
                       <div className="flex flex-col items-center">
                         <span className="text-xs font-black text-slate-700">{order.ordered_quantity ?? '—'}</span>
                         <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">{mat?.stock_unit || '---'}</span>
                       </div>
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-right pr-6">
+                    <td className="py-2.5 border-y border-transparent group-hover:border-slate-100 text-right pr-6">
                       <span className="text-sm font-black text-emerald-600">
                         {order.total_amount != null ? `₱${Number(order.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '—'}
                       </span>
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-[10px] font-black text-slate-400 uppercase text-left">
-                      {order.requisitioner_name || 'Admin'}
+                    <td className="py-2.5 border-y border-transparent group-hover:border-slate-100 text-left">
+                      <span className="block truncate max-w-[100px] text-[10px] font-black text-slate-400 uppercase" title={order.requisitioner_name}>
+                        {order.requisitioner_name || 'Admin'}
+                      </span>
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-left">
+                    <td className="py-2.5 border-y border-transparent group-hover:border-slate-100 text-left">
                       <span className={`px-4 py-1.5 rounded-full text-[8px] uppercase font-black text-white shadow-sm ${getStatusStyle(order.status)}`}>
                         {order.status === 'Approved' ? 'Ongoing' : order.status}
                       </span>
                     </td>
-                    <td className="py-4 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
+                    <td className="py-2.5 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
                       <div className="flex justify-end gap-2">
                         {isDelivered && (
-                          <button onClick={() => handlePrintReceipt(order)} className="p-2.5 bg-slate-50 text-slate-400 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200"><HiOutlinePrinter size={18} /></button>
+                          <button
+                            onClick={() => generatePDFReceipt(order)}
+                            title="Download Receipt PDF"
+                            className="p-2.5 bg-slate-50 text-slate-400 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide px-3"
+                          >
+                            <FaRegFilePdf size={13} />
+                            <span>Receipt</span>
+                          </button>
                         )}
                         {order.status === 'Ongoing' && (
-                          <button onClick={() => handleMarkDelivered(order.assignment_id)} className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all border border-emerald-100"><HiOutlineCheck size={18} /></button>
+                          <button
+                            onClick={() => handleMarkDeliveredClick(order)}
+                            title="Mark as Delivered"
+                            className="flex items-center gap-1.5 px-3 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 active:scale-95 rounded-xl transition-all text-[10px] font-black uppercase tracking-wide shadow-md shadow-emerald-100"
+                          >
+                            <HiOutlineTruck size={14} />
+                            <span>Delivered?</span>
+                          </button>
                         )}
-                        <button onClick={() => handleEditClick(order)} disabled={isDelivered} className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-20 cursor-not-allowed' : ''}`}><HiOutlinePencil size={18} /></button>
+                        <button
+                          onClick={() => handleEditClick(order)}
+                          disabled={isDelivered}
+                          className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isDelivered ? 'opacity-20 cursor-not-allowed' : ''}`}
+                        >
+                          <HiOutlinePencil size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -415,13 +665,13 @@ export default function PurchaseOrder() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-12 relative shadow-2xl text-left">
-            <button onClick={() => { setShowModal(false); resetForm(); }} className="absolute top-10 right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full"><HiX size={28} /></button>
-            <h2 className="text-4xl font-black text-slate-900 uppercase mb-2 tracking-tighter leading-none">Execute Order</h2>
-            <p className="text-xs text-slate-400 mb-8 font-black uppercase tracking-widest">Processing for: <span className="text-black">{userName}</span></p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-4 sm:p-6 text-left">
+          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] w-full max-w-2xl p-6 sm:p-12 relative shadow-2xl text-left max-h-[90vh] overflow-y-auto">
+            <button onClick={() => { setShowModal(false); resetForm(); }} className="absolute top-6 right-6 sm:top-10 sm:right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full"><HiX size={24} /></button>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 uppercase mb-2 tracking-tighter leading-none">Execute Order</h2>
+            <p className="text-xs text-slate-400 mb-6 sm:mb-8 font-black uppercase tracking-widest">Processing for: <span className="text-black">{userName}</span></p>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-6 font-bold">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 font-bold">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Supplier</label>
                   <select required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-sm" value={formData.supplier_id} onChange={e => setFormData({ ...formData, supplier_id: e.target.value })}>
@@ -431,7 +681,7 @@ export default function PurchaseOrder() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Raw Material</label>
-                  <div className="w-full bg-slate-100 rounded-2xl p-4 font-bold text-sm text-slate-400 cursor-not-allowed border border-slate-200">
+                  <div className="w-full bg-slate-100 rounded-2xl p-4 font-bold text-sm text-slate-400 cursor-not-allowed border border-slate-200 truncate">
                     {materials.find(m => parseInt(m.material_id) === parseInt(formData.material_id))?.material_name || '—'}
                   </div>
                 </div>
@@ -451,8 +701,8 @@ export default function PurchaseOrder() {
                 </div>
               </div>
               <div className="flex gap-4 pt-4 justify-end">
-                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button>
-                <button type="submit" className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest">Confirm & Process</button>
+                <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="px-8 sm:px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all">Cancel</button>
+                <button type="submit" className="px-10 sm:px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest">Confirm & Process</button>
               </div>
             </form>
           </div>

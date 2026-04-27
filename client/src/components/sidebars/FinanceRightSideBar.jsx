@@ -1,8 +1,53 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { HiOutlineBell, HiOutlineRefresh, HiOutlinePaperAirplane, HiOutlineX, HiMinus, HiChevronLeft } from "react-icons/hi";
+import { HiOutlineBell, HiOutlineRefresh, HiOutlinePaperAirplane, HiOutlineX, HiMinus, HiChevronLeft, HiCheckCircle, HiXCircle } from "react-icons/hi";
 import { getHashedPath } from "../../utils/hash";
+
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+  return (
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess
+            ? <HiCheckCircle size={44} className="text-emerald-500" />
+            : <HiXCircle size={44} className="text-rose-500" />
+          }
+        </div>
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+        <p className="text-slate-800 font-bold text-lg leading-tight tracking-tight mb-8">
+          {alert.message}
+        </p>
+        <button
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-100'}`}
+        >
+          {isSuccess ? 'CLOSE' : 'GOT IT'}
+        </button>
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      </div>
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   const [activities, setActivities] = useState([]);
@@ -27,26 +72,49 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   const [sendSuccess, setSendSuccess] = useState(false);
   const [formatting, setFormatting] = useState({ bold: false, italic: false, underline: false });
   const [attachments, setAttachments] = useState([]);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isFromPO, setIsFromPO] = useState(false);
+  const [sidebarAlert, setSidebarAlert] = useState(null);
   const bodyRef = useRef(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (!pendingCompose) return;
-    const rawBody = pendingCompose.body || "";
-    setComposeTo(pendingCompose.to || "");
-    setComposeSubject(pendingCompose.subject || "");
+    if (!pendingCompose || !pendingCompose.to) return;
+
+    const targetTo = pendingCompose.to;
+    const targetSubject = pendingCompose.subject || "";
+    const targetBody = pendingCompose.body || "";
+
+    setIsFromPO(true);
     setShowCompose(true);
     setComposeMinimized(false);
-    if (onComposeHandled) onComposeHandled();
-    setTimeout(() => {
+    setComposeTo(targetTo);
+    setComposeSubject(targetSubject);
+
+    let attempts = 0;
+    const injectInterval = setInterval(() => {
+      attempts++;
       if (bodyRef.current) {
-        const escaped = rawBody.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+        const escaped = targetBody
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br>");
+
         bodyRef.current.innerHTML = escaped;
+
+        if (onComposeHandled) {
+          onComposeHandled();
+        }
+
+        clearInterval(injectInterval);
       }
-    }, 80);
-  }, [pendingCompose, onComposeHandled]);
+
+      if (attempts > 20) clearInterval(injectInterval);
+    }, 100);
+
+    return () => clearInterval(injectInterval);
+  }, [pendingCompose]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "Just now";
@@ -176,7 +244,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     setComposeTo("");
     setComposeSubject("");
     setAttachments([]);
-    setFormatting({ bold: false, italic: false, underline: false });
+    setIsFromPO(false);
     setSendSuccess(false);
     if (bodyRef.current) bodyRef.current.innerHTML = "";
   }, []);
@@ -185,6 +253,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     const bodyText = bodyRef.current?.innerText?.trim() || "";
     const bodyHTML = bodyRef.current?.innerHTML || "";
     if (!composeTo || !composeSubject || !bodyText) return;
+
     setSending(true);
     try {
       const formData = new FormData();
@@ -192,12 +261,27 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
       formData.append("subject", composeSubject);
       formData.append("body", bodyHTML);
       attachments.forEach(file => formData.append("attachments", file));
-      await axios.post("http://localhost:5000/api/gmail/send", formData, { headers: { "Content-Type": "multipart/form-data" } });
+
+      await axios.post("http://localhost:5000/api/gmail/send", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
       setSendSuccess(true);
       fetchGmailMessages();
-      setTimeout(() => { handleDiscard(); }, 2000);
-    } catch { alert("Failed to send email."); }
-    finally { setSending(false); }
+
+      if (isFromPO) {
+        setSidebarAlert({ type: 'success', message: 'Purchase order created and email sent successfully!' });
+      }
+
+      setTimeout(() => {
+        handleDiscard();
+      }, 2000);
+    } catch (err) {
+      console.error(err);
+      setSidebarAlert({ type: 'error', message: 'Failed to send email.' });
+    } finally {
+      setSending(false);
+    }
   };
 
   useEffect(() => {
@@ -219,6 +303,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
 
   return (
     <>
+      <AlertDialog alert={sidebarAlert} onClose={() => setSidebarAlert(null)} />
       <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
         <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 z-40 overflow-hidden">
           {showNotifications && (
