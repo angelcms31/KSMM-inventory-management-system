@@ -178,9 +178,78 @@ const AdminSidebar = () => {
         </div>
       </div>
 
-      {/* Mobile view remains same using internalActiveTab */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-3">
-        {/* ... mobile bottom bar code using internalActiveTab ... */}
+        <div
+          className="rounded-2xl relative"
+          style={{
+            background: 'rgba(38, 34, 33, 0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}
+        >
+          {mobileLogsOpen && (
+            <div className="absolute bottom-20 left-0 right-0 mx-4 bg-[#262221] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+              {logSubItems.map((sub) => (
+                <button
+                  key={sub.id}
+                  onClick={() => handleTabClick(sub.id)}
+                  className={`w-full flex items-center gap-3 p-4 text-[14px] font-medium transition-colors ${
+                    internalActiveTab === sub.id ? 'bg-white text-black' : 'text-gray-400 hover:bg-white/5'
+                  }`}
+                >
+                  {sub.icon}
+                  {sub.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center justify-around px-2 py-2">
+            {menuItems.map((item) => {
+              const isActive = internalActiveTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setMobileLogsOpen(false);
+                    handleTabClick(item.id);
+                  }}
+                  className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] outline-none cursor-pointer"
+                >
+                  <div className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${isActive ? 'bg-white shadow-md' : 'bg-transparent'}`}>
+                    <span className={`transition-colors duration-300 ${isActive ? 'text-[#262221]' : 'text-gray-400'}`} style={{ display: 'flex' }}>
+                      {React.cloneElement(item.icon, { size: 22 })}
+                    </span>
+                  </div>
+                  {isActive && <span className="mt-1 w-1 h-1 rounded-full bg-white block" />}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => setMobileLogsOpen(!mobileLogsOpen)}
+              className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] outline-none cursor-pointer"
+            >
+              <div className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-300 ${isLogsActive ? 'bg-white shadow-md' : 'bg-transparent'}`}>
+                <span className={`transition-colors duration-300 ${isLogsActive ? 'text-[#262221]' : 'text-gray-400'}`} style={{ display: 'flex' }}>
+                  <HiOutlineShieldCheck size={22} />
+                </span>
+              </div>
+              {isLogsActive && <span className="mt-1 w-1 h-1 rounded-full bg-white block" />}
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="flex flex-col items-center justify-center px-2 py-1.5 min-w-[44px] cursor-pointer outline-none"
+            >
+              <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-transparent">
+                <HiOutlineLogout size={22} className="text-gray-400" />
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
     </>
   );

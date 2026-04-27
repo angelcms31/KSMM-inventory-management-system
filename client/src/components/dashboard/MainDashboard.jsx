@@ -12,25 +12,19 @@ import {
   Filler,
 } from "chart.js";
 import {
-  AlertTriangle,
   Package,
-  DollarSign,
-  ShoppingCart,
   Truck,
   ChevronLeft,
   ChevronRight,
   X,
   Search,
   TrendingUp,
-  Download,
-  ExternalLink,
-  CheckCircle,
-  XCircle,
-  Eye,
-  User,
-  Clock,
 } from "lucide-react";
 import { HiPhoto } from "react-icons/hi2";
+import {
+  HiCheckCircle, HiXCircle, HiOutlineEye, HiOutlineDownload, HiX,
+} from "react-icons/hi";
+import { FaRegFilePdf, FaRegFileExcel } from "react-icons/fa";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
@@ -78,63 +72,49 @@ const TRACKING_STEPS = [
   { key: "Pending", label: "Order Placed", sub: "An order has been placed" },
 ];
 
-function Toast({ message, type, onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 4000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  const styles = {
-    success: "bg-emerald-600 text-white",
-    error: "bg-red-600 text-white",
-    info: "bg-gray-900 text-white",
-  };
-
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
   return (
-    <div className={`fixed bottom-6 right-6 z-[300] px-5 py-3 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-3 ${styles[type]}`}
-      style={{ animation: "slideUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}>
-      {type === "success" && <CheckCircle className="w-4 h-4" />}
-      {type === "error" && <XCircle className="w-4 h-4" />}
-      {message}
-      <style>{`@keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }`}</style>
-    </div>
-  );
-}
-
-function NotifModal({ title, message, type, onClose, actionLabel, onAction }) {
-  return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 relative"
-        style={{ animation: "popIn 0.25s cubic-bezier(0.16,1,0.3,1) forwards" }}>
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 ${type === "success" ? "bg-emerald-50" : "bg-red-50"}`}>
-          {type === "success"
-            ? <CheckCircle className="w-7 h-7 text-emerald-500" />
-            : <XCircle className="w-7 h-7 text-red-500" />}
+    <div
+      className="fixed inset-0 z-[500] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in duration-300"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess ? <HiCheckCircle size={44} className="text-emerald-500" /> : <HiXCircle size={44} className="text-rose-500" />}
         </div>
-        <h3 className="text-lg font-black text-gray-900 text-center mb-2">{title}</h3>
-        <p className="text-sm text-gray-400 text-center mb-7">{message}</p>
-        <div className="flex flex-col gap-2">
-          {onAction && (
-            <button onClick={onAction} className="w-full py-3 bg-black text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2">
-              <Eye className="w-4 h-4" /> {actionLabel}
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+        <p className="text-slate-800 font-black text-lg leading-snug tracking-tight mb-8">
+          {alert.message}
+        </p>
+        <div className="flex flex-col gap-2 w-full">
+          {isSuccess && alert.fileUrl && !alert.isExcel && (
+            <button
+              onClick={() => { window.open(alert.fileUrl, '_blank'); onClose(); }}
+              className="w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all bg-black hover:bg-stone-800 shadow-xl"
+            >
+              View Document
             </button>
           )}
-          <button onClick={onClose} className="w-full py-3 text-gray-400 text-sm font-bold hover:text-black transition-colors">
-            Close
+          <button
+            onClick={onClose}
+            className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]
+              ${isSuccess ? 'text-emerald-600 bg-emerald-50' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}
+          >
+            {isSuccess ? (alert.isExcel ? 'Close' : 'Close') : 'Try Again'}
           </button>
         </div>
-        <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.9) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
       </div>
     </div>
   );
-}
-
-const fmtDateTime = (d) => {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-PH", {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
 };
 
 const OrderDetailModal = ({ order, onClose, products = [] }) => {
@@ -250,7 +230,6 @@ const OrderDetailModal = ({ order, onClose, products = [] }) => {
           </div>
         </div>
       </div>
-      <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.9) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
     </div>
   );
 };
@@ -264,120 +243,103 @@ const SalesTrendModal = ({ orders, onClose }) => {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedDay, setSelectedDay] = useState("");
 
-  const [showExportPanel, setShowExportPanel] = useState(false);
-  const [exportFormat, setExportFormat] = useState("csv");
+  const [sortModalOpen, setSortModalOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [exportedByName, setExportedByName] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [alert, setAlert] = useState(null);
+
   const [exportFilterYear, setExportFilterYear] = useState("");
   const [exportFilterMonth, setExportFilterMonth] = useState("");
   const [exportFilterDay, setExportFilterDay] = useState("");
   const [exportFilterCourier, setExportFilterCourier] = useState("");
   const [exportFilterPlatform, setExportFilterPlatform] = useState("");
-  const [exporterName, setExporterName] = useState("");
-  const [lastDownloadBlob, setLastDownloadBlob] = useState(null);
-  const [lastDownloadName, setLastDownloadName] = useState("");
+  const [sortOrder, setSortOrder] = useState("desc");
 
-  const [toast, setToast] = useState(null);
-  const [notifModal, setNotifModal] = useState(null);
+  const showAlert = (message, type = 'success', fileUrl = null, isExcel = false) => setAlert({ message, type, fileUrl, isExcel });
+  const closeAlert = () => setAlert(null);
 
-  const showToast = (message, type = "info") => setToast({ message, type });
+  const exportTimestamp = new Date().toLocaleString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+
+  const fetchExporterInfo = useCallback(async () => {
+    const fName = localStorage.getItem("firstName");
+    const lName = localStorage.getItem("lastName");
+    const sId = localStorage.getItem("user_id");
+    if (fName && lName && fName !== "null" && lName !== "null") {
+      setExportedByName(`${fName} ${lName}`);
+    } else if (sId) {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/user/name/${sId}`);
+        if (res.data?.name) setExportedByName(res.data.name);
+      } catch {
+        setExportedByName("Unknown User");
+      }
+    }
+    if (sId) setCurrentUserId(sId);
+  }, []);
+
+  useEffect(() => { fetchExporterInfo(); }, [fetchExporterInfo]);
 
   const daysInSelected = selectedYear && selectedMonth !== ""
-    ? DAYS_IN_MONTH(Number(selectedYear), Number(selectedMonth))
-    : 31;
-
+    ? DAYS_IN_MONTH(Number(selectedYear), Number(selectedMonth)) : 31;
   const exportDaysInSelected = exportFilterYear && exportFilterMonth !== ""
-    ? DAYS_IN_MONTH(Number(exportFilterYear), Number(exportFilterMonth))
-    : 31;
+    ? DAYS_IN_MONTH(Number(exportFilterYear), Number(exportFilterMonth)) : 31;
 
   const allCouriers = [...new Set(orders.map(o => o.courier).filter(Boolean))];
   const allPlatforms = [...new Set(orders.map(o => o.platform).filter(Boolean))];
 
-  const filterOrdersByYear = (year) =>
-    orders.filter(o => o.order_date && new Date(o.order_date).getFullYear() === year);
-
-  const buildMonthly = (filteredOrders) => {
-    const arr = Array(12).fill(0);
-    filteredOrders.filter(o => o.status === "Delivered").forEach(o => {
-      arr[new Date(o.order_date).getMonth()] += Number(o.total_amount || 0);
-    });
-    return arr;
-  };
-
-  const buildDaily = (filteredOrders, year, month) => {
-    const days = DAYS_IN_MONTH(year, month);
-    const arr = Array(days).fill(0);
-    filteredOrders.filter(o => o.status === "Delivered").forEach(o => {
-      const d = new Date(o.order_date);
-      if (d.getMonth() === month) arr[d.getDate() - 1] += Number(o.total_amount || 0);
-    });
-    return arr;
-  };
-
-  const getDayOrders = (year, month, day) =>
-    orders.filter(o => {
-      if (!o.order_date) return false;
-      const d = new Date(o.order_date);
-      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
-    });
-
   const getChartData = () => {
     const yr = selectedYear ? Number(selectedYear) : currentYear;
+    const mo = selectedMonth !== "" ? Number(selectedMonth) : -1;
+    const filterByYear = (y) => orders.filter(o => o.order_date && new Date(o.order_date).getFullYear() === y);
+
     if (selectedYear && selectedMonth !== "") {
-      const mo = Number(selectedMonth);
-      return {
-        labels: Array.from({ length: DAYS_IN_MONTH(yr, mo) }, (_, i) => `${i + 1}`),
-        thisData: buildDaily(filterOrdersByYear(yr), yr, mo),
-        lastData: buildDaily(filterOrdersByYear(yr - 1), yr - 1, mo),
-      };
+      const dInM = DAYS_IN_MONTH(yr, mo);
+      const arr = Array(dInM).fill(0);
+      orders.filter(o => o.status === "Delivered" && new Date(o.order_date).getFullYear() === yr && new Date(o.order_date).getMonth() === mo).forEach(o => {
+        arr[new Date(o.order_date).getDate() - 1] += Number(o.total_amount || 0);
+      });
+      const lastArr = Array(dInM).fill(0);
+      orders.filter(o => o.status === "Delivered" && new Date(o.order_date).getFullYear() === (yr - 1) && new Date(o.order_date).getMonth() === mo).forEach(o => {
+        const d = new Date(o.order_date).getDate();
+        if (d <= dInM) lastArr[d - 1] += Number(o.total_amount || 0);
+      });
+      return { labels: Array.from({ length: dInM }, (_, i) => `${i + 1}`), thisData: arr, lastData: lastArr };
     }
-    return {
-      labels: MONTHS,
-      thisData: buildMonthly(filterOrdersByYear(yr)),
-      lastData: buildMonthly(filterOrdersByYear(yr - 1)),
+    const buildM = (y) => {
+      const arr = Array(12).fill(0);
+      orders.filter(o => o.status === "Delivered" && new Date(o.order_date).getFullYear() === y).forEach(o => {
+        arr[new Date(o.order_date).getMonth()] += Number(o.total_amount || 0);
+      });
+      return arr;
     };
+    return { labels: MONTHS, thisData: buildM(yr), lastData: buildM(yr - 1) };
   };
 
   const isSingleDay = selectedYear && selectedMonth !== "" && selectedDay !== "";
-  const singleDayOrders = isSingleDay
-    ? getDayOrders(Number(selectedYear), Number(selectedMonth), Number(selectedDay))
-    : [];
-  const singleDayDelivered = singleDayOrders.filter(o => o.status === "Delivered");
-  const singleDayRevenue = singleDayDelivered.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-  const singleDayLastYearRevenue = isSingleDay
-    ? getDayOrders(Number(selectedYear) - 1, Number(selectedMonth), Number(selectedDay))
-        .filter(o => o.status === "Delivered")
-        .reduce((s, o) => s + Number(o.total_amount || 0), 0)
-    : 0;
+  const singleDayOrders = isSingleDay ? orders.filter(o => {
+    const d = new Date(o.order_date);
+    return d.getFullYear() === Number(selectedYear) && d.getMonth() === Number(selectedMonth) && d.getDate() === Number(selectedDay);
+  }) : [];
+  const singleDayRevenue = singleDayOrders.filter(o => o.status === "Delivered").reduce((s, o) => s + Number(o.total_amount || 0), 0);
+  const singleDayLYRev = isSingleDay ? orders.filter(o => {
+    const d = new Date(o.order_date);
+    return d.getFullYear() === (Number(selectedYear) - 1) && d.getMonth() === Number(selectedMonth) && d.getDate() === Number(selectedDay) && o.status === "Delivered";
+  }).reduce((s, o) => s + Number(o.total_amount || 0), 0) : 0;
 
   const { labels, thisData, lastData } = getChartData();
   const thisTotal = isSingleDay ? singleDayRevenue : thisData.reduce((a, b) => a + b, 0);
-  const lastTotal = isSingleDay ? singleDayLastYearRevenue : lastData.reduce((a, b) => a + b, 0);
+  const lastTotal = isSingleDay ? singleDayLYRev : lastData.reduce((a, b) => a + b, 0);
   const pctChange = lastTotal > 0 ? (((thisTotal - lastTotal) / lastTotal) * 100).toFixed(1) : null;
 
   const chartData = {
     labels,
     datasets: [
-      {
-        label: "Running Year",
-        data: thisData,
-        borderColor: "#2563eb",
-        backgroundColor: "transparent",
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        borderWidth: 2.5,
-        fill: false,
-      },
-      {
-        label: "Last Year",
-        data: lastData,
-        borderColor: "#22c55e",
-        backgroundColor: "transparent",
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        borderWidth: 2.5,
-        fill: false,
-      },
+      { label: "Running Year", data: thisData, borderColor: "#2563eb", backgroundColor: "transparent", tension: 0.4, pointRadius: 0, pointHoverRadius: 0, borderWidth: 2.5, fill: false },
+      { label: "Last Year", data: lastData, borderColor: "#22c55e", backgroundColor: "transparent", tension: 0.4, pointRadius: 0, pointHoverRadius: 0, borderWidth: 2.5, fill: false },
     ],
   };
 
@@ -385,50 +347,12 @@ const SalesTrendModal = ({ orders, onClose }) => {
     maintainAspectRatio: false,
     interaction: { mode: "index", intersect: false },
     plugins: {
-      legend: {
-        display: true,
-        position: "top",
-        align: "end",
-        labels: {
-          boxWidth: 32,
-          boxHeight: 10,
-          borderRadius: 4,
-          useBorderRadius: true,
-          font: { size: 11, weight: "bold" },
-          color: "#64748b",
-          padding: 16,
-        },
-      },
-      tooltip: {
-        enabled: true,
-        backgroundColor: "#0f172a",
-        titleColor: "#94a3b8",
-        bodyColor: "#f1f5f9",
-        padding: 12,
-        cornerRadius: 10,
-        titleFont: { size: 10, weight: "bold" },
-        bodyFont: { size: 12, weight: "bold" },
-        displayColors: true,
-        callbacks: {
-          label: (item) => ` ₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
-        },
-      },
+      legend: { display: true, position: "top", align: "end", labels: { boxWidth: 32, boxHeight: 10, borderRadius: 4, useBorderRadius: true, font: { size: 11, weight: "bold" }, color: "#64748b", padding: 16 } },
+      tooltip: { enabled: true, backgroundColor: "#0f172a", titleColor: "#94a3b8", bodyColor: "#f1f5f9", padding: 12, cornerRadius: 10, titleFont: { size: 10, weight: "bold" }, bodyFont: { size: 12, weight: "bold" }, displayColors: true, callbacks: { label: (item) => ` ₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` } },
     },
     scales: {
-      y: {
-        grid: { color: "rgba(0,0,0,0.05)" },
-        ticks: {
-          callback: (v) => formatPeso(v),
-          font: { size: 10 },
-          color: "#94a3b8",
-        },
-        border: { display: false },
-      },
-      x: {
-        grid: { color: "rgba(0,0,0,0.04)" },
-        ticks: { font: { size: 10 }, color: "#94a3b8" },
-        border: { display: false },
-      },
+      y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
+      x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
     },
   };
 
@@ -439,147 +363,80 @@ const SalesTrendModal = ({ orders, onClose }) => {
     if (exportFilterDay !== "") filtered = filtered.filter(o => new Date(o.order_date).getDate() === Number(exportFilterDay));
     if (exportFilterCourier) filtered = filtered.filter(o => o.courier === exportFilterCourier);
     if (exportFilterPlatform) filtered = filtered.filter(o => o.platform === exportFilterPlatform);
-    return filtered;
+    filtered.sort((a, b) => sortOrder === "asc" ? new Date(a.order_date) - new Date(b.order_date) : new Date(b.order_date) - new Date(a.order_date));
+    return filtered.map(o => ({
+      "Order ID": `SO-${o.order_id}`,
+      Date: o.order_date ? new Date(o.order_date).toLocaleDateString("en-PH") : "N/A",
+      Client: o.client_name || "N/A",
+      Product: o.product_name || o.sku || "N/A",
+      Quantity: o.quantity || 0,
+      Courier: o.courier || "N/A",
+      Platform: o.platform || "N/A",
+      "Total Amount (₱)": Number(o.total_amount || 0).toFixed(2),
+    }));
   };
 
-  const buildExportLabel = () => {
-    const parts = [];
-    if (exportFilterYear) parts.push(exportFilterYear);
-    if (exportFilterMonth !== "") parts.push(MONTHS[Number(exportFilterMonth)]);
-    if (exportFilterDay !== "") parts.push(`Day${exportFilterDay}`);
-    if (exportFilterCourier) parts.push(exportFilterCourier);
-    if (exportFilterPlatform) parts.push(exportFilterPlatform);
-    return parts.length ? parts.join("_") : "All";
-  };
-
-  const handleExport = () => {
-    if (!exporterName.trim()) {
-      showToast("Please enter your name before exporting.", "error");
-      return;
-    }
+  const exportToExcel = async () => {
     const rows = getExportRows();
-    if (rows.length === 0) {
-      showToast("No records matched the selected filters.", "error");
-      return;
-    }
-
-    const filterLabel = buildExportLabel().replace(/_/g, " ");
-    const downloadTimestamp = fmtDateTime(new Date());
-    const safeExporterName = exporterName.trim().replace(/\s+/g, "-");
-    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const filename = `sales_trend_${buildExportLabel()}_by-${safeExporterName}_${ts}`;
-
-    if (exportFormat === "csv") {
-      const header = ["Order ID", "Date", "Client", "Product", "Quantity", "Courier", "Platform", "Total Amount (₱)"];
-      const meta = [
-        [`Downloaded by: ${exporterName.trim()}`],
-        [`Downloaded at: ${downloadTimestamp}`],
-        [`Filter: ${filterLabel}`],
-        [],
-        header,
+    if (rows.length === 0) { showAlert("No records matched the selected filters.", "error"); return; }
+    try {
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+      const metaRows = [
+        { "Order ID": "Report:", Date: "Sales & Profit Trend" },
+        { "Order ID": "Exported By:", Date: `${exportedByName} (ID: ${currentUserId || 'N/A'})` },
+        { "Order ID": "Timestamp:", Date: exportTimestamp },
+        {}
       ];
-      const data = rows.map(o => [
-        `SO-${o.order_id}`,
-        o.order_date ? new Date(o.order_date).toLocaleDateString("en-PH") : "",
-        o.client_name || "",
-        o.product_name || o.sku || "",
-        o.quantity || 0,
-        o.courier || "",
-        o.platform || "",
-        Number(o.total_amount || 0).toFixed(2),
-      ]);
-      const csv = [...meta, ...data].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const ws = XLSX.utils.json_to_sheet([...metaRows, ...rows]);
+      XLSX.utils.book_append_sheet(wb, ws, "Sales Trend");
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Sales_Trend_${new Date().getTime()}.xlsx`;
+      a.click();
+      showAlert("Excel report generated successfully!", "success", null, true);
+    } catch { showAlert("Failed to export Excel.", "error"); }
+  };
+
+  const exportToPDF = async () => {
+    const rows = getExportRows();
+    if (rows.length === 0) { showAlert("No records matched the selected filters.", "error"); return; }
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+      const doc = new jsPDF({ orientation: 'landscape' });
+      doc.setFontSize(16).setFont(undefined, 'bold').text("Sales & Profit Trend Report", 14, 15);
+      doc.setFontSize(9).setFont(undefined, 'normal').setTextColor(100);
+      doc.text(`Exported By: ${exportedByName} (ID: ${currentUserId || 'N/A'})`, 14, 22);
+      doc.text(`Generated On: ${exportTimestamp}`, 14, 27);
+      doc.setTextColor(0);
+      const total = rows.reduce((s, r) => s + Number(r["Total Amount (₱)"] || 0), 0);
+      const headers = Object.keys(rows[0]);
+      const body = rows.map(r => headers.map(h => r[h]));
+      autoTable(doc, {
+        head: [headers],
+        body,
+        foot: [["", "", "", "", "", "", "Total", `₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`]],
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255] },
+        footStyles: { fillColor: [240, 245, 255], textColor: [30, 64, 175], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        theme: 'grid',
+        startY: 35,
+      });
+      const blob = doc.output("blob");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${filename}.csv`;
+      a.download = `Sales_Trend_${new Date().getTime()}.pdf`;
       a.click();
-
-      setLastDownloadBlob(blob);
-      setLastDownloadName(`${filename}.csv`);
-      setNotifModal({
-        title: "Export Successful",
-        message: `CSV saved as "${filename}.csv"`,
-        type: "success",
-        actionLabel: "View Downloaded File",
-        onAction: () => {
-          const u = URL.createObjectURL(blob);
-          window.open(u, "_blank");
-          setNotifModal(null);
-        },
-      });
-
-    } else {
-      import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js").then(() => {
-        import("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js").then(() => {
-          const { jsPDF } = window.jspdf;
-          const doc = new jsPDF({ orientation: "landscape" });
-          doc.setFontSize(14);
-          doc.setFont("helvetica", "bold");
-          doc.text("Sales & Profit Trend Report", 14, 16);
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(100);
-          doc.text(`Filter: ${filterLabel}`, 14, 23);
-          doc.text(`Downloaded by: ${exporterName.trim()}   |   ${downloadTimestamp}`, 14, 28);
-          doc.setTextColor(0);
-
-          const total = rows.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-
-          doc.autoTable({
-            startY: 34,
-            head: [["Order ID", "Date", "Client", "Product", "Qty", "Courier", "Platform", "Amount (₱)"]],
-            body: rows.map(o => [
-              `SO-${o.order_id}`,
-              o.order_date ? new Date(o.order_date).toLocaleDateString("en-PH") : "",
-              o.client_name || "",
-              o.product_name || o.sku || "",
-              o.quantity || 0,
-              o.courier || "",
-              o.platform || "",
-              `₱${Number(o.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
-            ]),
-            foot: [["", "", "", "", "", "", "Total", `₱${total.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`]],
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: "bold" },
-            footStyles: { fillColor: [240, 245, 255], textColor: [30, 64, 175], fontStyle: "bold" },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
-          });
-
-          const pdfBlob = doc.output("blob");
-          const url = URL.createObjectURL(pdfBlob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${filename}.pdf`;
-          a.click();
-
-          setLastDownloadBlob(pdfBlob);
-          setLastDownloadName(`${filename}.pdf`);
-          setNotifModal({
-            title: "Export Successful",
-            message: `PDF saved as "${filename}.pdf"`,
-            type: "success",
-            actionLabel: "View Downloaded File",
-            onAction: () => {
-              const u = URL.createObjectURL(pdfBlob);
-              window.open(u, "_blank");
-              setNotifModal(null);
-            },
-          });
-        });
-      });
-    }
-  };
-
-  const viewLastDownload = () => {
-    if (!lastDownloadBlob) return;
-    const url = URL.createObjectURL(lastDownloadBlob);
-    window.open(url, "_blank");
+      showAlert("PDF report generated successfully!", "success", url);
+    } catch { showAlert("Failed to export PDF.", "error"); }
   };
 
   const selectClass = "appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all pr-8";
-
   const Chevron = () => (
     <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
       <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -588,12 +445,14 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 text-left"
       style={{ backdropFilter: "blur(14px)", backgroundColor: "rgba(0,0,0,0.3)" }}
       onClick={onClose}
     >
+      <AlertDialog alert={alert} onClose={closeAlert} />
+
       <div
-        className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-2xl relative overflow-hidden max-h-[95vh] flex flex-col"
+        className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-2xl relative overflow-hidden max-h-[95vh] flex flex-col text-left"
         style={{ animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}
         onClick={e => e.stopPropagation()}
       >
@@ -601,251 +460,191 @@ const SalesTrendModal = ({ orders, onClose }) => {
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-xl font-black text-gray-900">Sales & Profit Trend</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Monthly sales revenue and profit margins</p>
+              <p className="text-xs text-gray-400 mt-0.5 uppercase font-bold tracking-widest">Monthly sales revenue and profit margins</p>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowExportPanel(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all ${showExportPanel ? "bg-gray-900 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}
+                onClick={() => setSortModalOpen(true)}
+                className="bg-black text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg hover:bg-stone-800 transition-all tracking-widest flex items-center gap-2"
               >
-                <Download size={12} />
-                Export
+                <HiOutlineDownload size={13} /> Export Data
               </button>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors p-1"><X size={20} /></button>
             </div>
           </div>
-
-          {showExportPanel && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
-              <p className="text-[11px] font-black text-gray-700 uppercase tracking-widest">Export Options</p>
-
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 flex items-center gap-1">
-                  <User className="w-3 h-3" /> Exported By
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your full name..."
-                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 ring-blue-100 focus:border-blue-300 transition-all"
-                  value={exporterName}
-                  onChange={e => setExporterName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> Download Timestamp
-                </label>
-                <p className="text-[10px] font-semibold text-gray-500 bg-white border border-gray-200 px-3 py-2 rounded-xl">{fmtDateTime(new Date())}</p>
-              </div>
-
-              <div className="flex gap-2">
-                {["csv", "pdf"].map(fmt => (
-                  <button
-                    key={fmt}
-                    onClick={() => setExportFormat(fmt)}
-                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide border transition-all ${exportFormat === fmt ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:border-gray-400"}`}
-                  >
-                    {fmt.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative">
-                  <select value={exportFilterYear} onChange={e => { setExportFilterYear(e.target.value); setExportFilterMonth(""); setExportFilterDay(""); }} className={selectClass + " w-full text-xs py-2"}>
-                    <option value="">All Years</option>
-                    {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <Chevron />
-                </div>
-                <div className="relative">
-                  <select value={exportFilterMonth} onChange={e => { setExportFilterMonth(e.target.value); setExportFilterDay(""); }} disabled={!exportFilterYear} className={selectClass + " w-full text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"}>
-                    <option value="">All Months</option>
-                    {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                  </select>
-                  <Chevron />
-                </div>
-                <div className="relative">
-                  <select value={exportFilterDay} onChange={e => setExportFilterDay(e.target.value)} disabled={!exportFilterYear || exportFilterMonth === ""} className={selectClass + " w-full text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"}>
-                    <option value="">All Days</option>
-                    {Array.from({ length: exportDaysInSelected }, (_, i) => i + 1).map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  <Chevron />
-                </div>
-                <div className="relative">
-                  <select value={exportFilterCourier} onChange={e => setExportFilterCourier(e.target.value)} className={selectClass + " w-full text-xs py-2"}>
-                    <option value="">All Couriers</option>
-                    {allCouriers.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  <Chevron />
-                </div>
-                <div className="relative col-span-2">
-                  <select value={exportFilterPlatform} onChange={e => setExportFilterPlatform(e.target.value)} className={selectClass + " w-full text-xs py-2"}>
-                    <option value="">All Platforms</option>
-                    {allPlatforms.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <Chevron />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
-                <p className="text-[10px] text-gray-400 font-semibold">
-                  {getExportRows().length} order{getExportRows().length !== 1 ? "s" : ""} matched
-                </p>
-                <div className="flex items-center gap-2">
-                  {lastDownloadBlob && (
-                    <button
-                      onClick={viewLastDownload}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all"
-                    >
-                      <Eye size={11} />
-                      View Last Download
-                    </button>
-                  )}
-                  <button
-                    onClick={handleExport}
-                    disabled={getExportRows().length === 0}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-[10px] font-black uppercase tracking-wide transition-all"
-                  >
-                    <Download size={11} />
-                    Download {exportFormat.toUpperCase()}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="px-6 pt-4 pb-1 flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 text-left">
             <span className="text-sm font-bold text-gray-800">
-              {isSingleDay
-                ? `${MONTHS[Number(selectedMonth)]} ${selectedDay}, ${selectedYear}`
-                : "Overall Sales"}
+              {isSingleDay ? `${MONTHS[Number(selectedMonth)]} ${selectedDay}, ${selectedYear}` : "Overall Sales"}
             </span>
             {pctChange !== null && (
               <div className="flex items-center gap-1.5">
                 <TrendingUp size={13} className={Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"} />
-                <span className={`text-xs font-black ${Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                  {Number(pctChange) >= 0 ? "" : ""}{pctChange}%
-                </span>
-                <span className="text-[10px] text-gray-400 font-semibold">vs last year</span>
+                <span className={`text-xs font-black ${Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{pctChange}%</span>
+                <span className="text-[10px] text-gray-400 font-semibold uppercase">vs last year</span>
               </div>
             )}
           </div>
 
-          {isSingleDay ? (
-            <div className="h-[200px] flex flex-col justify-center gap-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-blue-50 rounded-2xl p-4 flex flex-col justify-between">
-                  <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Revenue</p>
+          <div className="h-[200px]">
+            {isSingleDay ? (
+              <div className="grid grid-cols-3 gap-3 h-full items-center text-left uppercase">
+                <div className="bg-blue-50 rounded-2xl p-4 flex flex-col justify-center h-full">
+                  <p className="text-[9px] font-black text-blue-400 tracking-widest mb-1">Revenue</p>
                   <p className="text-xl font-black text-blue-700 leading-tight">{formatPeso(singleDayRevenue)}</p>
                   <p className="text-[9px] text-blue-400 mt-1">{singleDayDelivered.length} delivered</p>
                 </div>
-                <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-between">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Orders</p>
+                <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-center h-full">
+                  <p className="text-[9px] font-black text-gray-400 tracking-widest mb-1">Total Orders</p>
                   <p className="text-xl font-black text-gray-800 leading-tight">{singleDayOrders.length}</p>
                   <p className="text-[9px] text-gray-400 mt-1">{singleDayOrders.filter(o => o.status === "Shipped").length} in transit</p>
                 </div>
-                <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-between">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Last Year</p>
-                  <p className="text-xl font-black text-gray-800 leading-tight">{formatPeso(singleDayLastYearRevenue)}</p>
-                  <p className="text-[9px] text-gray-400 mt-1">{selectedYear - 1} same day</p>
+                <div className="bg-gray-50 rounded-2xl p-4 flex flex-col justify-center h-full">
+                  <p className="text-[9px] font-black text-gray-400 tracking-widest mb-1">Last Year</p>
+                  <p className="text-xl font-black text-gray-800 leading-tight">{formatPeso(singleDayLYRev)}</p>
+                  <p className="text-[9px] text-gray-400 mt-1">{selectedYear - 1} comparison</p>
                 </div>
               </div>
-              {singleDayOrders.length > 0 ? (
-                <div className="space-y-1.5 max-h-[80px] overflow-y-auto pr-1">
-                  {singleDayOrders.map(o => (
-                    <div key={o.order_id} className="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded-xl">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusStyle(o.status)}`} />
-                        <p className="text-[10px] font-bold text-gray-700 truncate">{o.client_name || `SO-${o.order_id}`}</p>
-                      </div>
-                      <p className="text-[10px] font-black text-gray-900 flex-shrink-0 ml-2">
-                        ₱{Number(o.total_amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-[10px] font-black text-gray-300 uppercase tracking-widest py-2">No orders on this day</p>
-              )}
-            </div>
-          ) : (
-            <div className="h-[200px]">
-              <Line data={chartData} options={chartOptions} />
-            </div>
-          )}
+            ) : <Line data={chartData} options={chartOptions} />}
+          </div>
         </div>
 
-        <div className="px-6 pb-6 pt-4 border-t border-gray-100 mt-2 flex-shrink-0">
-          <p className="text-base font-black text-gray-900 mb-3">Select Date</p>
+        <div className="px-6 pb-6 pt-4 border-t border-gray-100 mt-2 flex-shrink-0 text-left">
+          <p className="text-base font-black text-gray-900 mb-3">Select Timeline</p>
           <div className="flex gap-3">
             {[
-              {
-                value: selectedYear,
-                onChange: e => { setSelectedYear(e.target.value); setSelectedMonth(""); setSelectedDay(""); },
-                disabled: false,
-                placeholder: "Year",
-                options: availableYears.map(y => ({ value: y, label: y })),
-              },
-              {
-                value: selectedMonth,
-                onChange: e => { setSelectedMonth(e.target.value); setSelectedDay(""); },
-                disabled: !selectedYear,
-                placeholder: "Month",
-                options: MONTHS.map((m, i) => ({ value: i, label: m })),
-              },
-              {
-                value: selectedDay,
-                onChange: e => setSelectedDay(e.target.value),
-                disabled: !selectedYear || selectedMonth === "",
-                placeholder: "Day",
-                options: Array.from({ length: daysInSelected }, (_, i) => ({ value: i + 1, label: i + 1 })),
-              },
+              { value: selectedYear, onChange: e => { setSelectedYear(e.target.value); setSelectedMonth(""); setSelectedDay(""); }, disabled: false, placeholder: "Year", options: availableYears.map(y => ({ value: y, label: y })) },
+              { value: selectedMonth, onChange: e => { setSelectedMonth(e.target.value); setSelectedDay(""); }, disabled: !selectedYear, placeholder: "Month", options: MONTHS.map((m, i) => ({ value: i, label: m })) },
+              { value: selectedDay, onChange: e => setSelectedDay(e.target.value), disabled: !selectedYear || selectedMonth === "", placeholder: "Day", options: Array.from({ length: daysInSelected }, (_, i) => ({ value: i + 1, label: i + 1 })) },
             ].map((sel, idx) => (
               <div key={idx} className="relative flex-1">
-                <select
-                  value={sel.value}
-                  onChange={sel.onChange}
-                  disabled={sel.disabled}
-                  className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed"}
-                >
+                <select value={sel.value} onChange={sel.onChange} disabled={sel.disabled} className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-black uppercase tracking-widest"}>
                   <option value="">{sel.placeholder}</option>
                   {sel.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
+                <Chevron />
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {notifModal && (
-        <NotifModal
-          title={notifModal.title}
-          message={notifModal.message}
-          type={notifModal.type}
-          actionLabel={notifModal.actionLabel}
-          onAction={notifModal.onAction}
-          onClose={() => setNotifModal(null)}
-        />
+      {sortModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-[300] p-4 text-left">
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-xl relative shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <button className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" onClick={() => setSortModalOpen(false)}><HiX size={24} /></button>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase mb-4 tracking-tighter">Export Configuration</h2>
+
+            <div className="mb-6 p-5 bg-gray-50 rounded-2xl border border-gray-100 uppercase">
+              <p className="text-[10px] tracking-[0.2em] text-gray-400 font-black mb-1">Operator Signature</p>
+              <p className="text-sm font-black text-gray-800">{exportedByName} (ID: {currentUserId || 'N/A'})</p>
+              <p className="text-[10px] text-gray-400 font-medium mt-1 uppercase">{exportTimestamp}</p>
+            </div>
+
+            <div className="space-y-4 mb-6 uppercase font-black">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <select value={exportFilterYear} onChange={e => { setExportFilterYear(e.target.value); setExportFilterMonth(""); setExportFilterDay(""); }} className={selectClass + " w-full text-xs"}>
+                    <option value="">All Years</option>
+                    {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <Chevron />
+                </div>
+                <div className="relative">
+                  <select value={exportFilterMonth} onChange={e => { setExportFilterMonth(e.target.value); setExportFilterDay(""); }} disabled={!exportFilterYear} className={selectClass + " w-full text-xs"}>
+                    <option value="">All Months</option>
+                    {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                  </select>
+                  <Chevron />
+                </div>
+                <div className="relative col-span-2">
+                  <select value={exportFilterDay} onChange={e => setExportFilterDay(e.target.value)} disabled={!exportFilterYear || exportFilterMonth === ""} className={selectClass + " w-full text-xs"}>
+                    <option value="">Select Specific Day (Optional)</option>
+                    {Array.from({ length: exportDaysInSelected }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <Chevron />
+                </div>
+                <div className="relative">
+                  <select value={exportFilterCourier} onChange={e => setExportFilterCourier(e.target.value)} className={selectClass + " w-full text-xs"}>
+                    <option value="">All Couriers</option>
+                    {allCouriers.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <Chevron />
+                </div>
+                <div className="relative">
+                  <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className={selectClass + " w-full text-xs"}>
+                    <option value="desc">Newest First</option>
+                    <option value="asc">Oldest First</option>
+                  </select>
+                  <Chevron />
+                </div>
+              </div>
+            </div>
+
+            <button
+              className="w-full py-4 rounded-xl bg-black text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-800 transition-all active:scale-95 mb-4 shadow-xl shadow-stone-200"
+              onClick={() => setPreviewOpen(true)}
+            >
+              <HiOutlineEye size={16} /> Preview Data Stream
+            </button>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-black transition-all group font-black uppercase text-left" onClick={exportToPDF}>
+                <FaRegFilePdf size={28} className="text-gray-300 group-hover:text-red-500 mb-2" />
+                <p className="text-[10px] text-gray-400 group-hover:text-black tracking-widest">Generate PDF</p>
+              </div>
+              <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-black transition-all group font-black uppercase text-left" onClick={exportToExcel}>
+                <FaRegFileExcel size={28} className="text-gray-300 group-hover:text-emerald-500 mb-2" />
+                <p className="text-[10px] text-gray-400 group-hover:text-black tracking-widest">Excel Sheet</p>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+      {previewOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-[400] p-4 text-left uppercase">
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-4xl relative shadow-2xl max-h-[90vh] flex flex-col animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+            <button className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" onClick={() => setPreviewOpen(false)}><HiX size={24} /></button>
+            <h2 className="text-xl font-black text-slate-900 mb-2 tracking-tighter leading-none">Document Preview</h2>
+            <div className="mb-6 grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 uppercase font-black text-slate-800">
+              <div className="flex flex-col"><span className="text-[9px] text-gray-400 tracking-widest block mb-1">Operator</span><span className="text-xs">{exportedByName}</span></div>
+              <div className="flex flex-col"><span className="text-[9px] text-gray-400 tracking-widest block mb-1">Timestamp</span><span className="text-xs">{exportTimestamp}</span></div>
+              <div className="flex flex-col"><span className="text-[9px] text-gray-400 tracking-widest block mb-1">Volume</span><span className="text-xs text-emerald-600">{previewRows.length} RECORDS</span></div>
+            </div>
+            <div className="overflow-auto flex-1 rounded-2xl border border-gray-100 shadow-inner">
+              <table className="w-full text-left min-w-[700px] uppercase">
+                <thead className="sticky top-0 bg-black text-white text-[9px] font-black uppercase tracking-[0.2em]">
+                  <tr>{["Order ID", "Date", "Client", "Product", "Quantity", "Courier", "Total"].map(h => <th key={h} className="px-5 py-4">{h}</th>)}</tr>
+                </thead>
+                <tbody className="bg-white text-[10px] font-bold text-gray-700">
+                  {previewRows.map((row, i) => (
+                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-5 py-4 font-black">{row["Order ID"]}</td>
+                      <td className="px-5 py-4">{row.Date}</td>
+                      <td className="px-5 py-4 truncate max-w-[120px]">{row.Client}</td>
+                      <td className="px-5 py-4 truncate max-w-[150px]">{row.Product}</td>
+                      <td className="px-5 py-4">{row.Quantity}</td>
+                      <td className="px-5 py-4">{row.Courier}</td>
+                      <td className="px-5 py-4 font-black text-gray-900">₱{row["Total Amount (₱)"]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-4 mt-6">
+              <button className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-black/10" onClick={exportToPDF}>
+                <FaRegFilePdf size={18} /> Download Document (PDF)
+              </button>
+              <button className="flex-1 bg-white border-2 border-black text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all" onClick={exportToExcel}>
+                <FaRegFileExcel size={18} /> Download Sheet (Excel)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      <style>{`@keyframes popIn { from { opacity:0; transform:scale(0.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
     </div>
   );
 };
@@ -867,17 +666,12 @@ const MainDashboard = () => {
         ]);
         setOrders(ordersRes.data || []);
         setProducts(productsRes.data || []);
-      } catch (err) {
-        console.error(err);
-      }
+      } catch {}
     };
     fetchAll();
   }, []);
 
-  const totalRevenue = orders
-    .filter(o => o.status === "Delivered")
-    .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-
+  const totalRevenue = orders.filter(o => o.status === "Delivered").reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
   const totalOrders = orders.length;
   const lowStockProducts = products.filter(p => Number(p.current_stock) <= Number(p.min_stocks));
   const inTransitOrders = orders.filter(o => o.status === "Shipped");
@@ -885,43 +679,22 @@ const MainDashboard = () => {
   const currentDeliveryOrders = inTransitOrders.slice(deliveryPage * deliveryPerPage, (deliveryPage + 1) * deliveryPerPage);
 
   const topProducts = [...products]
-    .map(p => {
-      const sold = orders
-        .filter(o => o.status === "Delivered" && (o.product_name === p.name || o.sku === p.sku))
-        .reduce((sum, o) => sum + Number(o.quantity || 0), 0);
-      const revenue = orders
-        .filter(o => o.status === "Delivered" && (o.product_name === p.name || o.sku === p.sku))
-        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-      return { ...p, sold, revenue };
-    })
+    .map(p => ({
+      ...p,
+      sold: orders.filter(o => o.status === "Delivered" && (o.product_name === p.name || o.sku === p.sku)).reduce((sum, o) => sum + Number(o.quantity || 0), 0),
+      revenue: orders.filter(o => o.status === "Delivered" && (o.product_name === p.name || o.sku === p.sku)).reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+    }))
     .filter(p => p.sold > 0)
-    .sort((a, b) => b.sold - a.sold)
-    .slice(0, 5);
+    .sort((a, b) => b.sold - a.sold).slice(0, 5);
 
   const currentYear = new Date().getFullYear();
   const monthlySales = Array(12).fill(0);
-  orders
-    .filter(o => o.status === "Delivered" && o.order_date && new Date(o.order_date).getFullYear() === currentYear)
-    .forEach(o => {
-      const month = new Date(o.order_date).getMonth();
-      monthlySales[month] += Number(o.total_amount || 0);
-    });
+  orders.filter(o => o.status === "Delivered" && o.order_date && new Date(o.order_date).getFullYear() === currentYear)
+    .forEach(o => { monthlySales[new Date(o.order_date).getMonth()] += Number(o.total_amount || 0); });
 
   const salesData = {
     labels: MONTHS,
-    datasets: [
-      {
-        label: "Revenue (₱)",
-        data: monthlySales,
-        borderColor: "#1d4ed8",
-        backgroundColor: "rgba(29,78,216,0.07)",
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        fill: true,
-        borderWidth: 2,
-      },
-    ],
+    datasets: [{ label: "Revenue (₱)", data: monthlySales, borderColor: "#1d4ed8", backgroundColor: "rgba(29,78,216,0.07)", tension: 0.4, pointRadius: 0, pointHoverRadius: 0, fill: true, borderWidth: 2 }],
   };
 
   const chartOptions = {
@@ -929,119 +702,77 @@ const MainDashboard = () => {
     interaction: { mode: "index", intersect: false },
     plugins: {
       legend: { display: false },
-      tooltip: {
-        enabled: true,
-        backgroundColor: "#0f172a",
-        titleColor: "#94a3b8",
-        bodyColor: "#f1f5f9",
-        padding: 12,
-        cornerRadius: 12,
-        titleFont: { size: 10, weight: "bold" },
-        bodyFont: { size: 13, weight: "bold" },
-        displayColors: false,
-        callbacks: {
-          title: (items) => items[0]?.label || "",
-          label: (item) => `₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
-        },
-      },
+      tooltip: { enabled: true, backgroundColor: "#0f172a", titleColor: "#94a3b8", bodyColor: "#f1f5f9", padding: 12, cornerRadius: 12, titleFont: { size: 10, weight: "bold" }, bodyFont: { size: 13, weight: "bold" }, displayColors: false, callbacks: { title: (items) => items[0]?.label || "", label: (item) => `₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` } },
     },
     scales: {
-      y: {
-        grid: { color: "rgba(0,0,0,0.04)" },
-        ticks: {
-          callback: (v) => formatPeso(v),
-          font: { size: 10 },
-          color: "#94a3b8",
-        },
-        border: { display: false },
-      },
-      x: {
-        grid: { display: false },
-        ticks: { font: { size: 10 }, color: "#94a3b8" },
-        border: { display: false },
-      },
+      y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
     },
   };
 
   const stats = [
-    { label: "Total Products", value: products.length.toLocaleString(), sub: "Finished goods in inventory", icon: <Package className="w-3.5 h-3.5 text-gray-500 shrink-0" /> },
-    { label: "Total Revenue", value: `₱${totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`, sub: "From delivered orders", icon: <DollarSign className="w-3.5 h-3.5 text-gray-500 shrink-0" /> },
-    { label: "Total Orders", value: totalOrders.toLocaleString(), sub: "All time sales orders", icon: <ShoppingCart className="w-3.5 h-3.5 text-gray-500 shrink-0" /> },
-    { label: "In Transit", value: inTransitOrders.length.toLocaleString(), sub: "Orders currently shipped", icon: <Truck className="w-3.5 h-3.5 text-blue-500 shrink-0" /> },
-    { label: "Low Stock", value: lowStockProducts.length.toLocaleString(), sub: "Items need restocking", icon: <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" /> },
+    { label: "Total Products", value: products.length.toLocaleString(), sub: "Finished goods in inventory" },
+    { label: "Total Revenue", value: `₱${totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`, sub: "From delivered orders" },
+    { label: "Total Orders", value: totalOrders.toLocaleString(), sub: "All time sales orders" },
+    { label: "In Transit", value: inTransitOrders.length.toLocaleString(), sub: "Orders currently shipped" },
+    { label: "Low Stock", value: lowStockProducts.length.toLocaleString(), sub: "Items need restocking" },
   ];
 
   return (
-    <div className="w-full overflow-x-hidden bg-[#fafafa] font-sans">
-      {selectedOrder && (
-        <OrderDetailModal
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-          products={products}
-        />
-      )}
-      {showTrendModal && (
-        <SalesTrendModal
-          orders={orders}
-          onClose={() => setShowTrendModal(false)}
-        />
-      )}
+    <div className="w-full overflow-x-hidden bg-[#fafafa] font-sans text-left">
+      {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} products={products} />}
+      {showTrendModal && <SalesTrendModal orders={orders} onClose={() => setShowTrendModal(false)} />}
 
-      <div className="px-4 py-6 pb-28 lg:pb-6 max-w-full">
-        <div className="mb-6 mt-2">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">Here's your comprehensive business overview.</p>
+      <div className="px-4 py-6 pb-28 lg:pb-6 max-w-full text-left uppercase font-black">
+        <div className="mb-6 mt-2 text-left leading-none uppercase tracking-tighter font-black">
+          <h1 className="text-3xl text-gray-900 leading-none">Dashboard</h1>
+          <p className="text-sm text-gray-400 font-bold mt-2 uppercase tracking-widest leading-none">Enterprise Analytics Overview</p>
         </div>
 
-        <div className="flex gap-3 mb-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-5 lg:overflow-x-visible" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="flex gap-3 mb-6 overflow-x-auto pb-2 lg:grid lg:grid-cols-5 lg:overflow-x-visible no-scrollbar">
           {stats.map((s, i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-col justify-between flex-shrink-0 w-[140px] lg:w-auto min-w-0 overflow-hidden">
-              <span className="text-[11px] text-gray-500 font-medium truncate mb-1">{s.label}</span>
-              <h2 className="text-lg font-bold text-gray-900 truncate">{s.value}</h2>
-              <p className="text-[10px] text-gray-400 truncate mt-1">{s.sub}</p>
+            <div key={i} className="bg-white border border-gray-100 rounded-[1.75rem] p-4 shadow-sm flex flex-col justify-between flex-shrink-0 w-[150px] lg:w-auto h-[120px] text-left uppercase font-black">
+              <span className="text-[9px] text-gray-400 font-black tracking-widest">{s.label}</span>
+              <h2 className="text-xl font-black text-gray-900 tracking-tighter truncate leading-none uppercase">{s.value}</h2>
+              <p className="text-[8px] text-gray-300 font-bold tracking-tight truncate leading-none">{s.sub}</p>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col min-w-0">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Monthly Revenue</h3>
-                <p className="text-[10px] text-gray-400">Based on delivered orders · hover to inspect</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4 text-left uppercase font-black">
+          <div className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col min-w-0 text-left">
+            <div className="flex items-start justify-between mb-3 text-left leading-none">
+              <div className="text-left leading-none">
+                <h3 className="text-sm tracking-widest text-gray-900 leading-none">Monthly Revenue</h3>
+                <p className="text-[10px] text-gray-400 font-bold mt-2 leading-none uppercase">Running Year Performance</p>
               </div>
               <button
                 onClick={() => setShowTrendModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-wide transition-all flex-shrink-0"
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
               >
-                <Search size={12} />
-                View
+                <Search size={12} /> Detail
               </button>
             </div>
-            <div className="h-[250px]">
-              <Line data={salesData} options={chartOptions} />
-            </div>
+            <div className="h-[250px] uppercase font-black"><Line data={salesData} options={chartOptions} /></div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col min-w-0">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Top Selling Products</h3>
-            <div className="space-y-2 text-[10px]">
-              {topProducts.length === 0 ? (
-                <p className="text-gray-300 text-center py-10 font-black uppercase text-[10px]">No sales data yet</p>
-              ) : topProducts.map((p) => (
-                <div key={p.sku} className="flex justify-between items-center p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {p.product_image ? <img src={p.product_image} className="w-full h-full object-cover" alt="" /> : <HiPhoto size={16} className="text-gray-300" />}
+          <div className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col min-w-0 text-left uppercase font-black leading-none">
+            <h3 className="text-sm text-gray-900 tracking-widest mb-4 text-left uppercase">Top Selling Products</h3>
+            <div className="space-y-3 font-black">
+              {topProducts.map((p) => (
+                <div key={p.sku} className="flex justify-between items-center p-3 rounded-2xl border border-gray-50 hover:bg-gray-50 transition-all text-left uppercase">
+                  <div className="flex items-center gap-3 min-w-0 text-left uppercase leading-none font-black">
+                    <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 leading-none">
+                      {p.product_image ? <img src={p.product_image} className="w-full h-full object-cover" alt="" /> : <HiPhoto size={20} className="text-gray-300" />}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-bold text-gray-900 truncate uppercase">{p.name}</p>
-                      <p className="text-[9px] text-gray-400">{p.sold} units sold</p>
+                    <div className="min-w-0 text-left leading-none font-black">
+                      <p className="text-[11px] font-black text-gray-900 truncate tracking-tight leading-none uppercase">{p.name}</p>
+                      <p className="text-[9px] text-gray-400 font-bold tracking-widest mt-1 uppercase leading-none">{p.sold} UNITS SOLD</p>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <p className="text-sm font-semibold text-gray-900">₱{Number(p.revenue).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</p>
-                    <p className="text-[9px] text-emerald-600">₱{Math.round(p.revenue * 0.2).toLocaleString()} profit</p>
+                  <div className="text-right flex-shrink-0 ml-4 leading-none uppercase font-black">
+                    <p className="text-sm font-black text-gray-900 leading-none mb-1 uppercase">₱{Number(p.revenue).toLocaleString()}</p>
+                    <p className="text-[8px] text-emerald-600 tracking-widest uppercase font-black leading-none">TOP TIER</p>
                   </div>
                 </div>
               ))}
@@ -1049,91 +780,46 @@ const MainDashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm">
-            <h3 className="text-md font-bold text-gray-800 mb-1">Stock Restocking Alarms</h3>
-            <div className="space-y-4 mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-left uppercase font-black">
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm text-left font-black uppercase leading-none">
+            <h3 className="text-sm font-black text-gray-900 tracking-widest mb-6 uppercase leading-none text-left">Stock Restocking Alarms</h3>
+            <div className="space-y-4 font-black leading-none uppercase">
               {lowStockProducts.length === 0 ? (
-                <p className="text-gray-300 text-center py-10 font-black uppercase text-[10px] tracking-widest">All stocks are healthy</p>
-              ) : lowStockProducts.slice(0, 7).map((item) => {
-                const stock = Number(item.current_stock);
-                const min = Number(item.min_stocks);
-                const isNone = stock <= 0;
-                const statusLabel = isNone ? "No Stock" : "Low Stock";
-                const barColor = isNone ? "bg-red-600" : "bg-amber-500";
-                return (
-                  <div key={item.sku} className="flex items-center gap-3 border-b border-gray-50 pb-3 last:border-0">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                      {item.product_image ? <img src={item.product_image} className="w-full h-full object-cover" alt="" /> : <Package size={18} className="text-gray-400" />}
+                <p className="text-gray-300 text-center py-10 font-black uppercase text-[10px] italic">Resources stabilized</p>
+              ) : lowStockProducts.slice(0, 5).map((item) => (
+                <div key={item.sku} className="flex items-center gap-4 text-left font-black uppercase leading-none">
+                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0">{item.product_image ? <img src={item.product_image} className="w-full h-full object-cover rounded-xl" alt="" /> : <Package size={18} className="text-gray-200" />}</div>
+                  <div className="flex-1 min-w-0 text-left leading-none uppercase font-black">
+                    <div className="flex justify-between items-center mb-1.5 text-left leading-none uppercase font-black">
+                      <p className="text-[10px] text-gray-800 truncate tracking-tighter uppercase font-black leading-none">{item.name}</p>
+                      <span className={`text-[8px] px-2 py-0.5 rounded-full text-white uppercase font-black ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-500'}`}>{Number(item.current_stock) === 0 ? "Void" : "Low"}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start">
-                        <div className="truncate pr-2">
-                          <p className="text-[10px] font-bold text-gray-800 uppercase truncate">{item.name}</p>
-                          <p className="text-[9px] text-gray-400">{item.category || item.sku}</p>
-                        </div>
-                        <span className={`text-[8px] px-2 py-0.5 rounded-full text-white font-bold shrink-0 ${barColor}`}>{statusLabel}</span>
-                      </div>
-                      <div className="flex justify-between items-center mt-1">
-                        <div className="w-full bg-gray-100 h-1 rounded-full mr-2">
-                          <div className={`${barColor} h-1 rounded-full transition-all duration-500`} style={{ width: `${Math.min((stock / (min || 1)) * 100, 100)}%` }} />
-                        </div>
-                        <p className="text-[9px] text-gray-400 whitespace-nowrap"><span className="font-bold text-gray-700">{stock}/{min}</span></p>
-                      </div>
-                    </div>
+                    <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden leading-none"><div className={`h-full transition-all duration-700 ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${Math.max((item.current_stock / item.min_stocks) * 100, 5)}%` }} /></div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-md font-black text-gray-800">Delivery Tracking</h3>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Shipped Orders · click for details</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setDeliveryPage(p => Math.max(p - 1, 0))} disabled={deliveryPage === 0} className="p-1.5 rounded-full border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-all"><ChevronLeft size={14} /></button>
-                <button onClick={() => setDeliveryPage(p => p + 1)} disabled={deliveryPage >= totalDeliveryPages - 1} className="p-1.5 rounded-full border border-gray-200 disabled:opacity-30 hover:bg-gray-50 transition-all"><ChevronRight size={14} /></button>
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm text-left uppercase font-black leading-none">
+            <div className="flex justify-between items-center mb-6 text-left leading-none uppercase font-black">
+              <h3 className="text-sm font-black text-gray-900 tracking-widest uppercase font-black">Delivery Tracking</h3>
+              <div className="flex gap-2">
+                <button onClick={() => setDeliveryPage(p => Math.max(p - 1, 0))} disabled={deliveryPage === 0} className="p-1.5 rounded-full border border-gray-200 disabled:opacity-20 transition-all active:scale-90 leading-none"><ChevronLeft size={14}/></button>
+                <button onClick={() => setDeliveryPage(p => p + 1)} disabled={deliveryPage >= totalDeliveryPages - 1} className="p-1.5 rounded-full border border-gray-100 disabled:opacity-20 transition-all active:scale-90 leading-none"><ChevronRight size={14}/></button>
               </div>
             </div>
-
-            {inTransitOrders.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
-                <Truck size={36} className="text-gray-200 mb-2" />
-                <p className="text-[10px] font-black uppercase text-gray-300 tracking-widest">No orders in transit</p>
-              </div>
-            ) : (
-              <div className="space-y-3 flex-1">
-                {currentDeliveryOrders.map(order => (
-                  <button
-                    key={order.order_id}
-                    onClick={() => setSelectedOrder(order)}
-                    className="w-full text-left border border-gray-100 rounded-2xl p-4 hover:bg-blue-50 hover:border-blue-100 transition-all group"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-gray-900 uppercase truncate group-hover:text-blue-700 transition-colors">{order.client_name}</p>
-                        <p className="text-[9px] text-gray-400 font-bold mt-0.5">SO-{order.order_id} · {order.order_date ? new Date(order.order_date).toLocaleDateString("en-PH", { month: "short", day: "numeric" }) : "—"}</p>
-                      </div>
-                      <span className={`text-[8px] px-2 py-0.5 rounded-full text-white font-black shrink-0 ml-2 ${getStatusStyle(order.status)}`}>{order.status}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[9px] text-gray-500 font-bold">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base">{COURIERS_ICON[order.courier] || "📦"}</span>
-                        <span className="uppercase">{order.courier}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="uppercase text-[8px] font-black text-gray-400">{order.platform}</span>
-                        <span className="text-gray-300">·</span>
-                        <span className="font-black text-gray-700">{order.quantity}x {order.product_name || order.sku}</span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="space-y-3 font-black uppercase text-left">
+              {currentDeliveryOrders.map(order => (
+                <button key={order.order_id} onClick={() => setSelectedOrder(order)} className="w-full p-4 border border-gray-50 rounded-[1.5rem] hover:bg-gray-50 text-left transition-all group flex items-center justify-between gap-4 uppercase font-black shadow-sm leading-none">
+                  <div className="min-w-0 text-left leading-none uppercase font-black">
+                    <p className="text-[11px] font-black text-gray-900 truncate tracking-tighter group-hover:text-blue-600 uppercase font-black leading-none">{order.client_name}</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-2 uppercase font-black leading-none">SO-{order.order_id} · {order.courier}</p>
+                  </div>
+                  <span className="text-[8px] px-3 py-1 bg-blue-500 text-white rounded-full tracking-widest uppercase font-black shadow-sm leading-none">SHIPPED</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
