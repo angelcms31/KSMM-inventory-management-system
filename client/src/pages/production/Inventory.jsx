@@ -83,7 +83,7 @@ export default function Inventory() {
     setShowCompleteModal(true);
   };
 
-const handleCompleteSubmit = async (e) => {
+  const handleCompleteSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
 
@@ -103,14 +103,13 @@ const handleCompleteSubmit = async (e) => {
     setSubmitting(true);
     try {
       await axios.put(`http://localhost:5000/api/work_orders/${completeOrder.work_order_id}/complete`, {
-          actualMaterials: completeActuals.map(m => ({
-            material_id: m.material_id,
-            expected_qty: Number(m.expected_qty),
-            actual_qty: parseInt(m.actual_qty)
-          })),
-          userId: currentUserId 
-        });
-      
+        actualMaterials: completeActuals.map(m => ({
+          material_id: m.material_id,
+          expected_qty: Number(m.expected_qty),
+          actual_qty: parseInt(m.actual_qty)
+        })),
+        userId: currentUserId
+      });
       setShowCompleteModal(false);
       setCompleteOrder(null);
       setCompleteActuals([]);
@@ -207,21 +206,20 @@ const handleCompleteSubmit = async (e) => {
         `http://localhost:5000/api/work_orders/${selectedOrder.work_order_id}`,
         payload
       );
-
       if (res.data.success) {
         setShowEditModal(false);
         fetchData();
       }
     } catch (err) {
-  const raw = err.response?.data?.error || err.message || '';
-  if (raw.startsWith('INSUFFICIENT_STOCK::')) {
-    const [, name, needed, available] = raw.split('::');
-    alert(`Not enough stock for "${name}".\nNeeded: ${needed} | Available: ${available}`);
-  } else {
-    alert('Update failed: ' + raw);
-  }
+      const raw = err.response?.data?.error || err.message || '';
+      if (raw.startsWith('INSUFFICIENT_STOCK::')) {
+        const [, name, needed, available] = raw.split('::');
+        alert(`Not enough stock for "${name}".\nNeeded: ${needed} | Available: ${available}`);
+      } else {
+        alert('Update failed: ' + raw);
+      }
+    }
   };
-} 
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -246,59 +244,59 @@ const handleCompleteSubmit = async (e) => {
 
   return (
     <div className="w-full h-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden">
-      <div className="flex-shrink-0 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
+      <div className="flex-shrink-0 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-4 lg:mb-8 flex gap-3 items-center">
         <div className="relative flex-1">
-          <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <HiMagnifyingGlass className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
             placeholder="Search SKU, Artisan, or Product..."
-            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-black/5 transition-all"
+            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 pl-10 lg:pl-12 pr-4 outline-none font-bold text-slate-700 text-sm focus:ring-2 focus:ring-black/5 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <select
-          className="bg-[#F8F9FA] border-none rounded-2xl py-3.5 px-6 font-bold text-slate-600 outline-none cursor-pointer min-w-[200px] text-xs uppercase tracking-wider"
+          className="bg-[#F8F9FA] border-none rounded-2xl py-3 px-3 lg:px-6 font-bold text-slate-600 outline-none cursor-pointer text-[10px] uppercase tracking-wider"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="All Status">All Status</option>
-          <option value="In Production">In Production</option>
-          <option value="Quality Control">Quality Control</option>
-          <option value="Complete">Complete</option>
+          <option value="All Status">All</option>
+          <option value="In Production">In Prod</option>
+          <option value="Quality Control">QC</option>
+          <option value="Complete">Done</option>
         </select>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-10 min-h-0">
-        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col text-left">
-          <div className="flex justify-between items-center mb-8 px-2 flex-shrink-0">
+        <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm p-4 lg:p-8 flex flex-col text-left">
+          <div className="flex justify-between items-center mb-6 lg:mb-8 px-1 lg:px-2 flex-shrink-0 gap-3">
             <div>
-              <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Production Orders</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Active Work Orders</p>
+              <h1 className="text-xl lg:text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Production Orders</h1>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 lg:mt-2">Active Work Orders</p>
             </div>
-            <div className="flex gap-2 text-[10px] font-black uppercase">
-              <span className="px-3 py-1.5 rounded-lg bg-[#1D7A1D] text-white">
-                {workOrders.filter(o => o.status === 'In Production').length} In Production
+            <div className="flex gap-1.5 text-[8px] lg:text-[10px] font-black uppercase flex-shrink-0">
+              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#1D7A1D] text-white">
+                {workOrders.filter(o => o.status === 'In Production').length}
               </span>
-              <span className="px-3 py-1.5 rounded-lg bg-black text-white">
-                {workOrders.filter(o => o.status === 'Quality Control').length} QC
+              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-black text-white">
+                {workOrders.filter(o => o.status === 'Quality Control').length}
               </span>
-              <span className="px-3 py-1.5 rounded-lg bg-[#002B5B] text-white">
-                {workOrders.filter(o => o.status === 'Complete').length} Complete
+              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#002B5B] text-white">
+                {workOrders.filter(o => o.status === 'Complete').length}
               </span>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-separate border-spacing-y-4">
+          <div className="overflow-x-auto -mx-4 lg:mx-0 px-4 lg:px-0">
+            <table className="w-full border-separate border-spacing-y-3 min-w-[520px]">
               <thead>
-                <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
-                  <th className="pb-2 text-left pl-6 w-[28%]">Product Details</th>
-                  <th className="pb-2 text-left w-[16%]">Artisan</th>
-                  <th className="pb-2 text-left w-[10%]">Category</th>
-                  <th className="pb-2 text-center w-[13%]">Status</th>
-                  <th className="pb-2 text-center w-[11%]">Total Cost</th>
-                  <th className="pb-2 text-right pr-8">Actions</th>
+                <tr className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                  <th className="pb-2 text-left pl-4 lg:pl-6 w-[40%] lg:w-[28%]">Product</th>
+                  <th className="pb-2 text-left w-[18%] hidden lg:table-cell">Artisan</th>
+                  <th className="pb-2 text-left w-[12%] hidden lg:table-cell">Category</th>
+                  <th className="pb-2 text-center w-[18%] lg:w-[13%]">Status</th>
+                  <th className="pb-2 text-center w-[15%] lg:w-[11%]">Cost</th>
+                  <th className="pb-2 text-right pr-4 lg:pr-8">Actions</th>
                 </tr>
               </thead>
               <tbody className="font-bold text-slate-700">
@@ -308,60 +306,60 @@ const handleCompleteSubmit = async (e) => {
                   const displayCategory = getCategoryBySku(order.sku) || order.department || 'N/A';
                   return (
                     <tr key={order.work_order_id} className="group hover:bg-slate-50/80 transition-all">
-                      <td className="py-4 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100">
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
+                      <td className="py-3 pl-4 lg:pl-6 rounded-l-[1.5rem] lg:rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 lg:w-14 lg:h-14 bg-white rounded-xl lg:rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
                             {order.product_image
                               ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" />
-                              : <HiPhoto size={24} className="text-slate-200" />
+                              : <HiPhoto size={20} className="text-slate-200" />
                             }
                           </div>
                           <div className="flex flex-col items-start min-w-0">
-                            <span className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate max-w-[200px]">
+                            <span className="text-slate-900 font-black uppercase text-[10px] lg:text-xs mb-0.5 truncate max-w-[120px] lg:max-w-[200px]">
                               {getProductName(order.sku)}
                             </span>
-                            <div className="flex items-center gap-1.5 max-w-[200px]">
-                              <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider truncate max-w-[120px]">{order.sku}</span>
-                              <span className="text-slate-300 text-[10px] flex-shrink-0">•</span>
-                              <span className="text-slate-400 text-[10px] font-bold uppercase whitespace-nowrap flex-shrink-0">{order.quantity_needed} Units</span>
+                            <div className="flex items-center gap-1 max-w-[120px] lg:max-w-[200px]">
+                              <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider truncate max-w-[80px] lg:max-w-[120px]">{order.sku}</span>
+                              <span className="text-slate-300 text-[9px] flex-shrink-0">•</span>
+                              <span className="text-slate-400 text-[9px] font-bold uppercase whitespace-nowrap flex-shrink-0">{order.quantity_needed}u</span>
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 text-left text-slate-700 text-sm border-y border-transparent group-hover:border-slate-100">
+                      <td className="py-3 text-left text-slate-700 text-xs border-y border-transparent group-hover:border-slate-100 hidden lg:table-cell">
                         {order.first_name && order.last_name
                           ? `${order.first_name} ${order.last_name}`
                           : <span className="text-slate-300 italic text-xs">Unassigned</span>
                         }
                       </td>
-                      <td className="py-4 text-left text-slate-400 text-[10px] uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest">
+                      <td className="py-3 text-left text-slate-400 text-[10px] uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest hidden lg:table-cell">
                         {displayCategory}
                       </td>
-                      <td className="py-4 text-center border-y border-transparent group-hover:border-slate-100">
-                        <span className={`px-4 py-1.5 rounded-xl text-[10px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
-                          {order.status}
+                      <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
+                        <span className={`px-2 lg:px-4 py-1 lg:py-1.5 rounded-xl text-[9px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
+                          {order.status === 'In Production' ? 'Prod' : order.status === 'Quality Control' ? 'QC' : order.status}
                         </span>
                       </td>
-                      <td className="py-4 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100">
+                      <td className="py-3 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100 text-[10px] lg:text-sm">
                         ₱{Number(order.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-4 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
-                        <div className="flex justify-end gap-2">
+                      <td className="py-3 pr-4 lg:pr-8 rounded-r-[1.5rem] lg:rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
+                        <div className="flex justify-end gap-1.5">
                           {isQC && (
                             <button
                               onClick={() => handleOpenComplete(order)}
                               title="Mark as Complete"
-                              className="p-3 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-2xl transition-all border border-emerald-100"
+                              className="p-2 lg:p-3 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-xl transition-all border border-emerald-100"
                             >
-                              <HiCheckCircle size={18} />
+                              <HiCheckCircle size={15} />
                             </button>
                           )}
                           <button
                             onClick={() => handleOpenEdit(order)}
                             disabled={isComplete}
-                            className={`p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-2xl transition-all border border-slate-100 ${isComplete ? 'opacity-30 cursor-not-allowed' : ''}`}
+                            className={`p-2 lg:p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-xl transition-all border border-slate-100 ${isComplete ? 'opacity-30 cursor-not-allowed' : ''}`}
                           >
-                            <HiPencil size={18} />
+                            <HiPencil size={15} />
                           </button>
                         </div>
                       </td>
@@ -370,7 +368,7 @@ const handleCompleteSubmit = async (e) => {
                 })}
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="py-20 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
+                    <td colSpan="6" className="py-16 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
                       No Work Orders Found
                     </td>
                   </tr>
@@ -382,44 +380,44 @@ const handleCompleteSubmit = async (e) => {
       </div>
 
       {showCompleteModal && completeOrder && (
-        <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
-          <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 relative shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex justify-between items-start mb-6 flex-shrink-0">
+        <div className="fixed inset-0 flex justify-center items-center z-[100] p-4 lg:p-6 text-left backdrop-blur-md bg-black/10">
+          <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-2xl p-6 lg:p-10 relative shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-start mb-4 lg:mb-6 flex-shrink-0">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Complete Work Order</h2>
-                <p className="text-slate-400 font-bold mt-1 text-xs uppercase tracking-wider truncate max-w-[420px]">
-                  WO-{completeOrder.work_order_id} · {completeOrder.sku.length > 20 ? completeOrder.sku.slice(0, 20) + '...' : completeOrder.sku} · {getProductName(completeOrder.sku).length > 25 ? getProductName(completeOrder.sku).slice(0, 25) + '...' : getProductName(completeOrder.sku)}
+                <h2 className="text-xl lg:text-3xl font-black text-slate-900 uppercase tracking-tighter">Complete Work Order</h2>
+                <p className="text-slate-400 font-bold mt-1 text-[10px] uppercase tracking-wider truncate max-w-[260px] lg:max-w-[420px]">
+                  WO-{completeOrder.work_order_id} · {completeOrder.sku.length > 20 ? completeOrder.sku.slice(0, 20) + '...' : completeOrder.sku}
                 </p>
               </div>
               <button
                 onClick={() => { setShowCompleteModal(false); setCompleteOrder(null); setCompleteActuals([]); }}
-                className="text-slate-300 hover:text-black bg-slate-50 p-2 rounded-full shadow-sm"
+                className="text-slate-300 hover:text-black bg-slate-50 p-2 rounded-full shadow-sm flex-shrink-0"
               >
-                <HiXMark size={24} />
+                <HiXMark size={20} />
               </button>
             </div>
 
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 mb-6 flex gap-6 flex-shrink-0">
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 mb-4 flex gap-4 flex-wrap flex-shrink-0">
               <div>
                 <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Product</p>
-                <p className="text-sm font-black text-slate-900 truncate max-w-[160px]">{getProductName(completeOrder.sku)}</p>
+                <p className="text-xs font-black text-slate-900 truncate max-w-[130px]">{getProductName(completeOrder.sku)}</p>
               </div>
               <div>
                 <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Artisan</p>
-                <p className="text-sm font-black text-slate-900">{completeOrder.first_name} {completeOrder.last_name}</p>
+                <p className="text-xs font-black text-slate-900">{completeOrder.first_name} {completeOrder.last_name}</p>
               </div>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Qty to Add to Stock</p>
-                <p className="text-sm font-black text-emerald-600">+{completeOrder.quantity_needed} units</p>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Qty to Stock</p>
+                <p className="text-xs font-black text-emerald-600">+{completeOrder.quantity_needed} units</p>
               </div>
             </div>
 
             <form onSubmit={handleCompleteSubmit} className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1">
               <div className="mb-3">
                 <div className="mb-2">
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
-                    Variance = Actual − Expected. Positive means over-used, negative means saved.
+                    Variance = Actual − Expected
                   </p>
                 </div>
                 <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
@@ -427,9 +425,9 @@ const handleCompleteSubmit = async (e) => {
                     <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black sticky top-0 z-10">
                       <tr>
                         <th className="p-3">Material</th>
-                        <th className="p-3 text-center w-24">Expected</th>
-                        <th className="p-3 text-center w-28">Actual Used</th>
-                        <th className="p-3 text-center w-28">Variance</th>
+                        <th className="p-3 text-center w-20">Expected</th>
+                        <th className="p-3 text-center w-24">Actual</th>
+                        <th className="p-3 text-center w-24">Variance</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -440,15 +438,15 @@ const handleCompleteSubmit = async (e) => {
                         const isOver = variance > 0;
                         return (
                           <tr key={index} className="text-slate-700 font-bold hover:bg-slate-50 transition-colors">
-                            <td className="p-3 font-black text-slate-900 text-[11px]">{item.material_name}</td>
-                            <td className="p-3 text-center text-slate-400 font-black text-[11px]">{expectedQty}</td>
+                            <td className="p-3 font-black text-slate-900 text-[10px]">{item.material_name}</td>
+                            <td className="p-3 text-center text-slate-400 font-black text-[10px]">{expectedQty}</td>
                             <td className="p-3 text-center">
                               <input
                                 type="number"
                                 min="1"
                                 step="1"
                                 required
-                                className="w-20 text-center bg-slate-50 border border-slate-200 rounded-lg py-1.5 outline-none font-black text-[11px] focus:border-black transition-colors"
+                                className="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg py-1.5 outline-none font-black text-[10px] focus:border-black transition-colors"
                                 value={item.actual_qty}
                                 onChange={e => {
                                   const val = parseInt(e.target.value);
@@ -460,10 +458,10 @@ const handleCompleteSubmit = async (e) => {
                             </td>
                             <td className="p-3 text-center">
                               {variance === 0 ? (
-                                <span className="text-[11px] font-black text-slate-400">—</span>
+                                <span className="text-[10px] font-black text-slate-400">—</span>
                               ) : (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black ${isOver ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                  {isOver ? `+${variance} over` : `${variance} saved`}
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black ${isOver ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                  {isOver ? `+${variance}` : `${variance}`}
                                 </span>
                               )}
                             </td>
@@ -473,7 +471,7 @@ const handleCompleteSubmit = async (e) => {
                       {completeActuals.length === 0 && (
                         <tr>
                           <td colSpan="4" className="py-8 text-center text-slate-300 font-black text-[10px] uppercase tracking-widest">
-                            No materials found for this work order
+                            No materials found
                           </td>
                         </tr>
                       )}
@@ -481,40 +479,40 @@ const handleCompleteSubmit = async (e) => {
                   </table>
                 </div>
 
-                <div className="mt-3 flex gap-3 flex-wrap">
+                <div className="mt-3 flex gap-2 flex-wrap">
                   {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) > 0) && (
-                    <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-4 py-2">
-                      <span className="w-2 h-2 rounded-full bg-rose-400 flex-shrink-0"></span>
-                      <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider">Overage detected — extra stock will be deducted</span>
+                    <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0"></span>
+                      <span className="text-[9px] font-black text-rose-600 uppercase tracking-wider">Overage — extra stock deducted</span>
                     </div>
                   )}
                   {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) < 0) && (
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Under usage — unused materials returned to stock</span>
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
+                      <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Under usage — returned to stock</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0">
-                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest max-w-[220px] leading-relaxed">
-                  Only the variance is applied to stock. Expected qty was already deducted on assignment.
+              <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0 gap-3">
+                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest max-w-[220px] leading-relaxed hidden sm:block">
+                  Only variance applied to stock.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => { setShowCompleteModal(false); setCompleteOrder(null); setCompleteActuals([]); }}
-                    className="px-8 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
+                    className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-10 py-3 bg-[#002B5B] text-white rounded-xl uppercase text-[10px] font-black shadow-xl hover:bg-blue-900 transition-all tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 sm:flex-none px-6 py-2.5 bg-[#002B5B] text-white rounded-xl uppercase text-[10px] font-black shadow-xl hover:bg-blue-900 transition-all tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {submitting ? 'Completing...' : 'Confirm & Complete'}
+                    {submitting ? 'Completing...' : 'Confirm'}
                   </button>
                 </div>
               </div>
@@ -524,33 +522,33 @@ const handleCompleteSubmit = async (e) => {
       )}
 
       {showEditModal && (
-        <div className="fixed inset-0 flex justify-center items-center z-[100] p-6 text-left backdrop-blur-md bg-black/10">
-          <div className="bg-white rounded-[3rem] w-full max-w-4xl p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-100">
-            <div className="flex justify-between items-start mb-6 flex-shrink-0">
+        <div className="fixed inset-0 flex justify-center items-center z-[100] p-4 lg:p-6 text-left backdrop-blur-md bg-black/10">
+          <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-4xl p-5 lg:p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-100">
+            <div className="flex justify-between items-start mb-4 lg:mb-6 flex-shrink-0">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Update Record</h2>
-                <p className="text-slate-400 font-bold mt-1 tracking-tight text-xs uppercase truncate max-w-[400px]">WO-{selectedOrder?.work_order_id} · {selectedOrder?.sku?.length > 25 ? selectedOrder.sku.slice(0, 25) + '...' : selectedOrder?.sku}</p>
+                <h2 className="text-xl lg:text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Update Record</h2>
+                <p className="text-slate-400 font-bold mt-1 tracking-tight text-[10px] uppercase truncate max-w-[220px] lg:max-w-[400px]">WO-{selectedOrder?.work_order_id} · {selectedOrder?.sku?.length > 25 ? selectedOrder.sku.slice(0, 25) + '...' : selectedOrder?.sku}</p>
               </div>
-              <div className="flex items-center gap-4">
-                <select
-                  className={`${getStatusColor(editForm.status)} text-white px-5 py-2.5 rounded-2xl font-black uppercase text-[10px] outline-none cursor-pointer border-none shadow-lg tracking-widest`}
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+              <div className="flex items-center gap-3">
+                <div className={`${getStatusColor(editForm.status)} text-white px-3 lg:px-6 py-1.5 lg:py-2 rounded-xl font-black uppercase text-[9px] shadow-sm tracking-widest select-none`}>
+                  {editForm.status}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm"
                 >
-                  <option value="In Production">In Production</option>
-                </select>
-                <button onClick={() => setShowEditModal(false)} className="text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full shadow-sm">
-                  <HiXMark size={24} />
+                  <HiXMark size={20} />
                 </button>
               </div>
             </div>
 
             <form onSubmit={handleUpdate} className="flex-1 flex flex-col min-h-0">
-              <div className="grid grid-cols-2 gap-8 mb-6 overflow-y-auto pr-2 no-scrollbar flex-1">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-8 mb-4 lg:mb-6 overflow-y-auto pr-1 no-scrollbar flex-1">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Product SKU & Name</label>
+                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">SKU & Product</label>
                       <select
                         required
                         className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
@@ -567,7 +565,7 @@ const handleCompleteSubmit = async (e) => {
                       </select>
                     </div>
                     <div className="space-y-1 text-left">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Quantity</label>
+                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Quantity</label>
                       <input
                         type="number" min="1" step="1" required
                         className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
@@ -584,7 +582,7 @@ const handleCompleteSubmit = async (e) => {
                         value={editForm.category}
                         onChange={e => setEditForm({ ...editForm, category: e.target.value })}
                       >
-                        <option value="">Select category...</option>
+                        <option value="">Select...</option>
                         <option>Earrings</option>
                         <option>Necklace</option>
                         <option>Bracelets</option>
@@ -619,31 +617,31 @@ const handleCompleteSubmit = async (e) => {
 
                 <div className="flex flex-col">
                   <div className="flex justify-center mb-4 flex-shrink-0">
-                    <div className="w-28 h-28 rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
+                    <div className="w-20 h-20 lg:w-28 lg:h-28 rounded-[1.5rem] lg:rounded-[2rem] border-4 border-white shadow-xl flex items-center justify-center bg-slate-50 overflow-hidden relative group">
                       {editForm.product_image
                         ? <img src={editForm.product_image} className="w-full h-full object-cover" alt="Product" />
-                        : <HiPhoto size={40} className="text-slate-200" />
+                        : <HiPhoto size={32} className="text-slate-200" />
                       }
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                        <p className="text-white text-[9px] font-black uppercase text-center px-1">Change Photo</p>
+                        <p className="text-white text-[8px] font-black uppercase text-center px-1">Change Photo</p>
                       </div>
                       <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                     </div>
                   </div>
                   <div className="flex-1 flex flex-col min-h-0">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-base font-black text-slate-800 uppercase tracking-tighter">Raw Materials</h3>
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Raw Materials</h3>
                       <button type="button" onClick={addMaterialRow} className="bg-black text-white p-1.5 rounded-lg hover:scale-110 transition-all shadow-lg">
-                        <HiPlusSmall size={20} />
+                        <HiPlusSmall size={18} />
                       </button>
                     </div>
-                    <div className="border border-slate-100 rounded-2xl overflow-y-auto no-scrollbar bg-white flex-1 max-h-[180px]">
+                    <div className="border border-slate-100 rounded-2xl overflow-y-auto no-scrollbar bg-white flex-1 max-h-[160px]">
                       <table className="w-full text-left text-xs border-separate border-spacing-0">
                         <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black border-b sticky top-0 z-10">
                           <tr>
                             <th className="p-2">Material</th>
-                            <th className="p-2 text-center w-16">Qty</th>
-                            <th className="p-2 text-center w-20">Cost</th>
+                            <th className="p-2 text-center w-14">Qty</th>
+                            <th className="p-2 text-center w-16">Cost</th>
                             <th className="p-2 w-8"></th>
                           </tr>
                         </thead>
@@ -652,7 +650,7 @@ const handleCompleteSubmit = async (e) => {
                             <tr key={index} className="text-slate-600 font-bold hover:bg-slate-50 transition-colors">
                               <td className="p-2 text-left">
                                 <select
-                                  className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-[11px]"
+                                  className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-[10px]"
                                   value={item.material_id}
                                   onChange={e => handleMaterialChange(index, 'material_id', e.target.value)}
                                 >
@@ -665,12 +663,12 @@ const handleCompleteSubmit = async (e) => {
                               <td className="p-2 text-center">
                                 <input
                                   type="number" min="1" step="1"
-                                  className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[11px]"
+                                  className="w-12 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[10px]"
                                   value={item.qty}
                                   onChange={e => handleMaterialChange(index, 'qty', e.target.value)}
                                 />
                               </td>
-                              <td className="p-2 text-center text-slate-400 font-black text-[10px]">
+                              <td className="p-2 text-center text-slate-400 font-black text-[9px]">
                                 ₱{(Number(item.cost) || 0).toFixed(2)}
                               </td>
                               <td className="p-2 text-center">
@@ -678,7 +676,7 @@ const handleCompleteSubmit = async (e) => {
                                   type="button"
                                   onClick={() => setEditForm({ ...editForm, selectedMaterials: editForm.selectedMaterials.filter((_, i) => i !== index) })}
                                 >
-                                  <HiTrash className="text-rose-400 hover:text-rose-600 transition-colors" size={14} />
+                                  <HiTrash className="text-rose-400 hover:text-rose-600 transition-colors" size={13} />
                                 </button>
                               </td>
                             </tr>
@@ -695,24 +693,24 @@ const handleCompleteSubmit = async (e) => {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center pt-4 border-t border-slate-100 flex-shrink-0">
-                <div className="flex items-center gap-6">
-                  <span className="text-slate-400 font-black uppercase text-[9px] tracking-[0.2em]">Estimated Cost</span>
-                  <span className="text-3xl font-black text-emerald-600 tracking-tighter italic">
+              <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-slate-100 flex-shrink-0 gap-3">
+                <div className="flex items-center gap-4">
+                  <span className="text-slate-400 font-black uppercase text-[9px] tracking-[0.2em]">Est. Cost</span>
+                  <span className="text-2xl lg:text-3xl font-black text-emerald-600 tracking-tighter italic">
                     ₱{calculateSubtotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
-                    className="px-8 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
+                    className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-10 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-2xl hover:bg-stone-800 transition-all tracking-widest"
+                    className="flex-1 sm:flex-none px-7 py-2.5 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-2xl hover:bg-stone-800 transition-all tracking-widest"
                   >
                     Save Changes
                   </button>

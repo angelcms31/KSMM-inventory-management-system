@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {
   HiOutlineSearch, HiX, HiChevronLeft, HiChevronRight,
-  HiOutlinePencil, HiOutlineCheck
+  HiOutlineCheck
 } from "react-icons/hi";
 import { HiPhoto } from "react-icons/hi2";
 
@@ -128,74 +128,72 @@ export default function Orders() {
 
   return (
     <div className="w-full flex flex-col font-sans antialiased text-slate-900 text-left">
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-8 flex gap-4 items-center">
+      <div className="bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-4 lg:mb-8 flex gap-3 items-center">
         <div className="relative flex-1">
-          <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <HiOutlineSearch className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
-            placeholder="Search by client, platform, courier, product..."
-            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700"
+            placeholder="Search orders..."
+            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 pl-10 lg:pl-12 pr-4 outline-none font-bold text-slate-700 text-sm"
             value={searchTerm}
             onChange={e => { setSearchTerm(e.target.value); setCurrentPage(0); }}
           />
         </div>
         <select
-          className="bg-[#F8F9FA] border-none rounded-2xl py-3.5 px-6 font-bold text-slate-600 outline-none cursor-pointer text-xs uppercase tracking-wider"
+          className="bg-[#F8F9FA] border-none rounded-2xl py-3 px-3 lg:px-6 font-bold text-slate-600 outline-none cursor-pointer text-[10px] uppercase tracking-wider"
           value={statusFilter}
           onChange={e => { setStatusFilter(e.target.value); setCurrentPage(0); }}
         >
-          <option value="All">All Status</option>
+          <option value="All">All</option>
           <option value="Pending">Pending</option>
           <option value="Shipped">Shipped</option>
           <option value="Delivered">Delivered</option>
         </select>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col mb-10">
-        <div className="flex justify-between items-center mb-10 px-2">
-          <div>
-            <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Sales Orders</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-2">
+      <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm p-4 lg:p-8 flex flex-col mb-6 lg:mb-10">
+        <div className="flex justify-between items-center mb-5 lg:mb-10 px-1 lg:px-2">
+          <h1 className="text-xl lg:text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Sales Orders</h1>
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1.5">
               <button
                 onClick={() => setCurrentPage(p => Math.max(p - 1, 0))}
                 disabled={currentPage === 0}
-                className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"
+                className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"
               >
-                <HiChevronLeft size={20} />
+                <HiChevronLeft size={16} />
               </button>
               <button
                 onClick={() => setCurrentPage(p => p + 1)}
                 disabled={currentPage >= totalPages - 1}
-                className="p-2 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"
+                className="p-1.5 rounded-full border disabled:opacity-30 hover:bg-slate-100 transition-all"
               >
-                <HiChevronRight size={20} />
+                <HiChevronRight size={16} />
               </button>
             </div>
             <button
               onClick={() => { resetForm(); setShowModal(true); }}
-              className="bg-black text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest"
+              className="bg-black text-white px-3 lg:px-6 py-2 lg:py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest whitespace-nowrap"
             >
-              + New Order
+              + New
             </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-center border-separate border-spacing-y-2">
+        <div className="overflow-x-auto -mx-4 lg:mx-0 px-4 lg:px-0">
+          <table className="w-full text-center border-separate border-spacing-y-2 min-w-[560px]">
             <thead>
               <tr className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                <th className="pb-4 text-left">Order ID</th>
-                <th className="pb-4 text-left">Client</th>
-                <th className="pb-4 text-left">Product</th>
-                <th className="pb-4 text-center">Qty</th>
-                <th className="pb-4 text-center">Platform</th>
-                <th className="pb-4 text-center">Courier</th>
-                <th className="pb-4 text-right">Total</th>
-                <th className="pb-4 text-center">Order Date</th>
-                <th className="pb-4 text-left">Status</th>
-                <th className="pb-4 text-right pr-4">Actions</th>
+                <th className="pb-3 text-left">Order</th>
+                <th className="pb-3 text-left hidden sm:table-cell">Client</th>
+                <th className="pb-3 text-left">Product</th>
+                <th className="pb-3 text-center w-10">Qty</th>
+                <th className="pb-3 text-center hidden lg:table-cell">Platform</th>
+                <th className="pb-3 text-center hidden lg:table-cell">Courier</th>
+                <th className="pb-3 text-right">Total</th>
+                <th className="pb-3 text-center hidden md:table-cell">Date</th>
+                <th className="pb-3 text-left">Status</th>
+                <th className="pb-3 pr-2"></th>
               </tr>
             </thead>
             <tbody className="font-bold text-slate-700">
@@ -204,54 +202,54 @@ export default function Orders() {
                 const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(order.status) + 1];
                 return (
                   <tr key={order.order_id} className="hover:bg-slate-50 transition-all group">
-                    <td className="py-4 pl-4 rounded-l-2xl border-y border-l border-transparent group-hover:border-slate-100 text-sm font-black text-slate-900 uppercase text-left">
+                    <td className="py-3 pl-3 rounded-l-2xl border-y border-l border-transparent group-hover:border-slate-100 text-xs font-black text-slate-900 uppercase text-left whitespace-nowrap">
                       SO-{order.order_id}
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-xs text-left truncate max-w-[120px]">
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-xs text-left truncate max-w-[100px] hidden sm:table-cell">
                       {order.client_name}
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-left">
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-left">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 flex items-center justify-center">
                           {order.product_image
                             ? <img src={order.product_image} className="w-full h-full object-cover" alt="" />
-                            : <HiPhoto size={14} className="text-slate-300" />
+                            : <HiPhoto size={12} className="text-slate-300" />
                           }
                         </div>
-                        <span className="text-xs uppercase truncate max-w-[120px]">{order.product_name || order.sku}</span>
+                        <span className="text-[10px] uppercase truncate max-w-[80px] lg:max-w-[120px]">{order.product_name || order.sku}</span>
                       </div>
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center text-xs font-black">
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-center text-xs font-black">
                       {order.quantity}
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center text-[10px] font-black text-slate-500 uppercase">
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-center text-[10px] font-black text-slate-500 uppercase hidden lg:table-cell">
                       {order.platform}
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center text-[10px] font-black text-slate-500 uppercase">
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-center text-[10px] font-black text-slate-500 uppercase hidden lg:table-cell">
                       {order.courier}
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-right text-xs font-black text-emerald-600 pr-2">
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-right text-xs font-black text-emerald-600 pr-2 whitespace-nowrap">
                       {order.total_amount != null
                         ? `₱${Number(order.total_amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
                         : "—"}
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-center text-[11px] text-slate-400 uppercase">
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-center text-[10px] text-slate-400 uppercase hidden md:table-cell whitespace-nowrap">
                       {order.order_date ? new Date(order.order_date).toLocaleDateString("en-CA") : "—"}
                     </td>
-                    <td className="py-4 border-y border-transparent group-hover:border-slate-100 text-left">
-                      <span className={`px-4 py-1 rounded-lg text-[8px] uppercase font-black text-white shadow-sm ${getStatusStyle(order.status)}`}>
+                    <td className="py-3 border-y border-transparent group-hover:border-slate-100 text-left">
+                      <span className={`px-2 lg:px-3 py-1 rounded-lg text-[8px] uppercase font-black text-white shadow-sm ${getStatusStyle(order.status)}`}>
                         {order.status}
                       </span>
                     </td>
-                    <td className="py-4 text-right pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
+                    <td className="py-3 text-right pr-2 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">
                       {!isDelivered && nextStatus && (
                         <button
                           onClick={() => handleStatusUpdate(order.order_id, order.status)}
                           disabled={updatingId === order.order_id}
                           title={`Mark as ${nextStatus}`}
-                          className="p-2.5 bg-slate-50 text-slate-500 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200 shadow-sm disabled:opacity-40"
+                          className="p-2 bg-slate-50 text-slate-500 hover:bg-black hover:text-white rounded-xl transition-all border border-slate-200 shadow-sm disabled:opacity-40"
                         >
-                          <HiOutlineCheck size={16} />
+                          <HiOutlineCheck size={13} />
                         </button>
                       )}
                     </td>
@@ -259,7 +257,7 @@ export default function Orders() {
                 );
               }) : (
                 <tr>
-                  <td colSpan="10" className="py-20 text-center opacity-20 font-black uppercase tracking-widest text-slate-400 text-xs">
+                  <td colSpan="10" className="py-16 text-center opacity-20 font-black uppercase tracking-widest text-slate-400 text-xs">
                     No orders found.
                   </td>
                 </tr>
@@ -270,74 +268,74 @@ export default function Orders() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-6 text-left">
-          <div className="bg-white rounded-[3rem] w-full max-w-xl p-12 relative shadow-2xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex justify-center items-center z-[100] p-4 lg:p-6 text-left">
+          <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-xl p-6 lg:p-12 relative shadow-2xl max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => { setShowModal(false); resetForm(); }}
-              className="absolute top-10 right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full"
+              className="absolute top-5 right-5 lg:top-10 lg:right-10 text-slate-300 hover:text-black transition-all bg-slate-50 p-2 rounded-full"
             >
-              <HiX size={24} />
+              <HiX size={20} />
             </button>
 
-            <h2 className="text-4xl font-black text-slate-900 uppercase mb-2 tracking-tighter leading-none">New Order</h2>
-            <p className="text-xs text-slate-400 mb-8 font-black uppercase tracking-widest">Create a sales transaction</p>
+            <h2 className="text-2xl lg:text-4xl font-black text-slate-900 uppercase mb-1 tracking-tighter leading-none">New Order</h2>
+            <p className="text-[10px] text-slate-400 mb-5 font-black uppercase tracking-widest">Create a sales transaction</p>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Client Name</label>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Client Name</label>
                   <input
                     required
                     type="text"
-                    className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm"
+                    className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-bold text-sm"
                     value={form.client_name}
                     onChange={e => setForm({ ...form, client_name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Platform</label>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Platform</label>
                   <select
                     required
-                    className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-sm"
+                    className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-black text-sm"
                     value={form.platform}
                     onChange={e => setForm({ ...form, platform: e.target.value })}
                   >
-                    <option value="">Select Platform...</option>
+                    <option value="">Select...</option>
                     {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Courier</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Courier</label>
                   <select
                     required
-                    className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-sm"
+                    className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-black text-sm"
                     value={form.courier}
                     onChange={e => setForm({ ...form, courier: e.target.value })}
                   >
-                    <option value="">Select Courier...</option>
+                    <option value="">Select...</option>
                     {COURIERS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Order Date</label>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Order Date</label>
                   <input
                     required
                     type="date"
-                    className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm"
+                    className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-bold text-sm"
                     value={form.order_date}
                     onChange={e => setForm({ ...form, order_date: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Product</label>
+              <div className="space-y-1.5">
+                <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Product</label>
                 <select
                   required
-                  className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-black text-sm"
+                  className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-black text-sm"
                   value={form.sku}
                   onChange={e => setForm({ ...form, sku: e.target.value, quantity: "" })}
                 >
@@ -358,8 +356,8 @@ export default function Orders() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Quantity</label>
+              <div className="space-y-1.5">
+                <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Quantity</label>
                 <input
                   required
                   type="number"
@@ -367,7 +365,7 @@ export default function Orders() {
                   max={selectedProduct?.current_stock || undefined}
                   step="1"
                   placeholder="Enter quantity"
-                  className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm"
+                  className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-bold text-sm"
                   value={form.quantity}
                   onChange={e => setForm({ ...form, quantity: e.target.value })}
                 />
@@ -389,20 +387,20 @@ export default function Orders() {
                 </div>
               )}
 
-              <div className="flex gap-4 pt-4 justify-end">
+              <div className="flex gap-3 pt-2 justify-end">
                 <button
                   type="button"
                   onClick={() => { setShowModal(false); resetForm(); }}
-                  className="px-10 py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[11px] font-black hover:bg-slate-50 transition-all"
+                  className="px-6 lg:px-10 py-3 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-12 py-4 bg-black text-white rounded-2xl uppercase text-[11px] font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest disabled:opacity-50"
+                  className="px-8 lg:px-12 py-3 bg-black text-white rounded-2xl uppercase text-[10px] font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest disabled:opacity-50"
                 >
-                  {submitting ? "Processing..." : "Confirm Order"}
+                  {submitting ? "Processing..." : "Confirm"}
                 </button>
               </div>
             </form>
