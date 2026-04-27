@@ -1,10 +1,50 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { HiOutlineBell, HiOutlineRefresh, HiOutlinePaperAirplane, HiOutlineX, HiMinus, HiChevronLeft } from "react-icons/hi";
+import { HiOutlineBell, HiOutlineRefresh, HiOutlinePaperAirplane, HiOutlineX, HiMinus, HiChevronLeft, HiCheckCircle, HiXCircle } from "react-icons/hi";
 import { getHashedPath } from "../../utils/hash";
 
-const AdminRightSidebar = () => {
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+  return (
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess ? <HiCheckCircle size={44} className="text-emerald-500" /> : <HiXCircle size={44} className="text-rose-500" />}
+        </div>
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+        <p className="text-slate-800 font-bold text-lg leading-tight tracking-tight mb-8">{alert.message}</p>
+        <button
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-100'}`}
+        >
+          {isSuccess ? 'CLOSE' : 'GOT IT'}
+        </button>
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      </div>
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+const AdminRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   const [activities, setActivities] = useState([]);
   const navigate = useNavigate();
 
@@ -23,7 +63,8 @@ const AdminRightSidebar = () => {
   const [selected, setSelected] = useState(null);
   const [showCompose, setShowCompose] = useState(false);
   const [composeMinimized, setComposeMinimized] = useState(false);
-  const [compose, setCompose] = useState({ to: "", subject: "", body: "" });
+  const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [formatting, setFormatting] = useState({ bold: false, italic: false, underline: false });
@@ -32,8 +73,37 @@ const AdminRightSidebar = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [sidebarAlert, setSidebarAlert] = useState(null);
+
   const bodyRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!pendingCompose || !pendingCompose.to) return;
+
+    setShowCompose(true);
+    setComposeMinimized(false);
+    setComposeTo(pendingCompose.to);
+    setComposeSubject(pendingCompose.subject || "");
+
+    let attempts = 0;
+    const injectInterval = setInterval(() => {
+      attempts++;
+      if (bodyRef.current) {
+        const escaped = (pendingCompose.body || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\n/g, "<br>");
+        bodyRef.current.innerHTML = escaped;
+        if (onComposeHandled) onComposeHandled();
+        clearInterval(injectInterval);
+      }
+      if (attempts > 20) clearInterval(injectInterval);
+    }, 100);
+
+    return () => clearInterval(injectInterval);
+  }, [pendingCompose, onComposeHandled]);
 
   const getStorageKey = () => `notif_read_${localStorage.getItem("user_id") || "guest"}`;
   const getSessionKey = () => `notif_session_${localStorage.getItem("user_id") || "guest"}`;
@@ -166,8 +236,11 @@ const AdminRightSidebar = () => {
       const res = await axios.get("http://localhost:5000/api/gmail/status");
       setGmailConnected(res.data.connected);
       if (res.data.connected) fetchGmailMessages();
-    } catch { setGmailConnected(false); }
-    finally { setGmailLoading(false); }
+      else setGmailLoading(false);
+    } catch {
+      setGmailConnected(false);
+      setGmailLoading(false);
+    }
   };
 
   const fetchGmailMessages = async () => {
@@ -179,8 +252,9 @@ const AdminRightSidebar = () => {
       ]);
       setMessages(inboxRes.data || []);
       setSentMessages(sentRes.data || []);
-    } catch {}
-    finally { setGmailLoading(false); }
+    } catch {
+      console.error("Failed to fetch messages");
+    } finally { setGmailLoading(false); }
   };
 
   const handleConnect = () => {
@@ -188,7 +262,7 @@ const AdminRightSidebar = () => {
     setTimeout(checkGmailStatus, 5000);
   };
 
-  const applyFormat = (cmd) => {
+  const applyFormat = useCallback((cmd) => {
     if (bodyRef.current) {
       bodyRef.current.focus();
       document.execCommand(cmd, false, null);
@@ -198,50 +272,60 @@ const AdminRightSidebar = () => {
         underline: document.queryCommandState('underline'),
       });
     }
-  };
+  }, []);
 
-  const handleBodyInput = () => {
-    if (bodyRef.current) {
-      setCompose(prev => ({ ...prev, body: bodyRef.current.innerHTML }));
-      setFormatting({
-        bold: document.queryCommandState('bold'),
-        italic: document.queryCommandState('italic'),
-        underline: document.queryCommandState('underline'),
-      });
-    }
-  };
+  const handleBodyKeyUp = useCallback(() => {
+    setFormatting({
+      bold: document.queryCommandState('bold'),
+      italic: document.queryCommandState('italic'),
+      underline: document.queryCommandState('underline'),
+    });
+  }, []);
 
   const handleAttachClick = () => fileInputRef.current?.click();
+
   const handleFileChange = (e) => {
     setAttachments(prev => [...prev, ...Array.from(e.target.files)]);
     e.target.value = "";
   };
+
   const removeAttachment = (index) => setAttachments(prev => prev.filter((_, i) => i !== index));
 
-  const handleDiscard = () => {
+  const handleDiscard = useCallback(() => {
     setShowCompose(false);
     setComposeMinimized(false);
-    setCompose({ to: "", subject: "", body: "" });
+    setComposeTo("");
+    setComposeSubject("");
     setAttachments([]);
-    setFormatting({ bold: false, italic: false, underline: false });
+    setSendSuccess(false);
     if (bodyRef.current) bodyRef.current.innerHTML = "";
-  };
+  }, []);
 
   const handleSend = async () => {
-    if (!compose.to || !compose.subject || !compose.body.trim()) return;
+    const bodyText = bodyRef.current?.innerText?.trim() || "";
+    const bodyHTML = bodyRef.current?.innerHTML || "";
+    if (!composeTo || !composeSubject || !bodyText) return;
+
     setSending(true);
     try {
       const formData = new FormData();
-      formData.append("to", compose.to);
-      formData.append("subject", compose.subject);
-      formData.append("body", compose.body);
+      formData.append("to", composeTo);
+      formData.append("subject", composeSubject);
+      formData.append("body", bodyHTML);
       attachments.forEach(file => formData.append("attachments", file));
-      await axios.post("http://localhost:5000/api/gmail/send", formData, { headers: { "Content-Type": "multipart/form-data" } });
+
+      await axios.post("http://localhost:5000/api/gmail/send", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
       setSendSuccess(true);
       fetchGmailMessages();
-      setTimeout(() => { setSendSuccess(false); handleDiscard(); }, 2000);
-    } catch { alert("Failed to send email."); }
-    finally { setSending(false); }
+      setSidebarAlert({ type: 'success', message: 'Email sent successfully!' });
+      setTimeout(() => { handleDiscard(); }, 2000);
+    } catch (err) {
+      console.error(err);
+      setSidebarAlert({ type: 'error', message: 'Failed to send email.' });
+    } finally { setSending(false); }
   };
 
   useEffect(() => {
@@ -279,7 +363,6 @@ const AdminRightSidebar = () => {
           <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">{unreadCount} new</span>
         )}
       </div>
-
       <div className="flex-1 overflow-y-auto text-left">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-3">
@@ -314,7 +397,6 @@ const AdminRightSidebar = () => {
           </div>
         )}
       </div>
-
       <div className="p-4 border-t border-white/5">
         <button
           onClick={() => { setShowNotifications(false); navigateToAudit(); }}
@@ -426,7 +508,12 @@ const AdminRightSidebar = () => {
                 {(viewMode === 'inbox' ? messages : sentMessages).map(msg => (
                   <div key={msg.id} onClick={() => setSelected(msg)} className={`px-2 py-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 ${msg.isUnread ? 'bg-white/[0.03]' : ''}`}>
                     <div className="flex items-start gap-2">
-                      <img src={msg.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'S')}&background=random&color=fff&size=40&bold=true`} alt={msg.senderName} className="w-7 h-7 rounded-full shrink-0 object-cover mt-0.5" />
+                      <img
+                        src={msg.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'S')}&background=random&color=fff&size=40&bold=true`}
+                        alt={msg.senderName}
+                        className="w-7 h-7 rounded-full shrink-0 object-cover mt-0.5"
+                        onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || '?')}&background=random&color=fff&size=40&bold=true`; }}
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">
                           <span className={`text-[11px] truncate max-w-[65%] ${msg.isUnread ? 'font-semibold text-white' : 'font-medium text-gray-300'}`}>
@@ -449,7 +536,14 @@ const AdminRightSidebar = () => {
                 <button onClick={() => setSelected(null)} className="p-1 hover:bg-white/5 rounded-md"><HiChevronLeft size={20} /></button>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => { setCompose({ to: selected.senderEmail, subject: `Re: ${selected.subject}`, body: "" }); setSelected(null); setShowCompose(true); }}
+                    onClick={() => {
+                      setComposeTo(selected.senderEmail || "");
+                      setComposeSubject(`Re: ${selected.subject}`);
+                      if (bodyRef.current) bodyRef.current.innerHTML = "";
+                      setSelected(null);
+                      setShowCompose(true);
+                      setComposeMinimized(false);
+                    }}
                     className="text-[10px] font-bold text-indigo-400 px-2 py-1 hover:bg-white/5 rounded"
                   >
                     REPLY
@@ -457,64 +551,18 @@ const AdminRightSidebar = () => {
                   <button onClick={() => setSelected(null)} className="text-[10px] font-bold text-gray-500 hover:text-white">CLOSE</button>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <h2 className="text-[14px] font-bold mb-2 leading-tight">{selected.subject}</h2>
-                <div className="text-[11px] mb-4"><span className="text-gray-500 font-medium">From:</span> <span className="text-white">{selected.from}</span></div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar text-left">
+                <h2 className="text-[14px] font-bold mb-2 leading-tight text-white">{selected.subject}</h2>
+                <div className="text-[11px] mb-4">
+                  <span className="text-gray-500 font-medium">From:</span>
+                  <span className="text-white ml-1">{selected.from}</span>
+                </div>
                 <div className="text-[12px] text-gray-300 leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: selected.snippet || "(No content)" }} />
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {showCompose && (
-        <div className={`absolute bottom-0 left-[-320px] z-[60] w-[310px] rounded-t-2xl overflow-hidden shadow-2xl border border-white/10 transition-all duration-300 ${composeMinimized ? 'h-12' : 'h-[450px]'}`} style={{ boxShadow: '0 -8px 40px rgba(0,0,0,0.6)' }}>
-          <div className="bg-[#404040] flex items-center justify-between px-4 py-3 cursor-pointer select-none" onClick={() => setComposeMinimized(m => !m)}>
-            <span className="text-[13px] font-semibold text-white tracking-tight">New Message</span>
-            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setComposeMinimized(m => !m)} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiMinus size={15} /></button>
-              <button onClick={handleDiscard} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiOutlineX size={15} /></button>
-            </div>
-          </div>
-          {!composeMinimized && (
-            <div className="bg-[#1e1b1a] flex flex-col h-[calc(100%-48px)]">
-              <div className="border-b border-white/10 px-4 py-2.5 flex items-center gap-2">
-                <span className="text-[11px] text-gray-500 shrink-0">To</span>
-                <input type="text" value={compose.to} onChange={e => setCompose({ ...compose, to: e.target.value })} className="flex-1 bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Recipients" autoFocus />
-              </div>
-              <div className="border-b border-white/10 px-4 py-2.5">
-                <input type="text" value={compose.subject} onChange={e => setCompose({ ...compose, subject: e.target.value })} className="w-full bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Subject" />
-              </div>
-              <div ref={bodyRef} contentEditable suppressContentEditableWarning onInput={handleBodyInput} className="flex-1 px-4 py-3 overflow-y-auto text-[12px] text-gray-300 outline-none" style={{ minHeight: 0 }} data-placeholder="Write your message..." />
-              {attachments.length > 0 && (
-                <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-white/5 pt-2">
-                  {attachments.map((file, i) => (
-                    <div key={i} className="flex items-center gap-1 bg-white/10 rounded-full px-2.5 py-1 text-[10px] text-gray-300 max-w-[140px]">
-                      <span className="truncate">{file.name}</span>
-                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5"><HiOutlineX size={10} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {sendSuccess && <div className="px-4 pb-1"><p className="text-[11px] text-green-400 font-medium">✓ Message sent!</p></div>}
-              <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
-                <button onClick={handleSend} disabled={sending || !compose.to || !compose.subject || !compose.body.trim()} className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] text-white text-[12px] font-semibold px-5 py-2 rounded-full transition-colors active:scale-95 disabled:opacity-50">
-                  {sending ? "Sending..." : "Send"}
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-                </button>
-                <div className="flex items-center gap-0.5">
-                  <button onMouseDown={e => { e.preventDefault(); applyFormat('bold'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" /></svg></button>
-                  <button onMouseDown={e => { e.preventDefault(); applyFormat('italic'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></svg></button>
-                  <button onMouseDown={e => { e.preventDefault(); applyFormat('underline'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></svg></button>
-                  <button onClick={handleAttachClick} className="p-1.5 rounded-full text-gray-500 hover:bg-white/5 transition-colors"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg></button>
-                  <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
-                  <button onClick={handleDiscard} className="p-1.5 rounded-full text-gray-500 hover:text-red-400 transition-colors"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg></button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <style>{`
         [contenteditable]:empty:before { content: attr(data-placeholder); color: #4b5563; pointer-events: none; }
@@ -528,6 +576,82 @@ const AdminRightSidebar = () => {
 
   return (
     <>
+      <AlertDialog alert={sidebarAlert} onClose={() => setSidebarAlert(null)} />
+
+      {showCompose && (
+        <div
+          className={`fixed z-[9999] w-[310px] rounded-t-2xl overflow-hidden shadow-2xl border border-white/10 transition-all duration-300 ${composeMinimized ? 'h-12' : 'h-[450px]'}`}
+          style={{ bottom: 0, right: 288, boxShadow: '0 -8px 40px rgba(0,0,0,0.6)' }}
+        >
+          <div className="bg-[#404040] flex items-center justify-between px-4 py-3 cursor-pointer select-none" onClick={() => setComposeMinimized(m => !m)}>
+            <span className="text-[13px] font-semibold text-white tracking-tight">New Message</span>
+            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setComposeMinimized(m => !m)} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiMinus size={15} /></button>
+              <button onClick={handleDiscard} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiOutlineX size={15} /></button>
+            </div>
+          </div>
+          {!composeMinimized && (
+            <div className="bg-[#1e1b1a] flex flex-col h-[calc(100%-48px)]">
+              <div className="border-b border-white/10 px-4 py-2.5 flex items-center gap-2">
+                <span className="text-[11px] text-gray-500 shrink-0">To</span>
+                <input type="text" value={composeTo} onChange={e => setComposeTo(e.target.value)} className="flex-1 bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Recipients" />
+              </div>
+              <div className="border-b border-white/10 px-4 py-2.5">
+                <input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} className="w-full bg-transparent text-[12px] text-gray-200 outline-none" placeholder="Subject" />
+              </div>
+              <div
+                ref={bodyRef}
+                contentEditable
+                suppressContentEditableWarning
+                onKeyUp={handleBodyKeyUp}
+                className="flex-1 px-4 py-3 overflow-y-auto text-[12px] text-gray-300 outline-none custom-scrollbar"
+                style={{ minHeight: 0 }}
+                data-placeholder="Write your message..."
+              />
+              {attachments.length > 0 && (
+                <div className="px-4 pb-2 flex flex-wrap gap-1.5 border-t border-white/5 pt-2">
+                  {attachments.map((file, i) => (
+                    <div key={i} className="flex items-center gap-1 bg-white/10 rounded-full px-2.5 py-1 text-[10px] text-gray-300 max-w-[140px]">
+                      <span className="truncate">{file.name}</span>
+                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5"><HiOutlineX size={10} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {sendSuccess && (
+                <div className="px-4 pb-1">
+                  <p className="text-[11px] text-green-400 font-medium">✓ Message sent!</p>
+                </div>
+              )}
+              <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
+                <button onClick={handleSend} disabled={sending} className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] text-white text-[12px] font-semibold px-5 py-2 rounded-full transition-colors active:scale-95 disabled:opacity-50">
+                  {sending ? "Sending..." : "Send"}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+                </button>
+                <div className="flex items-center gap-0.5">
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('bold'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" /></svg>
+                  </button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('italic'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></svg>
+                  </button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('underline'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500'}`}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></svg>
+                  </button>
+                  <button onClick={handleAttachClick} className="p-1.5 rounded-full text-gray-500 hover:bg-white/5 transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg>
+                  </button>
+                  <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
+                  <button onClick={handleDiscard} className="p-1.5 rounded-full text-gray-500 hover:text-red-400 transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
         <SidebarContent />
       </div>
