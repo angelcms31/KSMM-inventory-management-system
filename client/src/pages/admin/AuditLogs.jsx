@@ -95,6 +95,8 @@ const AuditLogs = ({ userId }) => {
   const [isMonthOpen, setIsMonthOpen] = useState(false);
   const [isDayOpen, setIsDayOpen] = useState(false);
 
+  const today = new Date().toISOString().split('T')[0];
+
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -297,7 +299,6 @@ const AuditLogs = ({ userId }) => {
         <div className="flex justify-between items-center mb-4">
           <h1 className="font-black text-2xl sm:text-3xl text-gray-900 select-none uppercase tracking-tighter">Audit Logs</h1>
           <div className="flex gap-2">
-
             <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
               <HiOutlineClock className="text-stone-400" size={20} />
               <div>
@@ -427,8 +428,33 @@ const AuditLogs = ({ userId }) => {
 
               <div className="space-y-4 mb-6">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><label className="text-[10px] uppercase tracking-widest text-slate-400 font-black ml-1">Start Date</label><input type="date" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={exportStartDate} onChange={(e) => setExportStartDate(e.target.value)} /></div>
-                  <div className="space-y-1"><label className="text-[10px] uppercase tracking-widest text-slate-400 font-black ml-1">End Date</label><input type="date" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={exportEndDate} onChange={(e) => setExportEndDate(e.target.value)} /></div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-black ml-1">Start Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                      value={exportStartDate}
+                      max={today}
+                      onChange={(e) => {
+                        setExportStartDate(e.target.value);
+                        if (exportEndDate && e.target.value > exportEndDate) {
+                          setExportEndDate("");
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-black ml-1">End Date</label>
+                    <input
+                      type="date"
+                      className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      value={exportEndDate}
+                      min={exportStartDate || undefined}
+                      max={today}
+                      disabled={!exportStartDate}
+                      onChange={(e) => setExportEndDate(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1"><label className="text-[10px] uppercase tracking-widest text-slate-400 font-black ml-1">Sort By</label><select className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="date">Date/Time</option><option value="user">User</option></select></div>

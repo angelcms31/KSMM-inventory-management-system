@@ -97,6 +97,14 @@ const VarianceLogs = ({ userId }) => {
   const [isMonthOpen, setIsMonthOpen] = useState(false);
   const [isDayOpen, setIsDayOpen] = useState(false);
 
+  const today = (() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  })();
+
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -462,13 +470,45 @@ const VarianceLogs = ({ userId }) => {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <label className="text-[9px] text-slate-500 ml-2 font-bold">From</label>
-                      <input type="date" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={exportStartDate} onChange={(e) => setExportStartDate(e.target.value)} />
-                      <input type="time" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm disabled:opacity-40" value={exportStartTime} onChange={(e) => setExportStartTime(e.target.value)} disabled={!exportStartDate} />
+                      <input
+                        type="date"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm"
+                        value={exportStartDate}
+                        max={today}
+                        onChange={(e) => {
+                          setExportStartDate(e.target.value);
+                          if (exportEndDate && e.target.value > exportEndDate) {
+                            setExportEndDate("");
+                            setExportEndTime("");
+                          }
+                        }}
+                      />
+                      <input
+                        type="time"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        value={exportStartTime}
+                        onChange={(e) => setExportStartTime(e.target.value)}
+                        disabled={!exportStartDate}
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[9px] text-slate-500 ml-2 font-bold">To</label>
-                      <input type="date" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm" value={exportEndDate} onChange={(e) => setExportEndDate(e.target.value)} />
-                      <input type="time" className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm disabled:opacity-40" value={exportEndTime} onChange={(e) => setExportEndTime(e.target.value)} disabled={!exportEndDate} />
+                      <input
+                        type="date"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        value={exportEndDate}
+                        min={exportStartDate || undefined}
+                        max={today}
+                        disabled={!exportStartDate}
+                        onChange={(e) => setExportEndDate(e.target.value)}
+                      />
+                      <input
+                        type="time"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none border border-transparent font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        value={exportEndTime}
+                        onChange={(e) => setExportEndTime(e.target.value)}
+                        disabled={!exportEndDate}
+                      />
                     </div>
                   </div>
                 </div>
