@@ -1,7 +1,618 @@
-import React, { useState, useEffect } from "react";
+import React, { 
+  useState, 
+  useEffect, 
+  useRef, 
+  useCallback 
+} from "react";
 import axios from "axios";
-import { HiMagnifyingGlass, HiPencil, HiPhoto, HiChevronLeft, HiChevronRight } from "react-icons/hi2";
+import jsQR from "jsqr";
+import QRCode from "qrcode";
+import { 
+  HiMagnifyingGlass, 
+  HiPencil, 
+  HiPhoto, 
+  HiChevronLeft, 
+  HiChevronRight, 
+  HiQrCode, 
+  HiXMark, 
+  HiCheckCircle, 
+  HiXCircle, 
+  HiArrowDownTray, 
+  HiPlus, 
+  HiArrowUpTray 
+} from "react-icons/hi2";
 import AddProductModal from "../../components/modals/AddProductModal";
+
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  
+  const isSuccess = alert.type === "success";
+  
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ 
+        backdropFilter: "blur(12px)", 
+        backgroundColor: "rgba(0,0,0,0.25)" 
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ 
+          animation: "popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards" 
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div 
+          className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${
+            isSuccess ? "bg-emerald-50" : "bg-rose-50"
+          }`}
+        >
+          {isSuccess ? (
+            <HiCheckCircle size={44} className="text-emerald-500" />
+          ) : (
+            <HiXCircle size={44} className="text-rose-500" />
+          )}
+        </div>
+
+        <p 
+          className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
+            isSuccess ? "text-emerald-500" : "text-rose-500"
+          }`}
+        >
+          {isSuccess ? "Success" : "Error"}
+        </p>
+
+        <p className="text-slate-800 font-black text-lg leading-snug tracking-tight mb-8">
+          {alert.message}
+        </p>
+
+        <button
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg ${
+            isSuccess 
+              ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200" 
+              : "bg-rose-500 hover:bg-rose-600 shadow-rose-200"
+          }`}
+        >
+          Got it
+        </button>
+
+        <div 
+          className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${
+            isSuccess ? "bg-emerald-500" : "bg-rose-500"
+          }`} 
+        />
+        
+        <div 
+          className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${
+            isSuccess ? "bg-emerald-500" : "bg-rose-500"
+          }`} 
+        />
+      </div>
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0);    }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+const useAlert = () => {
+  const [alert, setAlert] = useState(null);
+  
+  const showAlert = useCallback((message, type = "success") => {
+    setAlert({ message, type });
+  }, []);
+  
+  const closeAlert = useCallback(() => {
+    setAlert(null);
+  }, []);
+  
+  return { alert, showAlert, closeAlert };
+};
+
+const downloadQRCode = async (product) => {
+  const text = product.sku || product.name || "NO-SKU";
+  
+  const truncateText = (str, n) => {
+    return str.length > n ? str.substr(0, n - 1) + "..." : str;
+  };
+
+  const qrDataUrl = await QRCode.toDataURL(text, {
+    width: 256,
+    margin: 2,
+    color: { 
+      dark: "#0f172a", 
+      light: "#ffffff" 
+    },
+    errorCorrectionLevel: "H",
+  });
+
+  const qrImg = new Image();
+  await new Promise((resolve) => {
+    qrImg.onload = resolve;
+    qrImg.src = qrDataUrl;
+  });
+
+  const padding = 32;
+  const labelHeight = 48;
+  const finalCanvas = document.createElement("canvas");
+  
+  finalCanvas.width = qrImg.width + padding * 2;
+  finalCanvas.height = qrImg.height + padding * 2 + labelHeight;
+  
+  const ctx = finalCanvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+  ctx.drawImage(qrImg, padding, padding);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 13px monospace";
+  ctx.textAlign = "center";
+  
+  const displaySku = truncateText(product.sku || "", 28);
+  ctx.fillText(displaySku, finalCanvas.width / 2, qrImg.height + padding + 20);
+  
+  ctx.font = "11px monospace";
+  ctx.fillStyle = "#64748b";
+  
+  const displayName = truncateText(product.name || "", 32);
+  ctx.fillText(displayName, finalCanvas.width / 2, qrImg.height + padding + 38);
+
+  const link = document.createElement("a");
+  link.download = `QR-${text.substring(0, 20)}.png`;
+  link.href = finalCanvas.toDataURL("image/png");
+  link.click();
+};
+
+const QRScannerModal = ({ products, onClose, showAlert }) => {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const animFrameRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const activeRef = useRef(false);
+  const productsRef = useRef(products);
+
+  const [scannedProduct, setScannedProduct] = useState(null);
+  const [cameraError, setCameraError] = useState(null);
+  const [mode, setMode] = useState("camera");
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
+
+  const getStockStatus = (current, min) => {
+    const stock = Number(current) || 0;
+    const threshold = Number(min) || 0;
+    
+    if (stock <= 0) {
+      return { label: "NO STOCK", color: "bg-rose-500 text-white" };
+    }
+    if (stock <= threshold) {
+      return { label: "LOW STOCK", color: "bg-rose-500 text-white" };
+    }
+    return { label: "IN STOCK", color: "bg-emerald-500 text-white" };
+  };
+
+  const stopCamera = () => {
+    activeRef.current = false;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const resolveProduct = (value) => {
+    const v = value.trim().toLowerCase();
+    return productsRef.current.find(
+      (p) => (p.sku || "").toLowerCase() === v || (p.name || "").toLowerCase() === v
+    );
+  };
+
+  const tick = () => {
+    if (!activeRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (!video || !canvas) return;
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const ctx = canvas.getContext("2d");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "dontInvert",
+      });
+
+      if (code && code.data) {
+        activeRef.current = false;
+        stopCamera();
+        const found = resolveProduct(code.data);
+        if (found) {
+          setScannedProduct(found);
+        } else {
+          showAlert(`No product found for: "${code.data.trim()}"`, "error");
+        }
+        return;
+      }
+    }
+    animFrameRef.current = requestAnimationFrame(tick);
+  };
+
+  const startCamera = () => {
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        streamRef.current = stream;
+        activeRef.current = true;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current
+            .play()
+            .then(() => {
+              animFrameRef.current = requestAnimationFrame(tick);
+            })
+            .catch((err) => {
+              if (err.name !== "AbortError") {
+                console.error("Video play error:", err);
+              }
+            });
+        }
+      })
+      .catch(() => {
+        setCameraError("Camera access denied. Please allow permissions.");
+      });
+  };
+
+  useEffect(() => {
+    if (mode === "camera") {
+      startCamera();
+    }
+    return () => stopCamera();
+  }, [mode]);
+
+  const handleRescan = () => {
+    setScannedProduct(null);
+    setCameraError(null);
+    setUploading(false);
+    if (mode === "camera") {
+      startCamera();
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    setScannedProduct(null);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        setUploading(false);
+        if (code && code.data) {
+          const found = resolveProduct(code.data);
+          if (found) {
+            setScannedProduct(found);
+          } else {
+            showAlert(`No product found for: "${code.data.trim()}"`, "error");
+          }
+        } else {
+          showAlert("No QR code detected in the image.", "error");
+        }
+      };
+      img.onerror = () => {
+        setUploading(false);
+        showAlert("Failed to load image.", "error");
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const switchMode = (newMode) => {
+    stopCamera();
+    setScannedProduct(null);
+    setCameraError(null);
+    setUploading(false);
+    setMode(newMode);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(0,0,0,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden relative"
+        style={{ animation: "popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        
+        <div className="flex items-center justify-between px-8 pt-8 pb-4">
+          <div>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900 leading-none">
+              QR Scanner
+            </h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">
+              Scan product barcode / QR
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-all"
+          >
+            <HiXMark size={20} />
+          </button>
+        </div>
+
+        <div className="px-8 pb-4">
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+            <button
+              onClick={() => switchMode("camera")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                mode === "camera" 
+                  ? "bg-white shadow-sm text-slate-900" 
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <HiQrCode size={14} />
+              Camera
+            </button>
+            <button
+              onClick={() => switchMode("upload")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                mode === "upload" 
+                  ? "bg-white shadow-sm text-slate-900" 
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              <HiArrowUpTray size={14} />
+              Upload
+            </button>
+          </div>
+        </div>
+
+        <div className="px-8 pb-8">
+          {!scannedProduct ? (
+            <div className="space-y-4">
+              {mode === "camera" && !cameraError && (
+                <div className="relative w-full rounded-[2rem] overflow-hidden bg-black aspect-[4/3] shadow-inner">
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-48 h-48 relative border-2 border-white/20 rounded-3xl">
+                      <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-xl" />
+                      <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-xl" />
+                      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-xl" />
+                      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-xl" />
+                      <div 
+                        className="absolute top-1/2 left-0 right-0 h-0.5 bg-emerald-400/60 shadow-[0_0_15px_rgba(52,211,153,0.8)] -translate-y-1/2 animate-[scanLine_2s_ease-in-out_infinite]" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === "upload" && (
+                <button
+                  onClick={() => !uploading && fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full py-12 rounded-[2rem] border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all flex flex-col items-center gap-3 disabled:opacity-60"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-slate-400">
+                    {uploading ? (
+                      <svg
+                        className="animate-spin text-slate-400"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        />
+                      </svg>
+                    ) : (
+                      <HiArrowUpTray size={24} />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
+                      {uploading ? "Processing..." : "Upload QR Image"}
+                    </p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-1">
+                      Tap to select from gallery
+                    </p>
+                  </div>
+                </button>
+              )}
+
+              {cameraError && (
+                <div className="flex flex-col items-center gap-4 py-8">
+                  <div className="w-20 h-20 rounded-[1.75rem] bg-rose-50 flex items-center justify-center">
+                    <HiXCircle size={48} className="text-rose-500" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-600 text-center">
+                    {cameraError}
+                  </p>
+                  <button
+                    onClick={handleRescan}
+                    className="bg-black text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+              
+              {!cameraError && (
+                <p className="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                  {mode === "camera" 
+                    ? "Align QR code within the frame" 
+                    : "Select a clear image of the QR"}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4 animate-[popIn_0.35s_cubic-bezier(0.16,1,0.3,1)_forwards]">
+              <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[2rem] border border-slate-100">
+                <div className="w-20 h-20 rounded-[1.5rem] bg-white border border-slate-100 flex-shrink-0 overflow-hidden shadow-sm flex items-center justify-center">
+                  {scannedProduct.product_image ? (
+                    <img
+                      src={scannedProduct.product_image}
+                      className="w-full h-full object-cover"
+                      alt=""
+                    />
+                  ) : (
+                    <HiPhoto size={32} className="text-slate-200" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3
+                    className="font-black text-slate-900 uppercase text-sm leading-tight truncate"
+                    title={scannedProduct.name}
+                  >
+                    {scannedProduct.name || "Unnamed Product"}
+                  </h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider truncate mt-1">
+                    {scannedProduct.sku}
+                  </p>
+                  {scannedProduct.collection && (
+                    <p className="text-[10px] font-bold text-slate-500 truncate mt-0.5">
+                      {scannedProduct.collection}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 rounded-[1.5rem] p-4 border border-slate-50">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                    Category
+                  </p>
+                  <p className="font-black text-slate-800 text-xs uppercase truncate">
+                    {scannedProduct.category || "---"}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-[1.5rem] p-4 border border-slate-50">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                    Unit
+                  </p>
+                  <p className="font-black text-slate-800 text-xs uppercase">
+                    {scannedProduct.stock_unit || "---"}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-[1.5rem] p-4 border border-slate-50">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                    Stock Level
+                  </p>
+                  <p className="font-black text-slate-800 text-sm">
+                    {scannedProduct.current_stock?.toLocaleString() || 0}
+                  </p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">
+                    Min: {scannedProduct.min_stocks || 0}
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-[1.5rem] p-4 border border-slate-50">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                    Price
+                  </p>
+                  <p className="font-black text-emerald-500 text-sm">
+                    ₱{parseFloat(scannedProduct.selling_price || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div
+                  className={`px-5 py-2 rounded-full text-[10px] font-black tracking-tight ${
+                    getStockStatus(scannedProduct.current_stock, scannedProduct.min_stocks).color
+                  }`}
+                >
+                  {getStockStatus(scannedProduct.current_stock, scannedProduct.min_stocks).label}
+                </div>
+                <button
+                  onClick={handleRescan}
+                  className="bg-black text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shadow-lg"
+                >
+                  <HiQrCode size={16} />
+                  {mode === "upload" ? "Upload Again" : "Rescan"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
+      </div>
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0);    }
+        }
+        @keyframes scanLine {
+          0%, 100% { transform: translateY(-60px); opacity: 0.4; }
+          50% { transform: translateY(60px); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 export default function SalesInventory() {
   const [products, setProducts] = useState([]);
@@ -10,26 +621,42 @@ export default function SalesInventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  
   const PAGE_SIZE = 10;
+  const { alert, showAlert, closeAlert } = useAlert();
+
+  const fetchData = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/finished_goods");
+      const fetchedProducts = res.data || [];
+      setProducts(fetchedProducts);
+      await autoCreateWorkOrders(fetchedProducts);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      showAlert("Failed to fetch inventory data.", "error");
+    }
+  };
 
   const autoCreateWorkOrders = async (productList) => {
     try {
       const woRes = await axios.get("http://localhost:5000/api/artisan_work_orders");
       const existingOrders = woRes.data || [];
+      
       const activeSkus = new Set(
         existingOrders
-          .filter(wo => wo.status === "Pending" || wo.status === "pending" || wo.status === "In Production")
-          .map(wo => wo.sku)
+          .filter((wo) => ["Pending", "pending", "In Production"].includes(wo.status))
+          .map((wo) => wo.sku)
       );
-      const lowStockProducts = productList.filter(p => {
-        const stock = Number(p.current_stock) || 0;
-        const threshold = Number(p.min_stocks) || 0;
-        return stock <= threshold;
-      });
+      
+      const lowStockProducts = productList.filter(
+        (p) => (Number(p.current_stock) || 0) <= (Number(p.min_stocks) || 0)
+      );
+
       await Promise.all(
         lowStockProducts
-          .filter(p => !activeSkus.has(p.sku))
-          .map(p =>
+          .filter((p) => !activeSkus.has(p.sku))
+          .map((p) =>
             axios.post("http://localhost:5000/api/artisan_work_orders", {
               sku: p.sku,
               quantity_needed: p.min_stocks || 1,
@@ -40,22 +667,13 @@ export default function SalesInventory() {
           )
       );
     } catch (err) {
-      console.error("Auto work order creation failed:", err);
+      console.error("Auto WO failed:", err);
     }
   };
 
-  const fetchData = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/finished_goods");
-      const fetchedProducts = res.data || [];
-      setProducts(fetchedProducts);
-      await autoCreateWorkOrders(fetchedProducts);
-    } catch (err) {
-      console.error("Error fetching data:", err);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const getStockStatus = (current, min) => {
     const stock = Number(current) || 0;
@@ -68,16 +686,16 @@ export default function SalesInventory() {
   const generateNextSKU = (productList) => {
     if (!productList || productList.length === 0) return "SKU-001";
     const nums = productList
-      .map(p => {
+      .map((p) => {
         const match = p.sku?.match(/^SKU-(\d+)$/);
         return match ? parseInt(match[1], 10) : 0;
       })
-      .filter(n => !isNaN(n));
+      .filter((n) => !isNaN(n));
     const max = nums.length > 0 ? Math.max(...nums) : 0;
     return `SKU-${String(max + 1).padStart(3, "0")}`;
   };
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = products.filter((p) => {
     const search = searchTerm.toLowerCase().trim();
     const matchesSearch =
       !search ||
@@ -85,181 +703,381 @@ export default function SalesInventory() {
       (p.sku || "").toLowerCase().includes(search) ||
       (p.category || "").toLowerCase().includes(search) ||
       (p.collection || "").toLowerCase().includes(search);
+      
     const statusObj = getStockStatus(p.current_stock, p.min_stocks);
-    const matchesStatus = statusFilter === "All Status" || statusObj.label === statusFilter;
+    const matchesStatus =
+      statusFilter === "All Status" || statusObj.label === statusFilter;
+      
     return matchesSearch && matchesStatus;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const pagedProducts = filteredProducts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedProducts = filteredProducts.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
 
-  const handlePrev = () => setCurrentPage(p => Math.max(1, p - 1));
-  const handleNext = () => setCurrentPage(p => Math.min(totalPages, p + 1));
+  const handlePrev = () => setCurrentPage((p) => Math.max(1, p - 1));
+  const handleNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const handleCloseModal = () => {
     setShowAddModal(false);
     setSelectedProduct(null);
   };
 
-  const handleEditClick = p => {
+  const handleEditClick = (p) => {
     setSelectedProduct(p);
+    setShowAddModal(true);
+  };
+
+  const handleAddClick = () => {
+    setSelectedProduct({ sku: generateNextSKU(products), isNew: true });
     setShowAddModal(true);
   };
 
   return (
     <div
       className="flex w-full bg-[#F9FAFB] font-sans antialiased text-slate-900"
-      style={{ height: "100vh", overflow: "hidden" }}
+      style={{ minHeight: "100vh", overflow: "hidden" }}
     >
+      <AlertDialog alert={alert} onClose={closeAlert} />
+
       <div
-        className="flex-1 flex flex-col min-w-0 px-10 py-8"
-        style={{ overflow: "hidden" }}
+        className="flex-1 flex flex-col min-w-0 px-4 sm:px-6 lg:px-10 py-6 lg:py-8"
+        style={{ overflow: "hidden", height: "100vh" }}
       >
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-6 flex gap-4 items-center flex-shrink-0">
-          <div className="relative flex-1">
-            <HiMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search by SKU, Product Name, or Category..."
-              className="w-full bg-slate-50 border-none rounded-2xl py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-black/5 transition-all"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+        
+          <div className="bg-white p-3 sm:p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-4 sm:mb-6 flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center flex-shrink-0">
+          <div className="flex gap-2 items-center flex-1">
+            <div className="relative flex-1 min-w-0">
+              <HiMagnifyingGlass
+                className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 flex-shrink-0"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search SKU, Name..."
+                className="w-full bg-slate-50 border-none rounded-2xl py-3 sm:py-3.5 pl-10 sm:pl-12 pr-3 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-black/5 transition-all text-xs sm:text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <button
+              onClick={handleAddClick}
+              className="sm:hidden flex-shrink-0 w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
+            >
+              <HiPlus size={20} />
+            </button>
+
+            <button
+              onClick={() => setShowQRScanner(true)}
+              className="sm:hidden flex-shrink-0 w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
+            >
+              <HiQrCode size={20} />
+            </button>
           </div>
+
+          <button
+            onClick={() => setShowQRScanner(true)}
+            className="hidden sm:flex flex-shrink-0 items-center justify-center gap-2 bg-slate-900 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg whitespace-nowrap"
+          >
+            <HiQrCode size={16} />
+            <span>Scan QR</span>
+          </button>
         </div>
 
-        <div
-          className="flex-1 min-h-0"
-          style={{ overflow: "hidden" }}
-        >
+        <div className="flex-1 min-h-0" style={{ overflow: "hidden" }}>
           <section
-            className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 flex flex-col"
+            className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm p-4 sm:p-6 lg:p-8 flex flex-col"
             style={{ height: "100%", overflow: "hidden" }}
           >
-            <div className="flex justify-between items-center mb-6 px-2 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6 px-1 sm:px-2 flex-shrink-0">
               <div>
-                <h1 className="text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">
                   Finished Goods Inventory
                 </h1>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 sm:mt-2">
                   Production Records
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 <select
-                  className="bg-slate-50 border border-slate-100 rounded-xl py-2.5 px-4 font-bold text-slate-600 outline-none cursor-pointer text-[10px] uppercase tracking-wider hover:bg-slate-100 transition-all shadow-sm"
+                  className="bg-slate-50 border border-slate-100 rounded-xl py-2.5 px-3 sm:px-4 font-bold text-slate-600 outline-none cursor-pointer text-[10px] uppercase tracking-wider hover:bg-slate-100 transition-all shadow-sm"
                   value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value)}
+                  onChange={(e) => setStatusFilter(e.target.value)}
                 >
                   <option value="All Status">All Status</option>
                   <option value="IN STOCK">In Stock</option>
                   <option value="LOW STOCK">Low Stock</option>
                   <option value="NO STOCK">No Stock</option>
                 </select>
+                
                 <button
-                  onClick={() => {
-                    setSelectedProduct({ sku: generateNextSKU(products), isNew: true });
-                    setShowAddModal(true);
-                  }}
-                  className="bg-black text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest"
+                  onClick={handleAddClick}
+                  className="hidden sm:flex bg-black text-white px-4 sm:px-6 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg hover:scale-105 transition-all tracking-widest whitespace-nowrap items-center gap-2"
                 >
                   + Add Product
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 min-h-0" style={{ overflow: "hidden" }}>
+            <div className="flex-1 min-h-0" style={{ overflow: "hidden auto" }}>
               {pagedProducts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-300">
                   <HiMagnifyingGlass size={56} className="mb-4" />
-                  <p className="text-base font-black uppercase tracking-widest text-slate-400">No results found</p>
-                  {searchTerm && (
-                    <p className="text-[11px] font-bold text-slate-300 mt-1 uppercase tracking-wider">
-                      No products matching "{searchTerm}"
-                    </p>
-                  )}
+                  <p className="text-base font-black uppercase tracking-widest text-slate-400">
+                    No results found
+                  </p>
                 </div>
               ) : (
-                <table className="w-full border-separate border-spacing-y-3" style={{ tableLayout: "fixed" }}>
-                  <thead>
-                    <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
-                      <th className="pb-2 text-left pl-6" style={{ width: "28%" }}>Product Details</th>
-                      <th className="pb-2 text-center" style={{ width: "12%" }}>Category</th>
-                      <th className="pb-2 text-center" style={{ width: "13%" }}>Stocks</th>
-                      <th className="pb-2 text-center" style={{ width: "10%" }}>Unit</th>
-                      <th className="pb-2 text-center" style={{ width: "13%" }}>Status</th>
-                      <th className="pb-2 text-center" style={{ width: "12%" }}>Price</th>
-                      <th className="pb-2 text-right pr-8" style={{ width: "12%" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="font-bold text-slate-700">
-                    {pagedProducts.map(p => {
+                <>
+                  <div className="hidden lg:block">
+                    <table
+                      className="w-full border-separate border-spacing-y-3"
+                      style={{ tableLayout: "fixed" }}
+                    >
+                      <thead>
+                        <tr className="text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                          <th className="pb-2 text-left pl-6" style={{ width: "26%" }}>
+                            Product Details
+                          </th>
+                          <th className="pb-2 text-center" style={{ width: "11%" }}>
+                            Category
+                          </th>
+                          <th className="pb-2 text-center" style={{ width: "12%" }}>
+                            Stocks
+                          </th>
+                          <th className="pb-2 text-center" style={{ width: "9%" }}>
+                            Unit
+                          </th>
+                          <th className="pb-2 text-center" style={{ width: "12%" }}>
+                            Status
+                          </th>
+                          <th className="pb-2 text-center" style={{ width: "11%" }}>
+                            Price
+                          </th>
+                          <th className="pb-2 text-right pr-8" style={{ width: "19%" }}>
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="font-bold text-slate-700">
+                        {pagedProducts.map((p) => {
+                          const status = getStockStatus(p.current_stock, p.min_stocks);
+                          return (
+                            <tr
+                              key={p.sku}
+                              className="group hover:bg-slate-50/80 transition-all"
+                            >
+                              <td
+                                className="py-3 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100"
+                                style={{ overflow: "hidden" }}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
+                                    {p.product_image ? (
+                                      <img
+                                        src={p.product_image}
+                                        className="w-full h-full object-cover"
+                                        alt=""
+                                      />
+                                    ) : (
+                                      <HiPhoto size={22} className="text-slate-200" />
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-start min-w-0">
+                                    <span
+                                      className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate w-full"
+                                      title={p.name}
+                                    >
+                                      {p.name || "Unnamed"}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-black uppercase tracking-wider w-full overflow-hidden">
+                                      <span
+                                        className="truncate max-w-[100px]"
+                                        title={p.sku}
+                                      >
+                                        {p.sku}
+                                      </span>
+                                      {p.collection && (
+                                        <>
+                                          <span className="text-slate-300 flex-shrink-0">
+                                            •
+                                          </span>
+                                          <span
+                                            className="truncate max-w-[80px]"
+                                            title={p.collection}
+                                          >
+                                            {p.collection}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
+                                <p
+                                  className="truncate uppercase font-black text-[10px] text-slate-500"
+                                  title={p.category}
+                                >
+                                  {p.category || "---"}
+                                </p>
+                              </td>
+                              <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
+                                <div className="flex flex-col items-center">
+                                  <span className="text-[14px] text-slate-900 font-black leading-none">
+                                    {p.current_stock || 0}
+                                  </span>
+                                  <span className="text-[8px] text-slate-400 uppercase font-black mt-0.5 tracking-tight">
+                                    Min: {p.min_stocks || 0}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
+                                <span className="text-[10px] text-slate-500 font-black uppercase tracking-wide">
+                                  {p.stock_unit || "---"}
+                                </span>
+                              </td>
+                              <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
+                                <span
+                                  className={`px-4 py-1.5 rounded-full text-[10px] font-black shadow-sm tracking-tight inline-block whitespace-nowrap ${status.color}`}
+                                >
+                                  {status.label}
+                                </span>
+                              </td>
+                              <td className="py-3 text-center font-black text-[#10B981] border-y border-transparent group-hover:border-slate-100 whitespace-nowrap">
+                                ₱
+                                {parseFloat(p.selling_price || 0).toLocaleString(
+                                  undefined,
+                                  { minimumFractionDigits: 2 }
+                                )}
+                              </td>
+                              <td className="py-3 pr-4 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => downloadQRCode(p)}
+                                    title="Download QR"
+                                    className="w-10 h-10 bg-white text-slate-500 hover:text-emerald-600 hover:shadow-md rounded-xl transition-all border border-slate-100 inline-flex items-center justify-center shadow-sm"
+                                  >
+                                    <HiArrowDownTray size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditClick(p)}
+                                    className="w-10 h-10 bg-white text-slate-900 hover:shadow-md rounded-xl transition-all border border-slate-100 inline-flex items-center justify-center shadow-sm"
+                                  >
+                                    <HiPencil size={18} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="lg:hidden space-y-3">
+                    {pagedProducts.map((p) => {
                       const status = getStockStatus(p.current_stock, p.min_stocks);
                       return (
-                        <tr key={p.sku} className="group hover:bg-slate-50/80 transition-all">
-                          <td className="py-3 pl-6 rounded-l-[2rem] text-left border-y border-l border-transparent group-hover:border-slate-100" style={{ overflow: "hidden" }}>
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
-                                {p.product_image ? (
-                                  <img src={p.product_image} className="w-full h-full object-cover" alt="" />
-                                ) : (
-                                  <HiPhoto size={22} className="text-slate-200" />
+                        <div
+                          key={p.sku}
+                          className="bg-slate-50/60 rounded-[1.5rem] p-4 border border-slate-100"
+                        >
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-sm flex-shrink-0">
+                              {p.product_image ? (
+                                <img
+                                  src={p.product_image}
+                                  className="w-full h-full object-cover"
+                                  alt=""
+                                />
+                              ) : (
+                                <HiPhoto size={22} className="text-slate-200" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-black text-slate-900 uppercase text-xs truncate">
+                                {p.name || "Unnamed"}
+                              </p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                {p.sku}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <button
+                                onClick={() => downloadQRCode(p)}
+                                className="w-9 h-9 bg-white text-slate-500 hover:text-emerald-600 hover:shadow-md rounded-xl transition-all border border-slate-100 inline-flex items-center justify-center shadow-sm"
+                              >
+                                <HiArrowDownTray size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleEditClick(p)}
+                                className="w-9 h-9 bg-white text-slate-900 hover:shadow-md rounded-xl transition-all border border-slate-100 inline-flex items-center justify-center shadow-sm"
+                              >
+                                <HiPencil size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="bg-white rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">
+                                Stock
+                              </p>
+                              <p className="font-black text-slate-800 text-sm">
+                                {p.current_stock || 0}
+                              </p>
+                              <p className="text-[8px] text-slate-400 font-bold text-center">
+                                Min: {p.min_stocks || 0}
+                              </p>
+                            </div>
+                            <div className="bg-white rounded-xl p-2.5 text-center">
+                              <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">
+                                Price
+                              </p>
+                              <p className="font-black text-emerald-500 text-xs text-center leading-tight">
+                                ₱
+                                {parseFloat(p.selling_price || 0).toLocaleString(
+                                  undefined,
+                                  { minimumFractionDigits: 2 }
                                 )}
-                              </div>
-                              <div className="flex flex-col items-start min-w-0">
-                                <span className="text-slate-900 font-black uppercase text-xs mb-0.5 truncate w-full" title={p.name}>
-                                  {p.name || "Unnamed"}
+                              </p>
+                            </div>
+                            <div className="bg-white rounded-xl p-2.5 flex items-center justify-center">
+                              <span
+                                className={`px-2 py-1 rounded-full text-[9px] font-black tracking-tight inline-block whitespace-nowrap ${status.color}`}
+                              >
+                                {status.label}
+                              </span>
+                            </div>
+                          </div>
+                          {(p.category || p.collection) && (
+                            <div className="flex gap-2 mt-2 flex-wrap">
+                              {p.category && (
+                                <span className="text-[9px] font-black uppercase text-slate-400 bg-white px-2.5 py-1 rounded-full border border-slate-100">
+                                  {p.category}
                                 </span>
-                                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-black uppercase tracking-wider w-full overflow-hidden">
-                                  <span className="truncate max-w-[100px]" title={p.sku}>{p.sku}</span>
-                                  {p.collection && (
-                                    <>
-                                      <span className="text-slate-300 flex-shrink-0">•</span>
-                                      <span className="truncate max-w-[80px]" title={p.collection}>{p.collection}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
+                              )}
+                              {p.collection && (
+                                <span className="text-[9px] font-black uppercase text-slate-400 bg-white px-2.5 py-1 rounded-full border border-slate-100">
+                                  {p.collection}
+                                </span>
+                              )}
                             </div>
-                          </td>
-                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100" style={{ overflow: "hidden" }}>
-                            <p className="truncate uppercase font-black text-[10px] text-slate-500" title={p.category}>{p.category || "---"}</p>
-                          </td>
-                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
-                            <div className="flex flex-col items-center">
-                              <span className="text-[14px] text-slate-900 font-black leading-none">{p.current_stock || 0}</span>
-                              <span className="text-[8px] text-slate-400 uppercase font-black mt-0.5 tracking-tight">Min: {p.min_stocks || 0}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
-                            <span className="text-[10px] text-slate-500 font-black uppercase tracking-wide">
-                              {p.stock_unit || "---"}
-                            </span>
-                          </td>
-                          <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
-                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black shadow-sm tracking-tight inline-block whitespace-nowrap ${status.color}`}>
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="py-3 text-center font-black text-[#10B981] border-y border-transparent group-hover:border-slate-100 whitespace-nowrap">
-                            ₱{parseFloat(p.selling_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-3 pr-8 rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
-                            <button
-                              onClick={() => handleEditClick(p)}
-                              className="w-10 h-10 bg-white text-slate-900 hover:shadow-md rounded-xl transition-all border border-slate-100 inline-flex items-center justify-center shadow-sm"
-                            >
-                              <HiPencil size={18} />
-                            </button>
-                          </td>
-                        </tr>
+                          )}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                </>
               )}
             </div>
 
@@ -271,14 +1089,14 @@ export default function SalesInventory() {
                 <button
                   onClick={handlePrev}
                   disabled={safePage === 1}
-                  className="w-9 h-9 rounded-full border border-slate-200 bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  className="w-9 h-9 rounded-full border border-slate-200 bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all"
                 >
                   <HiChevronLeft size={16} />
                 </button>
                 <button
                   onClick={handleNext}
                   disabled={safePage === totalPages}
-                  className="w-9 h-9 rounded-full border border-slate-200 bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  className="w-9 h-9 rounded-full border border-slate-200 bg-white shadow-sm flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all"
                 >
                   <HiChevronRight size={16} />
                 </button>
@@ -287,6 +1105,14 @@ export default function SalesInventory() {
           </section>
         </div>
       </div>
+
+      {showQRScanner && (
+        <QRScannerModal
+          products={products}
+          onClose={() => setShowQRScanner(false)}
+          showAlert={showAlert}
+        />
+      )}
 
       {showAddModal && (
         <AddProductModal
