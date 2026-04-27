@@ -49,7 +49,9 @@ const MONTHS = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 ];
 
-const DAYS_IN_MONTH = (year, month) => new Date(year, month + 1, 0).getDate();
+const DAYS_IN_MONTH = (year, month) => {
+  return new Date(year, month + 1, 0).getDate();
+};
 
 const COURIERS_ICON = {
   "J&T Express": "🟥",
@@ -62,34 +64,60 @@ const COURIERS_ICON = {
 };
 
 const formatPeso = (v) => {
-  if (v === 0) return "₱0";
-  if (v >= 1_000_000) return `₱${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `₱${(v / 1_000).toFixed(1)}K`;
+  if (v === 0) {
+    return "₱0";
+  }
+  if (v >= 1_000_000) {
+    return `₱${(v / 1_000_000).toFixed(1)}M`;
+  }
+  if (v >= 1_000) {
+    return `₱${(v / 1_000).toFixed(1)}K`;
+  }
   return `₱${v.toFixed(0)}`;
 };
 
 const getStatusStyle = (status) => {
   switch (status) {
-    case "Delivered": return "bg-emerald-500";
-    case "Shipped": return "bg-blue-600";
-    case "Pending": return "bg-amber-500";
-    default: return "bg-slate-400";
+    case "Delivered": 
+      return "bg-emerald-500";
+    case "Shipped": 
+      return "bg-blue-600";
+    case "Pending": 
+      return "bg-amber-500";
+    default: 
+      return "bg-slate-400";
   }
 };
 
 const getStatusColor = (status) => {
   switch (status) {
-    case "Delivered": return "#10b981";
-    case "Shipped": return "#2563eb";
-    case "Pending": return "#f59e0b";
-    default: return "#94a3b8";
+    case "Delivered": 
+      return "#10b981";
+    case "Shipped": 
+      return "#2563eb";
+    case "Pending": 
+      return "#f59e0b";
+    default: 
+      return "#94a3b8";
   }
 };
 
 const TRACKING_STEPS = [
-  { key: "Delivered", label: "Order Delivered", sub: "Package successfully delivered to recipient" },
-  { key: "Shipped", label: "Out for Delivery", sub: "Package is on the way to destination" },
-  { key: "Pending", label: "Order Placed", sub: "An order has been placed" },
+  { 
+    key: "Delivered", 
+    label: "Order Delivered", 
+    sub: "Package successfully delivered to recipient" 
+  },
+  { 
+    key: "Shipped", 
+    label: "Out for Delivery", 
+    sub: "Package is on the way to destination" 
+  },
+  { 
+    key: "Pending", 
+    label: "Order Placed", 
+    sub: "An order has been placed" 
+  },
 ];
 
 const AlertDialog = ({ alert, onClose }) => {
@@ -99,14 +127,21 @@ const AlertDialog = ({ alert, onClose }) => {
   return (
     <div
       className="fixed inset-0 z-[500] flex items-center justify-center p-6"
-      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      style={{ 
+        backdropFilter: 'blur(12px)', 
+        backgroundColor: 'rgba(0,0,0,0.25)' 
+      }}
       onClick={onClose}
     >
       <div
         className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in duration-300"
         onClick={e => e.stopPropagation()}
       >
-        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+        <div 
+          className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${
+            isSuccess ? 'bg-emerald-50' : 'bg-rose-50'
+          }`}
+        >
           {isSuccess ? (
             <HiCheckCircle size={44} className="text-emerald-500" />
           ) : (
@@ -114,7 +149,9 @@ const AlertDialog = ({ alert, onClose }) => {
           )}
         </div>
         
-        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
+          isSuccess ? 'text-emerald-500' : 'text-rose-500'
+        }`}>
           {isSuccess ? 'Success' : 'Error'}
         </p>
         
@@ -125,7 +162,10 @@ const AlertDialog = ({ alert, onClose }) => {
         <div className="flex flex-col gap-2 w-full">
           {isSuccess && alert.fileUrl && !alert.isExcel && (
             <button
-              onClick={() => { window.open(alert.fileUrl, '_blank'); onClose(); }}
+              onClick={() => { 
+                window.open(alert.fileUrl, '_blank'); 
+                onClose(); 
+              }}
               className="w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all bg-black hover:bg-stone-800 shadow-xl"
             >
               View Document
@@ -134,12 +174,20 @@ const AlertDialog = ({ alert, onClose }) => {
           <button
             onClick={onClose}
             className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98]
-              ${isSuccess ? 'text-emerald-600 bg-emerald-50' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}
+              ${isSuccess 
+                ? 'text-emerald-600 bg-emerald-50' 
+                : 'bg-rose-500 text-white shadow-lg shadow-rose-200'
+              }`}
           >
             Close
           </button>
         </div>
-        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        
+        <div 
+          className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${
+            isSuccess ? 'bg-emerald-500' : 'bg-rose-500'
+          }`} 
+        />
       </div>
     </div>
   );
@@ -156,31 +204,47 @@ const OrderDetailModal = ({ order, onClose, products = [] }) => {
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ backdropFilter: "blur(14px)", backgroundColor: "rgba(0,0,0,0.3)" }}
+      style={{ 
+        backdropFilter: "blur(14px)", 
+        backgroundColor: "rgba(0,0,0,0.3)" 
+      }}
       onClick={onClose}
     >
       <div
         className="bg-white rounded-[1.75rem] shadow-2xl w-full max-w-sm relative overflow-hidden"
-        style={{ animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}
+        style={{ 
+          animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" 
+        }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between px-6 pt-6 pb-4">
           <h2 className="text-lg font-black text-gray-900 leading-tight">Real-time Delivery Tracking</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors mt-0.5"><X size={18} /></button>
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-gray-700 transition-colors mt-0.5"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="px-6 pb-4">
           <div className="flex items-start justify-between gap-4 py-4 border-t border-b border-gray-100">
             <div className="flex-1 min-w-0">
               <p className="text-gray-400 text-xs font-semibold mb-1">From</p>
-              <p className="text-sm font-bold text-gray-700 leading-snug truncate">{fromAddress || "Warehouse / Origin"}</p>
+              <p className="text-sm font-bold text-gray-700 leading-snug truncate">
+                {fromAddress || "Warehouse / Origin"}
+              </p>
             </div>
             <div className="flex items-center gap-1 pt-3 flex-shrink-0 px-1">
-              {[...Array(6)].map((_, i) => <div key={i} className="w-1.5 h-px bg-gray-300" />)}
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="w-1.5 h-px bg-gray-300" />
+              ))}
             </div>
             <div className="flex-1 min-w-0 text-right">
               <p className="text-gray-400 text-xs font-semibold mb-1">To</p>
-              <p className="text-sm font-bold text-gray-700 leading-snug truncate">{toAddress || order.client_name || "Customer"}</p>
+              <p className="text-sm font-bold text-gray-700 leading-snug truncate">
+                {toAddress || order.client_name || "Customer"}
+              </p>
             </div>
           </div>
 
@@ -209,20 +273,33 @@ const OrderDetailModal = ({ order, onClose, products = [] }) => {
                   <div className="flex flex-col items-center flex-shrink-0">
                     <div
                       className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ borderColor: dotColor, backgroundColor: isActive ? dotColor : "white" }}
+                      style={{ 
+                        borderColor: dotColor, 
+                        backgroundColor: isActive ? dotColor : "white" 
+                      }}
                     >
-                      {isActive && i === activeStep && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      {isActive && i === activeStep && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      )}
                     </div>
                     {!isLast && (
-                      <div className="w-0.5 flex-1 mt-1 mb-1 min-h-[28px]"
-                        style={{ backgroundColor: i < activeStep ? dotColor : "#e5e7eb" }} />
+                      <div 
+                        className="w-0.5 flex-1 mt-1 mb-1 min-h-[28px]"
+                        style={{ 
+                          backgroundColor: i < activeStep ? dotColor : "#e5e7eb" 
+                        }} 
+                      />
                     )}
                   </div>
                   <div className="pb-4 min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className={`text-sm font-bold leading-tight ${isActive ? "text-gray-900" : "text-gray-400"}`}>{step.label}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5 leading-snug">{step.sub}</p>
+                        <p className={`text-sm font-bold leading-tight ${isActive ? "text-gray-900" : "text-gray-400"}`}>
+                          {step.label}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5 leading-snug">
+                          {step.sub}
+                        </p>
                       </div>
                       {isActive && (
                         <p className="text-[10px] text-gray-400 font-semibold whitespace-nowrap flex-shrink-0">
@@ -285,12 +362,19 @@ const SalesTrendModal = ({ orders, onClose }) => {
   const [exportFilterPlatform, setExportFilterPlatform] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
 
-  const showAlert = (message, type = 'success', fileUrl = null, isExcel = false) => setAlert({ message, type, fileUrl, isExcel });
+  const showAlert = (message, type = 'success', fileUrl = null, isExcel = false) => {
+    setAlert({ message, type, fileUrl, isExcel });
+  };
+  
   const closeAlert = () => setAlert(null);
 
   const exportTimestamp = new Date().toLocaleString('en-US', {
-    month: 'long', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true,
+    month: 'long', 
+    day: 'numeric', 
+    year: 'numeric',
+    hour: '2-digit', 
+    minute: '2-digit', 
+    hour12: true,
   });
 
   const fetchExporterInfo = useCallback(async () => {
@@ -302,7 +386,9 @@ const SalesTrendModal = ({ orders, onClose }) => {
     } else if (sId) {
       try {
         const res = await axios.get(`http://localhost:5000/api/user/name/${sId}`);
-        if (res.data?.name) setExportedByName(res.data.name);
+        if (res.data?.name) {
+          setExportedByName(res.data.name);
+        }
       } catch {
         setExportedByName("Unknown User");
       }
@@ -310,7 +396,9 @@ const SalesTrendModal = ({ orders, onClose }) => {
     if (sId) setCurrentUserId(sId);
   }, []);
 
-  useEffect(() => { fetchExporterInfo(); }, [fetchExporterInfo]);
+  useEffect(() => { 
+    fetchExporterInfo(); 
+  }, [fetchExporterInfo]);
 
   const daysInSelected = (selectedYear && selectedMonth !== "")
     ? new Date(Number(selectedYear), Number(selectedMonth) + 1, 0).getDate()
@@ -338,16 +426,24 @@ const SalesTrendModal = ({ orders, onClose }) => {
         const d = new Date(o.order_date).getDate();
         if (d <= dInM) lastArr[d - 1] += Number(o.total_amount || 0);
       });
-      return { labels: Array.from({ length: dInM }, (_, i) => `${i + 1}`), thisData: arr, lastData: lastArr };
+      return { 
+        labels: Array.from({ length: dInM }, (_, i) => `${i + 1}`), 
+        thisData: arr, 
+        lastData: lastArr 
+      };
     }
     const buildM = (y) => {
       const arr = Array(12).fill(0);
-      orders.filter(o => o.status === "Delivered" && new Date(o.order_date).getFullYear() === y).forEach(o => {
+      orders.filter(o => o.status === "Delivered" && o.order_date && new Date(o.order_date).getFullYear() === y).forEach(o => {
         arr[new Date(o.order_date).getMonth()] += Number(o.total_amount || 0);
       });
       return arr;
     };
-    return { labels: MONTHS, thisData: buildM(yr), lastData: buildM(yr - 1) };
+    return { 
+      labels: MONTHS, 
+      thisData: buildM(yr), 
+      lastData: buildM(yr - 1) 
+    };
   };
 
   const { labels, thisData, lastData } = getChartData();
@@ -373,6 +469,21 @@ const SalesTrendModal = ({ orders, onClose }) => {
            o.status === "Delivered";
   }).reduce((s, o) => s + Number(o.total_amount || 0), 0) : 0;
 
+  const validateFutureDate = (y, m, d) => {
+    const now = new Date();
+    const checkDate = new Date(
+      Number(y), 
+      m !== "" ? Number(m) : 0, 
+      d !== "" ? Number(d) : 1
+    );
+    
+    if (m === "" && Number(y) > now.getFullYear()) return true;
+    if (m !== "" && d === "" && checkDate.getFullYear() >= now.getFullYear() && checkDate.getMonth() > now.getMonth()) return true;
+    if (m !== "" && d !== "" && checkDate > now) return true;
+    
+    return false;
+  };
+
   const getExportRows = useCallback(() => {
     let filtered = orders.filter(o => o.status === "Delivered" && o.order_date);
     if (exportFilterYear) filtered = filtered.filter(o => new Date(o.order_date).getFullYear() === Number(exportFilterYear));
@@ -380,7 +491,13 @@ const SalesTrendModal = ({ orders, onClose }) => {
     if (exportFilterDay !== "") filtered = filtered.filter(o => new Date(o.order_date).getDate() === Number(exportFilterDay));
     if (exportFilterCourier) filtered = filtered.filter(o => o.courier === exportFilterCourier);
     if (exportFilterPlatform) filtered = filtered.filter(o => o.platform === exportFilterPlatform);
-    filtered.sort((a, b) => sortOrder === "asc" ? new Date(a.order_date) - new Date(b.order_date) : new Date(b.order_date) - new Date(a.order_date));
+    
+    filtered.sort((a, b) => {
+      return sortOrder === "asc" 
+        ? new Date(a.order_date) - new Date(b.order_date) 
+        : new Date(b.order_date) - new Date(a.order_date);
+    });
+
     return filtered.map(o => ({
       "Order ID": `SO-${o.order_id}`,
       Date: o.order_date ? new Date(o.order_date).toLocaleDateString("en-PH") : "N/A",
@@ -406,8 +523,28 @@ const SalesTrendModal = ({ orders, onClose }) => {
   const chartData = {
     labels,
     datasets: [
-      { label: "Running Year", data: thisData, borderColor: "#2563eb", backgroundColor: "transparent", tension: 0.4, pointRadius: 0, pointHoverRadius: 0, borderWidth: 2.5, fill: false },
-      { label: "Last Year", data: lastData, borderColor: "#22c55e", backgroundColor: "transparent", tension: 0.4, pointRadius: 0, pointHoverRadius: 0, borderWidth: 2.5, fill: false },
+      { 
+        label: "Running Year", 
+        data: thisData, 
+        borderColor: "#2563eb", 
+        backgroundColor: "transparent", 
+        tension: 0.4, 
+        pointRadius: 0, 
+        pointHoverRadius: 0, 
+        borderWidth: 2.5, 
+        fill: false 
+      },
+      { 
+        label: "Last Year", 
+        data: lastData, 
+        borderColor: "#22c55e", 
+        backgroundColor: "transparent", 
+        tension: 0.4, 
+        pointRadius: 0, 
+        pointHoverRadius: 0, 
+        borderWidth: 2.5, 
+        fill: false 
+      },
     ],
   };
 
@@ -415,18 +552,61 @@ const SalesTrendModal = ({ orders, onClose }) => {
     maintainAspectRatio: false,
     interaction: { mode: "index", intersect: false },
     plugins: {
-      legend: { display: true, position: "top", align: "end", labels: { boxWidth: 32, boxHeight: 10, borderRadius: 4, useBorderRadius: true, font: { size: 11, weight: "bold" }, color: "#64748b", padding: 16 } },
-      tooltip: { enabled: true, backgroundColor: "#0f172a", titleColor: "#94a3b8", bodyColor: "#f1f5f9", padding: 12, cornerRadius: 10, titleFont: { size: 10, weight: "bold" }, bodyFont: { size: 12, weight: "bold" }, displayColors: true, callbacks: { label: (item) => ` ₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` } },
+      legend: { 
+        display: true, 
+        position: "top", 
+        align: "end", 
+        labels: { 
+          boxWidth: 32, 
+          boxHeight: 10, 
+          borderRadius: 4, 
+          useBorderRadius: true, 
+          font: { size: 11, weight: "bold" }, 
+          color: "#64748b", 
+          padding: 16 
+        } 
+      },
+      tooltip: { 
+        enabled: true, 
+        backgroundColor: "#0f172a", 
+        titleColor: "#94a3b8", 
+        bodyColor: "#f1f5f9", 
+        padding: 12, 
+        cornerRadius: 10, 
+        titleFont: { size: 10, weight: "bold" }, 
+        bodyFont: { size: 12, weight: "bold" }, 
+        displayColors: true, 
+        callbacks: { 
+          label: (item) => ` ₱${Number(item.raw).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` 
+        } 
+      },
     },
     scales: {
-      y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
-      x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
+      y: { 
+        grid: { color: "rgba(0,0,0,0.05)" }, 
+        ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, 
+        border: { display: false } 
+      },
+      x: { 
+        grid: { color: "rgba(0,0,0,0.04)" }, 
+        ticks: { font: { size: 10 }, color: "#94a3b8" }, 
+        border: { display: false } 
+      },
     },
   };
 
   const exportToExcel = async () => {
+    if (validateFutureDate(exportFilterYear, exportFilterMonth, exportFilterDay)) {
+      showAlert("Cannot export data for future dates. Please select a valid timeline.", "error");
+      return;
+    }
+    
     const rows = getExportRows();
-    if (rows.length === 0) { showAlert("No records matched the selected filters.", "error"); return; }
+    if (rows.length === 0) { 
+      showAlert("No records matched the selected filters.", "error"); 
+      return; 
+    }
+    
     try {
       const XLSX = await import('xlsx');
       const wb = XLSX.utils.book_new();
@@ -445,24 +625,38 @@ const SalesTrendModal = ({ orders, onClose }) => {
       a.download = `Sales_Trend_${new Date().getTime()}.xlsx`;
       a.click();
       showAlert("Excel report generated successfully!", "success", null, true);
-    } catch { showAlert("Failed to export Excel.", "error"); }
+    } catch { 
+      showAlert("Failed to export Excel.", "error"); 
+    }
   };
 
   const exportToPDF = async () => {
+    if (validateFutureDate(exportFilterYear, exportFilterMonth, exportFilterDay)) {
+      showAlert("Cannot export data for future dates. Please select a valid timeline.", "error");
+      return;
+    }
+
     const rows = getExportRows();
-    if (rows.length === 0) { showAlert("No records matched the selected filters.", "error"); return; }
+    if (rows.length === 0) { 
+      showAlert("No records matched the selected filters.", "error"); 
+      return; 
+    }
+    
     try {
       const { default: jsPDF } = await import('jspdf');
       const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF({ orientation: 'landscape' });
+      
       doc.setFontSize(16).setFont(undefined, 'bold').text("Sales & Profit Trend Report", 14, 15);
       doc.setFontSize(9).setFont(undefined, 'normal').setTextColor(100);
       doc.text(`Exported By: ${exportedByName} (ID: ${currentUserId || 'N/A'})`, 14, 22);
       doc.text(`Generated On: ${exportTimestamp}`, 14, 27);
       doc.setTextColor(0);
+      
       const total = rows.reduce((s, r) => s + Number(r["Total Amount (₱)"] || 0), 0);
       const headers = Object.keys(rows[0]);
       const body = rows.map(r => headers.map(h => r[h]));
+      
       autoTable(doc, {
         head: [headers],
         body,
@@ -474,6 +668,7 @@ const SalesTrendModal = ({ orders, onClose }) => {
         theme: 'grid',
         startY: 35,
       });
+      
       const blob = doc.output("blob");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -481,28 +676,37 @@ const SalesTrendModal = ({ orders, onClose }) => {
       a.download = `Sales_Trend_${new Date().getTime()}.pdf`;
       a.click();
       showAlert("PDF report generated successfully!", "success", url);
-    } catch { showAlert("Failed to export PDF.", "error"); }
+    } catch { 
+      showAlert("Failed to export PDF.", "error"); 
+    }
   };
 
   const selectClass = "appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 transition-all pr-8";
   
   const Chevron = () => (
     <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-      <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+        <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
     </div>
   );
 
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center p-4 text-left"
-      style={{ backdropFilter: "blur(14px)", backgroundColor: "rgba(0,0,0,0.3)" }}
+      style={{ 
+        backdropFilter: "blur(14px)", 
+        backgroundColor: "rgba(0,0,0,0.3)" 
+      }}
       onClick={onClose}
     >
       <AlertDialog alert={alert} onClose={closeAlert} />
 
       <div
         className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-2xl relative overflow-hidden max-h-[95vh] flex flex-col text-left"
-        style={{ animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}
+        style={{ 
+          animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" 
+        }}
         onClick={e => e.stopPropagation()}
       >
         <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
@@ -518,7 +722,12 @@ const SalesTrendModal = ({ orders, onClose }) => {
               >
                 <HiOutlineDownload size={13} /> Export Data
               </button>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition-colors p-1"><X size={20} /></button>
+              <button 
+                onClick={onClose} 
+                className="text-gray-400 hover:text-gray-700 transition-colors p-1"
+              >
+                <X size={20} />
+              </button>
             </div>
           </div>
         </div>
@@ -530,8 +739,13 @@ const SalesTrendModal = ({ orders, onClose }) => {
             </span>
             {pctChange !== null && (
               <div className="flex items-center gap-1.5">
-                <TrendingUp size={13} className={Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"} />
-                <span className={`text-xs font-black ${Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{pctChange}%</span>
+                <TrendingUp 
+                  size={13} 
+                  className={Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"} 
+                />
+                <span className={`text-xs font-black ${Number(pctChange) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                  {pctChange}%
+                </span>
                 <span className="text-[10px] text-gray-400 font-semibold uppercase">vs last year</span>
               </div>
             )}
@@ -598,7 +812,9 @@ const SalesTrendModal = ({ orders, onClose }) => {
                   className={selectClass + " w-full disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-black uppercase tracking-widest"}
                 >
                   <option value="">{sel.placeholder}</option>
-                  {sel.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  {sel.options.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
                 <Chevron />
               </div>
@@ -609,8 +825,16 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
       {sortModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-[300] p-4 text-left">
-          <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-xl relative shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <button className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" onClick={() => setSortModalOpen(false)}><HiX size={24} /></button>
+          <div 
+            className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-xl relative shadow-2xl max-h-[90vh] overflow-y-auto" 
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" 
+              onClick={() => setSortModalOpen(false)}
+            >
+              <HiX size={24} />
+            </button>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase mb-4 tracking-tighter">Export Configuration</h2>
 
             <div className="mb-6 p-5 bg-gray-50 rounded-2xl border border-gray-100 uppercase">
@@ -622,35 +846,57 @@ const SalesTrendModal = ({ orders, onClose }) => {
             <div className="space-y-4 mb-6 uppercase font-black">
               <div className="grid grid-cols-2 gap-3">
                 <div className="relative">
-                  <select value={exportFilterYear} onChange={e => { setExportFilterYear(e.target.value); setExportFilterMonth(""); setExportFilterDay(""); }} className={selectClass + " w-full text-xs"}>
+                  <select 
+                    value={exportFilterYear} 
+                    onChange={e => { setExportFilterYear(e.target.value); setExportFilterMonth(""); setExportFilterDay(""); }} 
+                    className={selectClass + " w-full text-xs"}
+                  >
                     <option value="">All Years</option>
                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                   <Chevron />
                 </div>
                 <div className="relative">
-                  <select value={exportFilterMonth} onChange={e => { setExportFilterMonth(e.target.value); setExportFilterDay(""); }} disabled={!exportFilterYear} className={selectClass + " w-full text-xs"}>
+                  <select 
+                    value={exportFilterMonth} 
+                    onChange={e => { setExportFilterMonth(e.target.value); setExportFilterDay(""); }} 
+                    disabled={!exportFilterYear} 
+                    className={selectClass + " w-full text-xs"}
+                  >
                     <option value="">All Months</option>
                     {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
                   </select>
                   <Chevron />
                 </div>
                 <div className="relative col-span-2">
-                  <select value={exportFilterDay} onChange={e => setExportFilterDay(e.target.value)} disabled={!exportFilterYear || exportFilterMonth === ""} className={selectClass + " w-full text-xs"}>
+                  <select 
+                    value={exportFilterDay} 
+                    onChange={e => setExportFilterDay(e.target.value)} 
+                    disabled={!exportFilterYear || exportFilterMonth === ""} 
+                    className={selectClass + " w-full text-xs"}
+                  >
                     <option value="">Select Specific Day (Optional)</option>
                     {Array.from({ length: exportDaysInSelected }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                   <Chevron />
                 </div>
                 <div className="relative">
-                  <select value={exportFilterCourier} onChange={e => setExportFilterCourier(e.target.value)} className={selectClass + " w-full text-xs"}>
+                  <select 
+                    value={exportFilterCourier} 
+                    onChange={e => setExportFilterCourier(e.target.value)} 
+                    className={selectClass + " w-full text-xs"}
+                  >
                     <option value="">All Couriers</option>
                     {allCouriers.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                   <Chevron />
                 </div>
                 <div className="relative">
-                  <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className={selectClass + " w-full text-xs"}>
+                  <select 
+                    value={sortOrder} 
+                    onChange={e => setSortOrder(e.target.value)} 
+                    className={selectClass + " w-full text-xs"}
+                  >
                     <option value="desc">Newest First</option>
                     <option value="asc">Oldest First</option>
                   </select>
@@ -661,17 +907,29 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
             <button
               className="w-full py-4 rounded-xl bg-black text-white font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-stone-800 transition-all active:scale-95 mb-4 shadow-xl shadow-stone-200"
-              onClick={() => setPreviewOpen(true)}
+              onClick={() => {
+                if (validateFutureDate(exportFilterYear, exportFilterMonth, exportFilterDay)) {
+                  showAlert("Cannot preview future dates.", "error");
+                } else {
+                  setPreviewOpen(true);
+                }
+              }}
             >
               <HiOutlineEye size={16} /> Preview Data Stream
             </button>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-black transition-all group font-black uppercase text-left" onClick={exportToPDF}>
+              <div 
+                className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-black transition-all group font-black uppercase text-left" 
+                onClick={exportToPDF}
+              >
                 <FaRegFilePdf size={28} className="text-gray-300 group-hover:text-red-500 mb-2" />
                 <p className="text-[10px] text-gray-400 group-hover:text-black tracking-widest">Generate PDF</p>
               </div>
-              <div className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-black transition-all group font-black uppercase text-left" onClick={exportToExcel}>
+              <div 
+                className="border-2 border-gray-100 rounded-2xl p-4 flex flex-col items-center cursor-pointer hover:border-black transition-all group font-black uppercase text-left" 
+                onClick={exportToExcel}
+              >
                 <FaRegFileExcel size={28} className="text-gray-300 group-hover:text-emerald-500 mb-2" />
                 <p className="text-[10px] text-gray-400 group-hover:text-black tracking-widest">Excel Sheet</p>
               </div>
@@ -682,18 +940,39 @@ const SalesTrendModal = ({ orders, onClose }) => {
 
       {previewOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-[400] p-4 text-left uppercase">
-          <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-4xl relative shadow-2xl max-h-[90vh] flex flex-col animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
-            <button className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" onClick={() => setPreviewOpen(false)}><HiX size={24} /></button>
+          <div 
+            className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-4xl relative shadow-2xl max-h-[90vh] flex flex-col animate-in zoom-in duration-300" 
+            onClick={e => e.stopPropagation()}
+          >
+            <button 
+              className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" 
+              onClick={() => setPreviewOpen(false)}
+            >
+              <HiX size={24} />
+            </button>
             <h2 className="text-xl font-black text-slate-900 mb-2 tracking-tighter leading-none">Document Preview</h2>
             <div className="mb-6 grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 uppercase font-black text-slate-800">
-              <div className="flex flex-col"><span className="text-[9px] text-gray-400 tracking-widest block mb-1">Operator</span><span className="text-xs">{exportedByName}</span></div>
-              <div className="flex flex-col"><span className="text-[9px] text-gray-400 tracking-widest block mb-1">Timestamp</span><span className="text-xs">{exportTimestamp}</span></div>
-              <div className="flex flex-col"><span className="text-[9px] text-gray-400 tracking-widest block mb-1">Volume</span><span className="text-xs text-emerald-600">{previewRows.length} RECORDS</span></div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-gray-400 tracking-widest block mb-1">Operator</span>
+                <span className="text-xs">{exportedByName}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-gray-400 tracking-widest block mb-1">Timestamp</span>
+                <span className="text-xs">{exportTimestamp}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] text-gray-400 tracking-widest block mb-1">Volume</span>
+                <span className="text-xs text-emerald-600">{previewRows.length} RECORDS</span>
+              </div>
             </div>
             <div className="overflow-auto flex-1 rounded-2xl border border-gray-100 shadow-inner">
               <table className="w-full text-left min-w-[700px] uppercase">
                 <thead className="sticky top-0 bg-black text-white text-[9px] font-black uppercase tracking-[0.2em]">
-                  <tr>{["Order ID", "Date", "Client", "Product", "Quantity", "Courier", "Total"].map(h => <th key={h} className="px-5 py-4">{h}</th>)}</tr>
+                  <tr>
+                    {["Order ID", "Date", "Client", "Product", "Quantity", "Courier", "Total"].map(h => (
+                      <th key={h} className="px-5 py-4">{h}</th>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody className="bg-white text-[10px] font-bold text-gray-700">
                   {previewRows.length > 0 ? (
@@ -709,16 +988,26 @@ const SalesTrendModal = ({ orders, onClose }) => {
                       </tr>
                     ))
                   ) : (
-                    <tr><td colSpan="7" className="px-5 py-10 text-center text-gray-400">No data available for the selected filters</td></tr>
+                    <tr>
+                      <td colSpan="7" className="px-5 py-10 text-center text-gray-400">
+                        No data available for the selected filters
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
             <div className="flex gap-4 mt-6">
-              <button className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-black/10" onClick={exportToPDF}>
+              <button 
+                className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-black/10" 
+                onClick={exportToPDF}
+              >
                 <FaRegFilePdf size={18} /> Download PDF
               </button>
-              <button className="flex-1 bg-white border-2 border-black text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all" onClick={exportToExcel}>
+              <button 
+                className="flex-1 bg-white border-2 border-black text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all" 
+                onClick={exportToExcel}
+              >
                 <FaRegFileExcel size={18} /> Download Excel
               </button>
             </div>
@@ -784,9 +1073,13 @@ const MainDashboard = () => {
 
   const currentYear = new Date().getFullYear();
   const monthlySales = Array(12).fill(0);
+  
   orders
     .filter(o => o.status === "Delivered" && o.order_date && new Date(o.order_date).getFullYear() === currentYear)
-    .forEach(o => { monthlySales[new Date(o.order_date).getMonth()] += Number(o.total_amount || 0); });
+    .forEach(o => { 
+      const mo = new Date(o.order_date).getMonth();
+      monthlySales[mo] += Number(o.total_amount || 0); 
+    });
 
   const salesData = {
     labels: MONTHS,
@@ -825,8 +1118,16 @@ const MainDashboard = () => {
       },
     },
     scales: {
-      y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
-      x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#94a3b8" }, border: { display: false } },
+      y: { 
+        grid: { color: "rgba(0,0,0,0.04)" }, 
+        ticks: { callback: (v) => formatPeso(v), font: { size: 10 }, color: "#94a3b8" }, 
+        border: { display: false } 
+      },
+      x: { 
+        grid: { display: false }, 
+        ticks: { font: { size: 10 }, color: "#94a3b8" }, 
+        border: { display: false } 
+      },
     },
   };
 
