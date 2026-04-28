@@ -1239,7 +1239,7 @@ const MainDashboard = () => {
                       <div className="flex justify-between items-center mb-1.5 text-left leading-none uppercase font-black">
                         <p className="text-[10px] text-gray-800 truncate tracking-tighter uppercase font-black leading-none">{item.name}</p>
                         <span className={`text-[8px] px-2 py-0.5 rounded-full text-white uppercase font-black ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
-                          {Number(item.current_stock) === 0 ? "Void" : "Low"}
+                          {Number(item.current_stock) === 0 ? "No Stock" : "Low Stock"}
                         </span>
                       </div>
                       <div className="w-full bg-gray-100 h-1 rounded-full overflow-hidden leading-none">
