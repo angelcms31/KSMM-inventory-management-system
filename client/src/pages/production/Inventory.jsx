@@ -337,7 +337,7 @@ export default function Inventory() {
                       </td>
                       <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
                         <span className={`px-2 lg:px-4 py-1 lg:py-1.5 rounded-xl text-[9px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
-                          {order.status === 'In Production' ? 'Production' : order.status === 'Quality Control' ? 'Quality Control' : order.status}
+                          {order.status === 'In Production' ? 'In Production' : order.status === 'Quality Control' ? 'Quality Control' : order.status}
                         </span>
                       </td>
                       <td className="py-3 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100 text-[10px] lg:text-sm">
