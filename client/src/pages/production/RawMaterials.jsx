@@ -207,7 +207,7 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
                   <td className="py-3 text-slate-900 font-black border-y border-transparent group-hover:border-slate-100 text-xs">₱{Number(m.cost_per_unit).toFixed(2)}</td>
                   <td className="py-3 border-y border-transparent group-hover:border-slate-100">
                     <span className={`px-2 lg:px-4 py-1 rounded-lg text-[8px] uppercase font-black ${getStatusStyle(m.stock_quantity, m.reorder_threshold)}`}>
-                      {parseInt(m.stock_quantity) > parseInt(m.reorder_threshold) ? 'OK' : 'Low'}
+                      {parseInt(m.stock_quantity) > parseInt(m.reorder_threshold) ? 'In Stock' : 'Low Stock'}
                     </span>
                   </td>
                   <td className="py-3 text-right pr-2 lg:pr-4 rounded-r-2xl border-y border-r border-transparent group-hover:border-slate-100">

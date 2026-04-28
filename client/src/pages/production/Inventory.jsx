@@ -261,9 +261,9 @@ export default function Inventory() {
           onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option value="All Status">All</option>
-          <option value="In Production">In Prod</option>
-          <option value="Quality Control">QC</option>
-          <option value="Complete">Done</option>
+          <option value="In Production">In Production</option>
+          <option value="Quality Control">Quality Control</option>
+          <option value="Complete">Complete</option>
         </select>
       </div>
 
@@ -275,16 +275,16 @@ export default function Inventory() {
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 lg:mt-2">Active Work Orders</p>
             </div>
             <div className="flex gap-1.5 text-[8px] lg:text-[10px] font-black uppercase flex-shrink-0">
-              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#1D7A1D] text-white">
-                {workOrders.filter(o => o.status === 'In Production').length}
-              </span>
-              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-black text-white">
-                {workOrders.filter(o => o.status === 'Quality Control').length}
-              </span>
-              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#002B5B] text-white">
-                {workOrders.filter(o => o.status === 'Complete').length}
-              </span>
-            </div>
+            <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#1D7A1D] text-white flex items-center gap-1">
+              {workOrders.filter(o => o.status === 'In Production').length} <span className="opacity-80">In Production</span>
+            </span>
+            <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-black text-white flex items-center gap-1">
+              {workOrders.filter(o => o.status === 'Quality Control').length} <span className="opacity-80">QC</span>
+            </span>
+            <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#002B5B] text-white flex items-center gap-1">
+              {workOrders.filter(o => o.status === 'Complete').length} <span className="opacity-80">Complete</span>
+            </span>
+          </div>
           </div>
 
           <div className="overflow-x-auto -mx-4 lg:mx-0 px-4 lg:px-0">
@@ -337,7 +337,7 @@ export default function Inventory() {
                       </td>
                       <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
                         <span className={`px-2 lg:px-4 py-1 lg:py-1.5 rounded-xl text-[9px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
-                          {order.status === 'In Production' ? 'Prod' : order.status === 'Quality Control' ? 'QC' : order.status}
+                          {order.status === 'In Production' ? 'Prod' : order.status === 'Quality Control' ? 'Quality Control' : order.status}
                         </span>
                       </td>
                       <td className="py-3 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100 text-[10px] lg:text-sm">
