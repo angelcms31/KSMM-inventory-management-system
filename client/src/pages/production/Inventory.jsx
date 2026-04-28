@@ -321,7 +321,7 @@ export default function Inventory() {
                             <div className="flex items-center gap-1 max-w-[120px] lg:max-w-[200px]">
                               <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider truncate max-w-[80px] lg:max-w-[120px]">{order.sku}</span>
                               <span className="text-slate-300 text-[9px] flex-shrink-0">•</span>
-                              <span className="text-slate-400 text-[9px] font-bold uppercase whitespace-nowrap flex-shrink-0">{order.quantity_needed}u</span>
+                              <span className="text-slate-400 text-[9px] font-bold uppercase whitespace-nowrap flex-shrink-0">{order.quantity_needed} unit/s</span>
                             </div>
                           </div>
                         </div>
