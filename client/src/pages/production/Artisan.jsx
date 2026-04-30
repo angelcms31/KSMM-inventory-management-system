@@ -16,15 +16,15 @@ const AlertDialog = ({ alert, onClose }) => {
         <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
           {isSuccess ? <HiCheckCircle size={44} className="text-emerald-500" /> : <HiXCircle size={44} className="text-rose-500" />}
         </div>
-        <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+        <p className={`text-xs font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
           {isSuccess ? 'Success' : 'Error'}
         </p>
-        <p className="text-slate-800 font-bold text-lg leading-snug tracking-tight mb-8">
+        <p className="text-slate-800 font-bold text-xl leading-snug tracking-tight mb-8">
           {alert.message}
         </p>
         <button
           onClick={onClose}
-          className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg
+          className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg
             ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-200'}`}
         >
           Got it
@@ -145,6 +145,12 @@ export default function Artisan() {
     setAssignForm({ ...assignForm, selectedMaterials: updated });
   };
 
+  const getAssignSelectedIds = (excludeIndex) =>
+    assignForm.selectedMaterials
+      .filter((_, i) => i !== excludeIndex)
+      .map(m => parseInt(m.material_id))
+      .filter(id => !isNaN(id));
+
   const calculateAssignSubtotal = () => assignForm.selectedMaterials.reduce((sum, item) => sum + Number(item.total || 0), 0);
 
   const handleAssignOrder = async (e) => {
@@ -175,35 +181,36 @@ export default function Artisan() {
       fetchData();
       showAlert(`Work Order WO-${selectedPendingOrder.work_order_id} assigned successfully!`, 'success');
     } catch (err) {
-  const raw = err.response?.data?.error || err.message || '';
-  if (raw.startsWith('INSUFFICIENT_STOCK::')) {
-    const [, name, needed, available] = raw.split('::');
-    showAlert(`Not enough stock for "${name}". Needed: ${needed}, Available: ${available}.`, 'error');
-  } else {
-    showAlert(raw || 'Failed to assign.', 'error');
-  }
+      const raw = err.response?.data?.error || err.message || '';
+      if (raw.startsWith('INSUFFICIENT_STOCK::')) {
+        const [, name, needed, available] = raw.split('::');
+        showAlert(`Not enough stock for "${name}". Needed: ${needed}, Available: ${available}.`, 'error');
+      } else {
+        showAlert(raw || 'Failed to assign.', 'error');
+      }
+    }
   };
-} 
+
   const PendingCard = ({ order }) => (
-    <div className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all text-left flex-shrink-0" style={{ width: `${cardWidth}px` }}>
+    <div className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all text-left flex-shrink-0" style={{ width: '260px' }}>
       <div className="flex justify-between items-start mb-3">
-        <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-          <span className="text-amber-600 text-[8px] font-black uppercase">New</span>
-        </div>
         <div className="w-12 h-12 rounded-2xl overflow-hidden border bg-slate-50 flex-shrink-0 flex items-center justify-center">
           {order.product_image ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" /> : <HiPhoto size={18} className="text-slate-200" />}
         </div>
+        <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <span className="text-amber-600 text-xs font-black uppercase">New</span>
+        </div>
       </div>
       <div className="mb-1 w-full overflow-hidden text-left">
-        <p className="font-black text-xs text-slate-900 leading-tight truncate" title={getProductName(order.sku)}>{getProductName(order.sku)}</p>
-        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 truncate">{order.sku}</p>
+        <p className="font-black text-sm text-slate-900 leading-tight truncate" title={getProductName(order.sku)}>{getProductName(order.sku)}</p>
+        <p className="text-xs text-slate-400 font-bold uppercase mt-0.5 truncate">{order.sku}</p>
       </div>
-      <div className="w-fit px-2.5 py-0.5 rounded-lg text-[8px] font-bold text-white mb-2 bg-amber-500 uppercase tracking-widest">Pending</div>
-      <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 mb-3 text-[10px] text-left">
+      <div className="w-fit px-2.5 py-0.5 rounded-lg text-xs font-bold text-white mb-2 bg-amber-500 uppercase tracking-widest">Pending</div>
+      <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 mb-3 text-sm text-left">
         <p className="text-slate-700 font-semibold">Qty: <span className="font-black text-slate-900">{order.quantity_needed} units</span></p>
-        <p className="text-slate-400 text-[9px] uppercase font-bold mt-0.5">WO-{order.work_order_id}</p>
+        <p className="text-slate-400 text-xs uppercase font-bold mt-0.5">WO-{order.work_order_id}</p>
       </div>
-      <button onClick={() => handleOpenAssign(order)} className="w-full py-2 rounded-xl bg-black text-white text-[8px] font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto shadow-sm">
+      <button onClick={() => handleOpenAssign(order)} className="w-full py-2.5 rounded-xl bg-black text-white text-[11px] font-black uppercase tracking-wide hover:bg-stone-800 transition-all mt-auto shadow-sm leading-tight">
         Assign Artisan & Materials
       </button>
     </div>
@@ -212,27 +219,27 @@ export default function Artisan() {
   const ProductionCard = ({ order }) => (
     <div className="border border-gray-200 rounded-[2rem] p-4 bg-white shadow-sm flex flex-col hover:shadow-md transition-all text-left flex-shrink-0" style={{ width: `${cardWidth}px` }}>
       <div className="flex justify-between items-start mb-3 text-left">
-        <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-left">
-          <span className="text-emerald-600 text-[8px] font-black uppercase">Prod</span>
-        </div>
         <div className="w-12 h-12 rounded-2xl overflow-hidden border bg-slate-50 flex-shrink-0 flex items-center justify-center">
           {order.product_image ? <img src={order.product_image} className="w-full h-full object-cover" alt="Product" /> : <HiPhoto size={18} className="text-slate-200" />}
         </div>
+        <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 text-left">
+          <span className="text-emerald-600 text-xs font-black uppercase">Prod</span>
+        </div>
       </div>
       <div className="mb-1 w-full overflow-hidden text-left">
-        <p className="font-black text-xs text-slate-900 leading-tight truncate uppercase" title={getProductName(order.sku)}>{getProductName(order.sku)}</p>
-        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 truncate">{order.sku}</p>
+        <p className="font-black text-sm text-slate-900 leading-tight truncate uppercase" title={getProductName(order.sku)}>{getProductName(order.sku)}</p>
+        <p className="text-xs text-slate-400 font-bold uppercase mt-0.5 truncate">{order.sku}</p>
       </div>
-      <div className="w-fit px-2.5 py-0.5 rounded-lg text-[8px] font-bold text-white mb-2 bg-[#1D7A1D] uppercase tracking-widest">In Production</div>
-      <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 mb-3 text-[10px] text-left">
+      <div className="w-fit px-2.5 py-0.5 rounded-lg text-xs font-bold text-white mb-2 bg-[#1D7A1D] uppercase tracking-widest">In Production</div>
+      <div className="bg-slate-50 border border-slate-100 rounded-xl p-2.5 mb-3 text-sm text-left">
         <p className="text-slate-700 font-semibold">Qty: <span className="font-black text-slate-900">{order.quantity_needed} units</span></p>
-        {order.first_name && <p className="text-slate-500 text-[9px] font-black truncate mt-0.5 uppercase tracking-tighter">{order.first_name} {order.last_name}</p>}
-        <p className="text-slate-400 text-[9px] uppercase font-bold mt-0.5">WO-{order.work_order_id}</p>
+        {order.first_name && <p className="text-slate-500 text-xs font-black truncate mt-0.5 uppercase tracking-tighter">{order.first_name} {order.last_name}</p>}
+        <p className="text-slate-400 text-xs uppercase font-bold mt-0.5">WO-{order.work_order_id}</p>
       </div>
       <button
         onClick={() => handleMoveToQC(order)}
         disabled={movingToQC === order.work_order_id}
-        className="w-full py-2 rounded-xl bg-black text-white text-[8px] font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-sm"
+        className="w-full py-2 rounded-xl bg-black text-white text-xs font-black uppercase tracking-wider hover:bg-stone-800 transition-all mt-auto flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-sm"
       >
         <HiShieldCheck size={12} />
         {movingToQC === order.work_order_id ? 'Moving...' : 'Move to QC'}
@@ -250,7 +257,7 @@ export default function Artisan() {
           <input
             type="text"
             placeholder="Search work orders, artisans, or SKU..."
-            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 lg:py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700 text-sm shadow-none focus:ring-0"
+            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 lg:py-3.5 pl-12 pr-4 outline-none font-bold text-slate-700 text-base shadow-none focus:ring-0"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -263,12 +270,12 @@ export default function Artisan() {
             <div className="flex justify-between items-center mb-4 lg:mb-5 flex-shrink-0">
               <div className="text-left">
                 <div className="flex items-center gap-2 flex-wrap text-left">
-                  <h2 className="text-base lg:text-xl font-black uppercase text-slate-900 leading-none tracking-tighter">Work Order Requests</h2>
+                  <h2 className="text-lg lg:text-xl font-black uppercase text-slate-900 leading-none tracking-tighter">Work Order Requests</h2>
                   {pendingOrders.length > 0 && (
-                    <span className="bg-amber-500 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">{pendingOrders.length} Pending</span>
+                    <span className="bg-amber-500 text-white text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">{pendingOrders.length} Pending</span>
                   )}
                 </div>
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Setup Production Pipeline</p>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Setup Production Pipeline</p>
               </div>
               <div className="flex gap-1.5">
                 <button onClick={() => scroll(woScrollRef, -1)} className="p-1.5 rounded-full border border-slate-200 hover:bg-slate-100 transition-all"><HiChevronLeft size={16} /></button>
@@ -276,7 +283,7 @@ export default function Artisan() {
               </div>
             </div>
             {filteredPendingOrders.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center py-10 text-slate-300 font-black uppercase text-[9px] tracking-widest italic">No requests available</div>
+              <div className="flex-1 flex items-center justify-center py-10 text-slate-300 font-black uppercase text-sm tracking-widest italic">No requests available</div>
             ) : (
               <div ref={woScrollRef} className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
                 {filteredPendingOrders.map(order => <PendingCard key={order.work_order_id} order={order} />)}
@@ -288,12 +295,12 @@ export default function Artisan() {
             <div className="flex justify-between items-center mb-4 lg:mb-5 flex-shrink-0 text-left">
               <div className="text-left">
                 <div className="flex items-center gap-2 flex-wrap text-left">
-                  <h2 className="text-base lg:text-xl font-black uppercase text-slate-900 leading-none tracking-tighter">In Production</h2>
+                  <h2 className="text-lg lg:text-xl font-black uppercase text-slate-900 leading-none tracking-tighter">In Production</h2>
                   {inProductionOrders.length > 0 && (
-                    <span className="bg-[#1D7A1D] text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">{inProductionOrders.length} Active</span>
+                    <span className="bg-[#1D7A1D] text-white text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">{inProductionOrders.length} Active</span>
                   )}
                 </div>
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Ongoing Artisan Craftsmanship</p>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Ongoing Artisan Craftsmanship</p>
               </div>
               <div className="flex gap-1.5">
                 <button onClick={() => scroll(ipScrollRef, -1)} className="p-1.5 rounded-full border border-slate-200 hover:bg-slate-100 transition-all"><HiChevronLeft size={16} /></button>
@@ -301,7 +308,7 @@ export default function Artisan() {
               </div>
             </div>
             {filteredIPOrders.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center py-10 text-slate-300 font-black uppercase text-[9px] tracking-widest italic">No active production</div>
+              <div className="flex-1 flex items-center justify-center py-10 text-slate-300 font-black uppercase text-sm tracking-widest italic">No active production</div>
             ) : (
               <div ref={ipScrollRef} className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
                 {filteredIPOrders.map(order => <ProductionCard key={order.work_order_id} order={order} />)}
@@ -315,17 +322,25 @@ export default function Artisan() {
         <div className="fixed inset-0 flex justify-center items-center z-[100] p-4 lg:p-6 text-left backdrop-blur-md bg-black/10">
           <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-2xl p-6 lg:p-10 relative shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden text-left">
             <div className="flex justify-between items-start mb-4 lg:mb-6 flex-shrink-0 text-left">
-              <div className="text-left">
-                <h2 className="text-xl lg:text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">Assign Work Order</h2>
-                <p className="text-slate-400 font-black mt-2 text-[10px] uppercase tracking-[0.15em]">WO-{selectedPendingOrder.work_order_id} · {selectedPendingOrder.sku}</p>
+              <div className="flex items-center gap-4 text-left">
+                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-slate-100 bg-slate-50 flex-shrink-0 flex items-center justify-center shadow-sm">
+                  {selectedPendingOrder.product_image
+                    ? <img src={selectedPendingOrder.product_image} className="w-full h-full object-cover" alt="Product" />
+                    : <HiPhoto size={22} className="text-slate-200" />
+                  }
+                </div>
+                <div>
+                  <h2 className="text-xl lg:text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">Assign Work Order</h2>
+                  <p className="text-slate-400 font-black mt-1 text-xs uppercase tracking-[0.15em]">WO-{selectedPendingOrder.work_order_id} · {selectedPendingOrder.sku}</p>
+                </div>
               </div>
               <button onClick={() => setShowAssignModal(false)} className="text-slate-300 hover:text-black bg-slate-50 p-2 rounded-full shadow-sm"><HiXMark size={24} /></button>
             </div>
             <form onSubmit={handleAssignOrder} className="flex-1 flex flex-col min-h-0 space-y-4 lg:space-y-6 overflow-y-auto pr-1 text-left">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assign Artisan</label>
-                  <select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs border-none shadow-none" value={assignForm.artisan_id} onChange={e => setAssignForm({ ...assignForm, artisan_id: e.target.value })}>
+                  <label className="text-sm uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assign Artisan</label>
+                  <select required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-sm border-none shadow-none" value={assignForm.artisan_id} onChange={e => setAssignForm({ ...assignForm, artisan_id: e.target.value })}>
                     <option value="">Select Personnel...</option>
                     {artisans.filter(a => a.status === 'Active').map(a => (
                       <option key={a.artisan_id} value={a.artisan_id}>{a.first_name} {a.last_name} — {a.department}</option>
@@ -333,25 +348,25 @@ export default function Artisan() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
-                  <input type="date" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs border-none shadow-none" value={assignForm.target_date} onChange={e => setAssignForm({ ...assignForm, target_date: e.target.value })} />
+                  <label className="text-sm uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
+                  <input type="date" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-sm border-none shadow-none" value={assignForm.target_date} onChange={e => setAssignForm({ ...assignForm, target_date: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1 text-left">
-                <label className="text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Output Quantity</label>
+                <label className="text-sm uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Output Quantity</label>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest ml-2">Required: {selectedPendingOrder.quantity_needed} Units</span>
+                  <span className="text-xs font-black text-amber-500 uppercase tracking-widest ml-2">Required: {selectedPendingOrder.quantity_needed} Units</span>
                   <input type="number" min="1" step="1" required className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-black text-sm border-none shadow-none" value={assignForm.quantity_needed} onChange={e => setAssignForm({ ...assignForm, quantity_needed: e.target.value })} />
                 </div>
               </div>
               <div className="text-left">
                 <div className="flex justify-between items-center mb-2 text-left">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Material Allocation</h3>
+                  <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest ml-1">Material Allocation</h3>
                   <button type="button" onClick={addMaterialToAssign} className="bg-black text-white p-1.5 rounded-lg hover:bg-stone-800 transition-all shadow-md"><HiPlusSmall size={18} /></button>
                 </div>
                 <div className="border border-slate-100 rounded-2xl overflow-y-auto bg-white max-h-[180px]">
-                  <table className="w-full text-left text-xs border-separate border-spacing-0">
-                    <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black sticky top-0 z-10 text-left">
+                  <table className="w-full text-left text-sm border-separate border-spacing-0">
+                    <thead className="bg-slate-50 text-slate-400 text-xs uppercase font-black sticky top-0 z-10 text-left">
                       <tr>
                         <th className="p-3">Resource</th>
                         <th className="p-3 text-center">Qty</th>
@@ -363,25 +378,31 @@ export default function Artisan() {
                     <tbody className="divide-y divide-slate-50 text-left">
                       {assignForm.selectedMaterials.map((item, index) => {
                         const mat = materials.find(m => m.material_id === parseInt(item.material_id));
+                        const usedIds = getAssignSelectedIds(index);
                         return (
                           <tr key={index} className="text-slate-600 font-bold hover:bg-slate-50 transition-colors text-left">
                             <td className="p-3 text-left">
-                              <select className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-[11px] border-none" value={item.material_id} onChange={e => handleAssignMaterialChange(index, 'material_id', e.target.value)}>
+                              <select
+                                className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-sm border-none"
+                                value={item.material_id}
+                                onChange={e => handleAssignMaterialChange(index, 'material_id', e.target.value)}
+                              >
                                 <option value="">Select Resource...</option>
-                                    {materials
-                                      .sort((a, b) => (a.material_name || "").localeCompare(b.material_name || ""))
-                                      .map(m => (
-                                        <option key={m.material_id} value={m.material_id}>
-                                          {m.material_name}
-                                        </option>
-                                    ))}                              
-                                    </select>
+                                {materials
+                                  .filter(m => !usedIds.includes(m.material_id))
+                                  .sort((a, b) => (a.material_name || "").localeCompare(b.material_name || ""))
+                                  .map(m => (
+                                    <option key={m.material_id} value={m.material_id}>
+                                      {m.material_name}
+                                    </option>
+                                  ))}
+                              </select>
                             </td>
                             <td className="p-3 text-center">
-                              <input type="number" min="1" step="1" className="w-12 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 font-black text-[11px]" value={item.qty} onChange={e => handleAssignMaterialChange(index, 'qty', e.target.value)} />
+                              <input type="number" min="1" step="1" className="w-12 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 font-black text-sm" value={item.qty} onChange={e => handleAssignMaterialChange(index, 'qty', e.target.value)} />
                             </td>
-                            <td className="p-3 text-center text-[10px] font-black text-slate-400 uppercase">{mat?.stock_unit || '---'}</td>
-                            <td className="p-3 text-center text-[10px] font-black">
+                            <td className="p-3 text-center text-sm font-black text-slate-400 uppercase">{mat?.stock_unit || '---'}</td>
+                            <td className="p-3 text-center text-sm font-black">
                               {mat ? <span className={parseInt(mat.stock_quantity) < item.qty ? 'text-rose-500' : 'text-emerald-500'}>{mat.stock_quantity}</span> : '---'}
                             </td>
                             <td className="p-3 text-center">
@@ -393,7 +414,7 @@ export default function Artisan() {
                         );
                       })}
                       {assignForm.selectedMaterials.length === 0 && (
-                        <tr><td colSpan="5" className="py-10 text-center text-slate-300 font-black text-[9px] uppercase tracking-widest italic">Inventory list is empty</td></tr>
+                        <tr><td colSpan="5" className="py-10 text-center text-slate-300 font-black text-sm uppercase tracking-widest italic">Inventory list is empty</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -401,12 +422,12 @@ export default function Artisan() {
               </div>
               <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0 gap-4 text-left">
                 <div className="flex flex-col text-left">
-                  <span className="text-slate-400 font-black uppercase text-[8px] tracking-[0.2em]">Estimated Overhead</span>
+                  <span className="text-slate-400 font-black uppercase text-xs tracking-[0.2em]">Estimated Overhead</span>
                   <span className="text-2xl font-black text-emerald-600 tracking-tighter leading-none">₱{calculateAssignSubtotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto text-left">
-                  <button type="button" onClick={() => setShowAssignModal(false)} className="flex-1 sm:flex-none px-6 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all active:scale-95">Cancel</button>
-                  <button type="submit" className="flex-1 sm:flex-none px-8 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest active:scale-95">Assign WO</button>
+                  <button type="button" onClick={() => setShowAssignModal(false)} className="flex-1 sm:flex-none px-6 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-sm font-black hover:bg-slate-50 transition-all active:scale-95">Cancel</button>
+                  <button type="submit" className="flex-1 sm:flex-none px-8 py-3 bg-black text-white rounded-xl uppercase text-sm font-black shadow-xl hover:bg-stone-800 transition-all tracking-widest active:scale-95">Assign WO</button>
                 </div>
               </div>
             </form>

@@ -74,6 +74,7 @@ const ManageUsers = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const usersPerPage = 9;
 
   const { alert, showAlert, closeAlert } = useAlert();
@@ -94,6 +95,7 @@ const ManageUsers = () => {
       setLoading(false);
     }
   };
+
 
   useEffect(() => { fetchUsers(); }, []);
   useEffect(() => { setCurrentPage(0); }, [searchTerm]);
@@ -154,16 +156,21 @@ const ManageUsers = () => {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
+    if(submitting) return;
     if (!formData.email.includes('@')) { showAlert("Email must contain @.", 'error'); return; }
     if (formData.contactNo.length !== 10) { showAlert("Contact number must be exactly 10 digits.", 'error'); return; }
+
+    setSubmitting(true);
     try {
       await axios.post("http://localhost:5000/api/add_user", { ...formData, creatorId: localStorage.getItem("user_id") });
+      await fetchUsers();
       setShowAddModal(false);
       setFormData(initialFormState);
-      fetchUsers();
       showAlert("User added successfully!", 'success');
     } catch (err) {
       showAlert(err.response?.data?.message || "Error adding user.", 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -530,8 +537,10 @@ const ManageUsers = () => {
                   <button type="button" onClick={closeModal} className="flex-1 py-3 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all cursor-pointer">
                     Cancel
                   </button>
-                  <button type="submit" className="flex-1 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest cursor-pointer">
-                    Confirm
+                  <button type="submit" 
+                    disabled={submitting}
+                    className={`flex-1 py-3 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest cursor-pointer ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}>                
+                    {submitting ? 'Adding' :  'Confirm'}
                   </button>
                 </div>
               </div>

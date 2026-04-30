@@ -1,8 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
-  HiMagnifyingGlass, HiPlusSmall, HiXMark, HiPhoto, HiPencil, HiTrash, HiCheckCircle
+  HiMagnifyingGlass, HiPlusSmall, HiXMark, HiPhoto, HiPencil, HiTrash, HiCheckCircle, HiXCircle
 } from 'react-icons/hi2';
+
+const AlertDialog = ({ alert, onClose }) => {
+  if (!alert) return null;
+  const isSuccess = alert.type === 'success';
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-6"
+      style={{ backdropFilter: 'blur(12px)', backgroundColor: 'rgba(0,0,0,0.25)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        style={{ animation: 'popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+          {isSuccess
+            ? <HiCheckCircle size={44} className="text-emerald-500" />
+            : <HiXCircle size={44} className="text-rose-500" />
+          }
+        </div>
+        <p className={`text-xs font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
+          {isSuccess ? 'Success' : 'Error'}
+        </p>
+        <p className="text-slate-800 font-black text-xl leading-snug tracking-tight mb-8">
+          {alert.message}
+        </p>
+        <button
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-widest text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-200'}`}
+        >
+          Got it
+        </button>
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+        <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      </div>
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.88) translateY(16px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0);    }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+const useAlert = () => {
+  const [alert, setAlert] = useState(null);
+  const showAlert = useCallback((message, type = 'success') => setAlert({ message, type }), []);
+  const closeAlert = useCallback(() => setAlert(null), []);
+  return { alert, showAlert, closeAlert };
+};
 
 export default function Inventory() {
   const [workOrders, setWorkOrders] = useState([]);
@@ -17,6 +69,7 @@ export default function Inventory() {
   const [completeOrder, setCompleteOrder] = useState(null);
   const [completeActuals, setCompleteActuals] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const { alert, showAlert, closeAlert } = useAlert();
 
   const [editForm, setEditForm] = useState({
     sku: '', quantity: '', category: '', target_date: '',
@@ -88,13 +141,13 @@ export default function Inventory() {
     if (submitting) return;
 
     if (completeActuals.length === 0) {
-      alert('No materials found for this work order.');
+      showAlert('No materials found for this work order.', 'error');
       return;
     }
 
     const hasInvalid = completeActuals.some(m => !m.actual_qty || parseInt(m.actual_qty) < 1);
     if (hasInvalid) {
-      alert('All actual quantities must be at least 1.');
+      showAlert('All actual quantities must be at least 1.', 'error');
       return;
     }
 
@@ -114,15 +167,16 @@ export default function Inventory() {
       setCompleteOrder(null);
       setCompleteActuals([]);
       fetchData();
+      showAlert('Work order completed successfully!', 'success');
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.error || err.message));
+      showAlert('Error: ' + (err.response?.data?.error || err.message), 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleOpenEdit = async (order) => {
-    if (order.status === 'Complete') return;
+    if (order.status === 'Complete' || order.status === 'Quality Control') return;
     setSelectedOrder(order);
     try {
       const res = await axios.get(`http://localhost:5000/api/work_order_materials/${order.work_order_id}`);
@@ -175,6 +229,12 @@ export default function Inventory() {
   const calculateSubtotal = () =>
     editForm.selectedMaterials.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
 
+  const getSelectedMaterialIds = (excludeIndex) =>
+    editForm.selectedMaterials
+      .filter((_, i) => i !== excludeIndex)
+      .map(m => parseInt(m.material_id))
+      .filter(id => !isNaN(id));
+
   const handleUpdate = async (e) => {
     e.preventDefault();
 
@@ -183,7 +243,7 @@ export default function Inventory() {
     );
 
     if (validMaterials.length === 0) {
-      alert('Please add at least one raw material with a valid quantity.');
+      showAlert('Please add at least one raw material with a valid quantity.', 'error');
       return;
     }
 
@@ -209,14 +269,15 @@ export default function Inventory() {
       if (res.data.success) {
         setShowEditModal(false);
         fetchData();
+        showAlert('Work order updated successfully!', 'success');
       }
     } catch (err) {
       const raw = err.response?.data?.error || err.message || '';
       if (raw.startsWith('INSUFFICIENT_STOCK::')) {
         const [, name, needed, available] = raw.split('::');
-        alert(`Not enough stock for "${name}".\nNeeded: ${needed} | Available: ${available}`);
+        showAlert(`Not enough stock for "${name}". Needed: ${needed} | Available: ${available}`, 'error');
       } else {
-        alert('Update failed: ' + raw);
+        showAlert('Update failed: ' + raw, 'error');
       }
     }
   };
@@ -244,19 +305,20 @@ export default function Inventory() {
 
   return (
     <div className="w-full h-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden">
+      <AlertDialog alert={alert} onClose={closeAlert} />
       <div className="flex-shrink-0 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-4 lg:mb-8 flex gap-3 items-center">
         <div className="relative flex-1">
-          <HiMagnifyingGlass className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <HiMagnifyingGlass className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input
             type="text"
             placeholder="Search SKU, Artisan, or Product..."
-            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 pl-10 lg:pl-12 pr-4 outline-none font-bold text-slate-700 text-sm focus:ring-2 focus:ring-black/5 transition-all"
+            className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 pl-10 lg:pl-12 pr-4 outline-none font-bold text-slate-700 text-base focus:ring-2 focus:ring-black/5 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <select
-          className="bg-[#F8F9FA] border-none rounded-2xl py-3 px-3 lg:px-6 font-bold text-slate-600 outline-none cursor-pointer text-[10px] uppercase tracking-wider"
+          className="bg-[#F8F9FA] border-none rounded-2xl py-3 px-3 lg:px-6 font-bold text-slate-600 outline-none cursor-pointer text-sm uppercase tracking-wider"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -271,32 +333,32 @@ export default function Inventory() {
         <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm p-4 lg:p-8 flex flex-col text-left">
           <div className="flex justify-between items-center mb-6 lg:mb-8 px-1 lg:px-2 flex-shrink-0 gap-3">
             <div>
-              <h1 className="text-xl lg:text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Production Orders</h1>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 lg:mt-2">Active Work Orders</p>
+              <h1 className="text-2xl lg:text-3xl font-black uppercase text-slate-900 leading-none tracking-tighter">Production Orders</h1>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 lg:mt-2">Active Work Orders</p>
             </div>
-            <div className="flex gap-1.5 text-[8px] lg:text-[10px] font-black uppercase flex-shrink-0">
-            <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#1D7A1D] text-white flex items-center gap-1">
-              {workOrders.filter(o => o.status === 'In Production').length} <span className="opacity-80">In Production</span>
-            </span>
-            <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-black text-white flex items-center gap-1">
-              {workOrders.filter(o => o.status === 'Quality Control').length} <span className="opacity-80">QC</span>
-            </span>
-            <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#002B5B] text-white flex items-center gap-1">
-              {workOrders.filter(o => o.status === 'Complete').length} <span className="opacity-80">Complete</span>
-            </span>
-          </div>
+            <div className="flex gap-1.5 text-xs font-black uppercase flex-shrink-0">
+              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#1D7A1D] text-white flex items-center gap-1">
+                {workOrders.filter(o => o.status === 'In Production').length} <span className="opacity-80">In Production</span>
+              </span>
+              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-black text-white flex items-center gap-1">
+                {workOrders.filter(o => o.status === 'Quality Control').length} <span className="opacity-80">QC</span>
+              </span>
+              <span className="px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg bg-[#002B5B] text-white flex items-center gap-1">
+                {workOrders.filter(o => o.status === 'Complete').length} <span className="opacity-80">Complete</span>
+              </span>
+            </div>
           </div>
 
           <div className="overflow-x-auto -mx-4 lg:mx-0 px-4 lg:px-0">
             <table className="w-full border-separate border-spacing-y-3 min-w-[520px]">
               <thead>
-                <tr className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                  <th className="pb-2 text-left pl-4 lg:pl-6 w-[40%] lg:w-[28%]">Product</th>
-                  <th className="pb-2 text-left w-[18%] hidden lg:table-cell">Artisan</th>
-                  <th className="pb-2 text-left w-[12%] hidden lg:table-cell">Category</th>
-                  <th className="pb-2 text-center w-[18%] lg:w-[13%]">Status</th>
-                  <th className="pb-2 text-center w-[15%] lg:w-[11%]">Cost</th>
-                  <th className="pb-2 text-right pr-4 lg:pr-8">Actions</th>
+                <tr className="text-xs font-black text-slate-300 uppercase tracking-widest">
+                  <th className="pb-2 text-left pl-4 lg:pl-6 w-[40%] lg:w-[25%]">Product</th>
+                  <th className="pb-2 text-left w-[16%] hidden lg:table-cell">Artisan</th>
+                  <th className="pb-2 text-left w-[10%] hidden lg:table-cell">Category</th>
+                  <th className="pb-2 text-center w-[20%] lg:w-[18%]">Status</th>
+                  <th className="pb-2 text-center w-[20%] lg:w-[16%]">Cost</th>
+                  <th className="pb-2 text-right pr-4 lg:pr-8 w-[20%] lg:w-[14%]">Actions</th>
                 </tr>
               </thead>
               <tbody className="font-bold text-slate-700">
@@ -315,32 +377,32 @@ export default function Inventory() {
                             }
                           </div>
                           <div className="flex flex-col items-start min-w-0">
-                            <span className="text-slate-900 font-black uppercase text-[10px] lg:text-xs mb-0.5 truncate max-w-[120px] lg:max-w-[200px]">
+                            <span className="text-slate-900 font-black uppercase text-sm mb-0.5 truncate max-w-[120px] lg:max-w-[200px]">
                               {getProductName(order.sku)}
                             </span>
                             <div className="flex items-center gap-1 max-w-[120px] lg:max-w-[200px]">
-                              <span className="text-slate-400 text-[9px] font-black uppercase tracking-wider truncate max-w-[80px] lg:max-w-[120px]">{order.sku}</span>
-                              <span className="text-slate-300 text-[9px] flex-shrink-0">•</span>
-                              <span className="text-slate-400 text-[9px] font-bold uppercase whitespace-nowrap flex-shrink-0">{order.quantity_needed} unit/s</span>
+                              <span className="text-slate-400 text-xs font-black uppercase tracking-wider truncate max-w-[80px] lg:max-w-[120px]">{order.sku}</span>
+                              <span className="text-slate-300 text-xs flex-shrink-0">•</span>
+                              <span className="text-slate-400 text-xs font-bold uppercase whitespace-nowrap flex-shrink-0">{order.quantity_needed} unit/s</span>
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 text-left text-slate-700 text-xs border-y border-transparent group-hover:border-slate-100 hidden lg:table-cell">
+                      <td className="py-3 text-left text-slate-700 text-sm border-y border-transparent group-hover:border-slate-100 hidden lg:table-cell">
                         {order.first_name && order.last_name
                           ? `${order.first_name} ${order.last_name}`
-                          : <span className="text-slate-300 italic text-xs">Unassigned</span>
+                          : <span className="text-slate-300 italic text-sm">Unassigned</span>
                         }
                       </td>
-                      <td className="py-3 text-left text-slate-400 text-[10px] uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest hidden lg:table-cell">
+                      <td className="py-3 text-left text-slate-400 text-xs uppercase font-black border-y border-transparent group-hover:border-slate-100 tracking-widest hidden lg:table-cell">
                         {displayCategory}
                       </td>
                       <td className="py-3 text-center border-y border-transparent group-hover:border-slate-100">
-                        <span className={`px-2 lg:px-4 py-1 lg:py-1.5 rounded-xl text-[9px] uppercase font-black text-white shadow-sm ${getStatusColor(order.status)}`}>
+                        <span className={`inline-flex items-center justify-center px-2 lg:px-3 py-1 lg:py-1.5 rounded-xl text-[9px] lg:text-[10px] uppercase font-black text-white shadow-sm whitespace-nowrap ${getStatusColor(order.status)}`}>
                           {order.status === 'In Production' ? 'In Production' : order.status === 'Quality Control' ? 'Quality Control' : order.status}
                         </span>
                       </td>
-                      <td className="py-3 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100 text-[10px] lg:text-sm">
+                      <td className="py-3 text-center font-black text-emerald-600 border-y border-transparent group-hover:border-slate-100 text-sm lg:text-base">
                         ₱{Number(order.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 pr-4 lg:pr-8 rounded-r-[1.5rem] lg:rounded-r-[2rem] text-right border-y border-r border-transparent group-hover:border-slate-100">
@@ -351,15 +413,15 @@ export default function Inventory() {
                               title="Mark as Complete"
                               className="p-2 lg:p-3 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-xl transition-all border border-emerald-100"
                             >
-                              <HiCheckCircle size={15} />
+                              <HiCheckCircle size={16} />
                             </button>
                           )}
                           <button
                             onClick={() => handleOpenEdit(order)}
-                            disabled={isComplete}
-                            className={`p-2 lg:p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-xl transition-all border border-slate-100 ${isComplete ? 'opacity-30 cursor-not-allowed' : ''}`}
+                            disabled={isComplete || isQC}
+                            className={`p-2 lg:p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-xl transition-all border border-slate-100 ${isComplete || isQC ? 'opacity-30 cursor-not-allowed' : ''}`}
                           >
-                            <HiPencil size={15} />
+                            <HiPencil size={16} />
                           </button>
                         </div>
                       </td>
@@ -368,7 +430,7 @@ export default function Inventory() {
                 })}
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="py-16 text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
+                    <td colSpan="6" className="py-16 text-center text-slate-300 font-black uppercase text-sm tracking-widest">
                       No Work Orders Found
                     </td>
                   </tr>
@@ -384,8 +446,8 @@ export default function Inventory() {
           <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-2xl p-6 lg:p-10 relative shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex justify-between items-start mb-4 lg:mb-6 flex-shrink-0">
               <div>
-                <h2 className="text-xl lg:text-3xl font-black text-slate-900 uppercase tracking-tighter">Complete Work Order</h2>
-                <p className="text-slate-400 font-bold mt-1 text-[10px] uppercase tracking-wider truncate max-w-[260px] lg:max-w-[420px]">
+                <h2 className="text-2xl lg:text-3xl font-black text-slate-900 uppercase tracking-tighter">Complete Work Order</h2>
+                <p className="text-slate-400 font-bold mt-1 text-xs uppercase tracking-wider truncate max-w-[260px] lg:max-w-[420px]">
                   WO-{completeOrder.work_order_id} · {completeOrder.sku.length > 20 ? completeOrder.sku.slice(0, 20) + '...' : completeOrder.sku}
                 </p>
               </div>
@@ -399,30 +461,30 @@ export default function Inventory() {
 
             <div className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 mb-4 flex gap-4 flex-wrap flex-shrink-0">
               <div>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Product</p>
-                <p className="text-xs font-black text-slate-900 truncate max-w-[130px]">{getProductName(completeOrder.sku)}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-black">Product</p>
+                <p className="text-sm font-black text-slate-900 truncate max-w-[130px]">{getProductName(completeOrder.sku)}</p>
               </div>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Artisan</p>
-                <p className="text-xs font-black text-slate-900">{completeOrder.first_name} {completeOrder.last_name}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-black">Artisan</p>
+                <p className="text-sm font-black text-slate-900">{completeOrder.first_name} {completeOrder.last_name}</p>
               </div>
               <div>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-black">Qty to Stock</p>
-                <p className="text-xs font-black text-emerald-600">+{completeOrder.quantity_needed} units</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-black">Qty to Stock</p>
+                <p className="text-sm font-black text-emerald-600">+{completeOrder.quantity_needed} units</p>
               </div>
             </div>
 
             <form onSubmit={handleCompleteSubmit} className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1">
               <div className="mb-3">
                 <div className="mb-2">
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Actual Materials Used</h3>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                     Variance = Actual − Expected
                   </p>
                 </div>
                 <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
-                  <table className="w-full text-left text-xs border-separate border-spacing-0">
-                    <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black sticky top-0 z-10">
+                  <table className="w-full text-left text-sm border-separate border-spacing-0">
+                    <thead className="bg-slate-50 text-slate-400 text-xs uppercase font-black sticky top-0 z-10">
                       <tr>
                         <th className="p-3">Material</th>
                         <th className="p-3 text-center w-20">Expected</th>
@@ -438,15 +500,15 @@ export default function Inventory() {
                         const isOver = variance > 0;
                         return (
                           <tr key={index} className="text-slate-700 font-bold hover:bg-slate-50 transition-colors">
-                            <td className="p-3 font-black text-slate-900 text-[10px]">{item.material_name}</td>
-                            <td className="p-3 text-center text-slate-400 font-black text-[10px]">{expectedQty}</td>
+                            <td className="p-3 font-black text-slate-900 text-sm">{item.material_name}</td>
+                            <td className="p-3 text-center text-slate-400 font-black text-sm">{expectedQty}</td>
                             <td className="p-3 text-center">
                               <input
                                 type="number"
                                 min="1"
                                 step="1"
                                 required
-                                className="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg py-1.5 outline-none font-black text-[10px] focus:border-black transition-colors"
+                                className="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg py-1.5 outline-none font-black text-sm focus:border-black transition-colors"
                                 value={item.actual_qty}
                                 onChange={e => {
                                   const val = parseInt(e.target.value);
@@ -458,9 +520,9 @@ export default function Inventory() {
                             </td>
                             <td className="p-3 text-center">
                               {variance === 0 ? (
-                                <span className="text-[10px] font-black text-slate-400">—</span>
+                                <span className="text-sm font-black text-slate-400">—</span>
                               ) : (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black ${isOver ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-black ${isOver ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                   {isOver ? `+${variance}` : `${variance}`}
                                 </span>
                               )}
@@ -470,7 +532,7 @@ export default function Inventory() {
                       })}
                       {completeActuals.length === 0 && (
                         <tr>
-                          <td colSpan="4" className="py-8 text-center text-slate-300 font-black text-[10px] uppercase tracking-widest">
+                          <td colSpan="4" className="py-8 text-center text-slate-300 font-black text-sm uppercase tracking-widest">
                             No materials found
                           </td>
                         </tr>
@@ -483,34 +545,34 @@ export default function Inventory() {
                   {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) > 0) && (
                     <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0"></span>
-                      <span className="text-[9px] font-black text-rose-600 uppercase tracking-wider">Overage — extra stock deducted</span>
+                      <span className="text-xs font-black text-rose-600 uppercase tracking-wider">Overage — extra stock deducted</span>
                     </div>
                   )}
                   {completeActuals.some(m => (parseInt(m.actual_qty) - Number(m.expected_qty)) < 0) && (
                     <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0"></span>
-                      <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Under usage — returned to stock</span>
+                      <span className="text-xs font-black text-emerald-600 uppercase tracking-wider">Under usage — returned to stock</span>
                     </div>
                   )}
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-slate-100 mt-auto flex-shrink-0 gap-3">
-                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest max-w-[220px] leading-relaxed hidden sm:block">
+                <p className="text-xs text-slate-400 font-black uppercase tracking-widest max-w-[220px] leading-relaxed hidden sm:block">
                   Only variance applied to stock.
                 </p>
                 <div className="flex gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => { setShowCompleteModal(false); setCompleteOrder(null); setCompleteActuals([]); }}
-                    className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
+                    className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-sm font-black hover:bg-slate-50 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 sm:flex-none px-6 py-2.5 bg-[#002B5B] text-white rounded-xl uppercase text-[10px] font-black shadow-xl hover:bg-blue-900 transition-all tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 sm:flex-none px-6 py-2.5 bg-[#002B5B] text-white rounded-xl uppercase text-sm font-black shadow-xl hover:bg-blue-900 transition-all tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {submitting ? 'Completing...' : 'Confirm'}
                   </button>
@@ -526,11 +588,11 @@ export default function Inventory() {
           <div className="bg-white rounded-[2rem] lg:rounded-[3rem] w-full max-w-4xl p-5 lg:p-8 relative shadow-2xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-100">
             <div className="flex justify-between items-start mb-4 lg:mb-6 flex-shrink-0">
               <div>
-                <h2 className="text-xl lg:text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Update Record</h2>
-                <p className="text-slate-400 font-bold mt-1 tracking-tight text-[10px] uppercase truncate max-w-[220px] lg:max-w-[400px]">WO-{selectedOrder?.work_order_id} · {selectedOrder?.sku?.length > 25 ? selectedOrder.sku.slice(0, 25) + '...' : selectedOrder?.sku}</p>
+                <h2 className="text-2xl lg:text-3xl font-black text-slate-900 leading-tight uppercase tracking-tighter">Update Record</h2>
+                <p className="text-slate-400 font-bold mt-1 tracking-tight text-xs uppercase truncate max-w-[220px] lg:max-w-[400px]">WO-{selectedOrder?.work_order_id} · {selectedOrder?.sku?.length > 25 ? selectedOrder.sku.slice(0, 25) + '...' : selectedOrder?.sku}</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className={`${getStatusColor(editForm.status)} text-white px-3 lg:px-6 py-1.5 lg:py-2 rounded-xl font-black uppercase text-[9px] shadow-sm tracking-widest select-none`}>
+                <div className={`${getStatusColor(editForm.status)} text-white px-3 lg:px-6 py-1.5 lg:py-2 rounded-xl font-black uppercase text-xs shadow-sm tracking-widest select-none`}>
                   {editForm.status}
                 </div>
                 <button
@@ -548,10 +610,10 @@ export default function Inventory() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">SKU & Product</label>
+                      <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">SKU & Product</label>
                       <select
                         required
-                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-sm"
                         value={editForm.sku}
                         onChange={e => {
                           const newSku = e.target.value;
@@ -565,10 +627,10 @@ export default function Inventory() {
                       </select>
                     </div>
                     <div className="space-y-1 text-left">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Quantity</label>
+                      <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Quantity</label>
                       <input
                         type="number" min="1" step="1" required
-                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-sm"
                         value={editForm.quantity}
                         onChange={e => setEditForm({ ...editForm, quantity: e.target.value })}
                       />
@@ -576,9 +638,9 @@ export default function Inventory() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-left">
                     <div className="space-y-1">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Category</label>
+                      <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Category</label>
                       <select
-                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-sm"
                         value={editForm.category}
                         onChange={e => setEditForm({ ...editForm, category: e.target.value })}
                       >
@@ -591,19 +653,19 @@ export default function Inventory() {
                       </select>
                     </div>
                     <div className="space-y-1 text-left">
-                      <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
+                      <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Target Date</label>
                       <input
                         type="date"
-                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
+                        className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-sm"
                         value={editForm.target_date}
                         onChange={e => setEditForm({ ...editForm, target_date: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="space-y-1 text-left">
-                    <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assigned Artisan</label>
+                    <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Assigned Artisan</label>
                     <select
-                      className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-xs"
+                      className="w-full bg-[#F3F4F6] rounded-xl p-3 outline-none font-bold text-sm"
                       value={editForm.artisan_id}
                       onChange={e => setEditForm({ ...editForm, artisan_id: e.target.value })}
                     >
@@ -623,7 +685,7 @@ export default function Inventory() {
                         : <HiPhoto size={32} className="text-slate-200" />
                       }
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                        <p className="text-white text-[8px] font-black uppercase text-center px-1">Change Photo</p>
+                        <p className="text-white text-xs font-black uppercase text-center px-1">Change Photo</p>
                       </div>
                       <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                     </div>
@@ -636,8 +698,8 @@ export default function Inventory() {
                       </button>
                     </div>
                     <div className="border border-slate-100 rounded-2xl overflow-y-auto no-scrollbar bg-white flex-1 max-h-[160px]">
-                      <table className="w-full text-left text-xs border-separate border-spacing-0">
-                        <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black border-b sticky top-0 z-10">
+                      <table className="w-full text-left text-sm border-separate border-spacing-0">
+                        <thead className="bg-slate-50 text-slate-400 text-xs uppercase font-black border-b sticky top-0 z-10">
                           <tr>
                             <th className="p-2">Material</th>
                             <th className="p-2 text-center w-14">Qty</th>
@@ -646,44 +708,49 @@ export default function Inventory() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                          {editForm.selectedMaterials.map((item, index) => (
-                            <tr key={index} className="text-slate-600 font-bold hover:bg-slate-50 transition-colors">
-                              <td className="p-2 text-left">
-                                <select
-                                  className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-[10px]"
-                                  value={item.material_id}
-                                  onChange={e => handleMaterialChange(index, 'material_id', e.target.value)}
-                                >
-                                  <option value="">Choose...</option>
-                                  {materials.map(m => (
-                                    <option key={m.material_id} value={m.material_id}>{m.material_name}</option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td className="p-2 text-center">
-                                <input
-                                  type="number" min="1" step="1"
-                                  className="w-12 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-[10px]"
-                                  value={item.qty}
-                                  onChange={e => handleMaterialChange(index, 'qty', e.target.value)}
-                                />
-                              </td>
-                              <td className="p-2 text-center text-slate-400 font-black text-[9px]">
-                                ₱{(Number(item.cost) || 0).toFixed(2)}
-                              </td>
-                              <td className="p-2 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setEditForm({ ...editForm, selectedMaterials: editForm.selectedMaterials.filter((_, i) => i !== index) })}
-                                >
-                                  <HiTrash className="text-rose-400 hover:text-rose-600 transition-colors" size={13} />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {editForm.selectedMaterials.map((item, index) => {
+                            const usedIds = getSelectedMaterialIds(index);
+                            return (
+                              <tr key={index} className="text-slate-600 font-bold hover:bg-slate-50 transition-colors">
+                                <td className="p-2 text-left">
+                                  <select
+                                    className="bg-transparent outline-none w-full font-black cursor-pointer text-slate-900 text-sm"
+                                    value={item.material_id}
+                                    onChange={e => handleMaterialChange(index, 'material_id', e.target.value)}
+                                  >
+                                    <option value="">Choose...</option>
+                                    {materials
+                                      .filter(m => !usedIds.includes(m.material_id))
+                                      .map(m => (
+                                        <option key={m.material_id} value={m.material_id}>{m.material_name}</option>
+                                      ))}
+                                  </select>
+                                </td>
+                                <td className="p-2 text-center">
+                                  <input
+                                    type="number" min="1" step="1"
+                                    className="w-12 text-center bg-slate-50 border border-slate-200 rounded-lg py-1 outline-none font-black text-sm"
+                                    value={item.qty}
+                                    onChange={e => handleMaterialChange(index, 'qty', e.target.value)}
+                                  />
+                                </td>
+                                <td className="p-2 text-center text-slate-400 font-black text-xs">
+                                  ₱{(Number(item.cost) || 0).toFixed(2)}
+                                </td>
+                                <td className="p-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditForm({ ...editForm, selectedMaterials: editForm.selectedMaterials.filter((_, i) => i !== index) })}
+                                  >
+                                    <HiTrash className="text-rose-400 hover:text-rose-600 transition-colors" size={13} />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                           {editForm.selectedMaterials.length === 0 && (
                             <tr>
-                              <td colSpan="4" className="py-6 text-center text-slate-300 font-black text-[10px] uppercase">No materials added</td>
+                              <td colSpan="4" className="py-6 text-center text-slate-300 font-black text-sm uppercase">No materials added</td>
                             </tr>
                           )}
                         </tbody>
@@ -695,7 +762,7 @@ export default function Inventory() {
 
               <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-slate-100 flex-shrink-0 gap-3">
                 <div className="flex items-center gap-4">
-                  <span className="text-slate-400 font-black uppercase text-[9px] tracking-[0.2em]">Est. Cost</span>
+                  <span className="text-slate-400 font-black uppercase text-xs tracking-[0.2em]">Est. Cost</span>
                   <span className="text-2xl lg:text-3xl font-black text-emerald-600 tracking-tighter italic">
                     ₱{calculateSubtotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
@@ -704,13 +771,13 @@ export default function Inventory() {
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
-                    className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all"
+                    className="flex-1 sm:flex-none px-5 py-2.5 border-2 border-slate-100 rounded-xl text-slate-400 uppercase text-sm font-black hover:bg-slate-50 transition-all"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 sm:flex-none px-7 py-2.5 bg-black text-white rounded-xl uppercase text-[10px] font-black shadow-2xl hover:bg-stone-800 transition-all tracking-widest"
+                    className="flex-1 sm:flex-none px-7 py-2.5 bg-black text-white rounded-xl uppercase text-sm font-black shadow-2xl hover:bg-stone-800 transition-all tracking-widest"
                   >
                     Save Changes
                   </button>

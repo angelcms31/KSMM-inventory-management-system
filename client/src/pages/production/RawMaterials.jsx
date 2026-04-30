@@ -130,11 +130,11 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
       {isStandalone && (
         <div className="flex-shrink-0 bg-white p-4 lg:p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-4 lg:mb-6 flex gap-4 items-center">
           <div className="relative flex-1">
-            <HiMagnifyingGlass className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <HiMagnifyingGlass className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
               placeholder="Search materials..."
-              className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 pl-10 lg:pl-12 pr-4 outline-none font-bold text-slate-700 text-sm"
+              className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 pl-10 lg:pl-12 pr-4 outline-none font-bold text-slate-700 text-base"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentMatPage(0); }}
             />
@@ -145,12 +145,12 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
       <section className={`bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm p-5 lg:p-10 ${isStandalone ? 'flex-1 overflow-y-auto' : ''}`}>
         <div className="flex justify-between items-center mb-6 lg:mb-10 text-slate-900 px-1 lg:px-2 gap-3">
           <div>
-            <h1 className="text-xl lg:text-3xl font-black uppercase tracking-tighter leading-none text-left">Raw Materials</h1>
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 lg:mt-2 text-left">Inventory Management</p>
+            <h1 className="text-2xl lg:text-3xl font-black uppercase tracking-tighter leading-none text-left">Raw Materials</h1>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-[0.2em] mt-1 lg:mt-2 text-left">Inventory Management</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <select
-              className="bg-[#F8F9FA] border-none rounded-xl py-2 px-2 lg:px-3 font-bold text-slate-500 outline-none text-[10px] cursor-pointer hidden sm:block"
+              className="bg-[#F8F9FA] border-none rounded-xl py-2 px-2 lg:px-3 font-bold text-slate-500 outline-none text-sm cursor-pointer hidden sm:block"
               value={filterInvStatus}
               onChange={(e) => setFilterInvStatus(e.target.value)}
             >
@@ -164,7 +164,7 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
             </div>
             <button
               onClick={() => { setIsUpdateMat(false); setMatForm(EMPTY_FORM); setImagePreview(null); setShowMatModal(true); }}
-              className="bg-black text-white px-3 lg:px-6 py-2 lg:py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg hover:scale-105 transition-all whitespace-nowrap"
+              className="bg-black text-white px-3 lg:px-6 py-2 lg:py-2.5 rounded-xl text-sm font-black uppercase shadow-lg hover:scale-105 transition-all whitespace-nowrap"
             >
               + Add
             </button>
@@ -174,7 +174,7 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
         <div className="overflow-x-auto -mx-5 lg:mx-0 px-5 lg:px-0">
           <table className="w-full text-center border-separate border-spacing-y-2 min-w-[480px]">
             <thead>
-              <tr className="text-[10px] font-black text-slate-300 uppercase tracking-widest border-b">
+              <tr className="text-xs font-black text-slate-300 uppercase tracking-widest border-b">
                 <th className="pb-4">Image</th>
                 <th className="pb-4 text-left">Material</th>
                 <th className="pb-4 hidden sm:table-cell">Code</th>
@@ -193,20 +193,20 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
                       {m.material_image ? <img src={m.material_image} className="w-full h-full object-cover" alt="Material" /> : <HiPhoto className="text-slate-300" size={18} />}
                     </div>
                   </td>
-                  <td className="py-3 text-left uppercase text-slate-900 font-black border-y border-transparent group-hover:border-slate-100 text-[10px] lg:text-xs truncate max-w-[100px] lg:max-w-[150px]">{m.material_name}</td>
-                  <td className="py-3 text-slate-400 text-[10px] font-bold border-y border-transparent group-hover:border-slate-100 hidden sm:table-cell">{m.unique_code}</td>
+                  <td className="py-3 text-left uppercase text-slate-900 font-black border-y border-transparent group-hover:border-slate-100 text-sm truncate max-w-[100px] lg:max-w-[150px]">{m.material_name}</td>
+                  <td className="py-3 text-slate-400 text-sm font-bold border-y border-transparent group-hover:border-slate-100 hidden sm:table-cell">{m.unique_code}</td>
                   <td className="py-3 border-y border-transparent group-hover:border-slate-100">
                     <div className="flex flex-col items-center">
-                      <span className="text-sm lg:text-[14px] text-slate-900 font-black leading-none">{m.stock_quantity}</span>
-                      <span className="text-[8px] text-slate-400 uppercase font-bold mt-1">Min: {m.reorder_threshold}</span>
+                      <span className="text-base text-slate-900 font-black leading-none">{m.stock_quantity}</span>
+                      <span className="text-xs text-slate-400 uppercase font-bold mt-1">Min: {m.reorder_threshold}</span>
                     </div>
                   </td>
                   <td className="py-3 border-y border-transparent group-hover:border-slate-100 hidden md:table-cell">
-                    <span className="text-[10px] text-slate-500 font-black uppercase tracking-wide">{m.stock_unit || '---'}</span>
+                    <span className="text-sm text-slate-500 font-black uppercase tracking-wide">{m.stock_unit || '---'}</span>
                   </td>
-                  <td className="py-3 text-slate-900 font-black border-y border-transparent group-hover:border-slate-100 text-xs">₱{Number(m.cost_per_unit).toFixed(2)}</td>
+                  <td className="py-3 text-slate-900 font-black border-y border-transparent group-hover:border-slate-100 text-sm">₱{Number(m.cost_per_unit).toFixed(2)}</td>
                   <td className="py-3 border-y border-transparent group-hover:border-slate-100">
-                    <span className={`px-2 lg:px-4 py-1 rounded-lg text-[8px] uppercase font-black ${getStatusStyle(m.stock_quantity, m.reorder_threshold)}`}>
+                    <span className={`px-2 lg:px-4 py-1 rounded-lg text-xs uppercase font-black ${getStatusStyle(m.stock_quantity, m.reorder_threshold)}`}>
                       {parseInt(m.stock_quantity) > parseInt(m.reorder_threshold) ? 'In Stock' : 'Low Stock'}
                     </span>
                   </td>
@@ -250,28 +250,50 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
                       : <HiPhoto size={32} className="text-slate-200" />
                   }
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <p className="text-white text-[9px] font-black uppercase text-center">Upload Photo</p>
+                    <p className="text-white text-xs font-black uppercase text-center">Upload Photo</p>
                   </div>
                   <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 lg:gap-6 font-bold text-left">
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Material Name</label>
-                  <input required className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-black text-sm" value={matForm.material_name} onChange={e => setMatForm({ ...matForm, material_name: e.target.value })} />
+                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">
+                    Material Name
+                    <span className="ml-2 text-slate-300 normal-case tracking-normal font-bold">
+                      ({(matForm.material_name || '').length}/30)
+                    </span>
+                  </label>
+                  <input
+                    required
+                    maxLength={30}
+                    className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 outline-none font-black text-sm"
+                    value={matForm.material_name}
+                    onChange={e => setMatForm({ ...matForm, material_name: e.target.value.slice(0, 30) })}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Unique Code</label>
+                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Unique Code</label>
                   <input disabled className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 opacity-50 outline-none cursor-not-allowed font-black text-sm" value={matForm.unique_code} />
                 </div>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 font-black">
                 <div className="space-y-2 text-left">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-1">Stock</label>
-                  <input type="number" min="0" step="1" required className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm" value={matForm.stock_quantity} onChange={e => setMatForm({ ...matForm, stock_quantity: e.target.value })} />
+                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Stock</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
+                    value={matForm.stock_quantity}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      setMatForm({ ...matForm, stock_quantity: isNaN(val) ? '' : Math.max(0, val) });
+                    }}
+                  />
                 </div>
                 <div className="space-y-2 text-left">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-1">Unit</label>
+                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Unit</label>
                   <select className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm font-black" value={matForm.stock_unit} onChange={e => setMatForm({ ...matForm, stock_unit: e.target.value })}>
                     {UNIT_OPTIONS.map(u => (
                       <option key={u.value} value={u.value}>{u.label}</option>
@@ -279,17 +301,39 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
                   </select>
                 </div>
                 <div className="space-y-2 text-left">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-1">Min Threshold</label>
-                  <input type="number" min="0" step="1" required className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm" value={matForm.reorder_threshold} onChange={e => setMatForm({ ...matForm, reorder_threshold: e.target.value })} />
+                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Min Threshold</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    required
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
+                    value={matForm.reorder_threshold}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      setMatForm({ ...matForm, reorder_threshold: isNaN(val) ? '' : Math.max(0, val) });
+                    }}
+                  />
                 </div>
                 <div className="space-y-2 text-left">
-                  <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-1">Unit Price</label>
-                  <input type="number" step="0.01" required className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm" value={matForm.cost_per_unit} onChange={e => setMatForm({ ...matForm, cost_per_unit: e.target.value })} />
+                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Unit Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
+                    value={matForm.cost_per_unit}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      setMatForm({ ...matForm, cost_per_unit: isNaN(val) ? '' : Math.max(0, val) });
+                    }}
+                  />
                 </div>
               </div>
               <div className="flex gap-3 pt-1 justify-end flex-shrink-0">
-                <button type="button" onClick={closeModal} className="px-6 lg:px-10 py-3 lg:py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-[10px] font-black hover:bg-slate-50 transition-all">Cancel</button>
-                <button type="submit" className="px-8 lg:px-12 py-3 lg:py-4 bg-black text-white rounded-2xl uppercase text-[10px] font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm</button>
+                <button type="button" onClick={closeModal} className="px-6 lg:px-10 py-3 lg:py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-sm font-black hover:bg-slate-50 transition-all">Cancel</button>
+                <button type="submit" className="px-8 lg:px-12 py-3 lg:py-4 bg-black text-white rounded-2xl uppercase text-sm font-black shadow-xl transition-all hover:bg-stone-800 tracking-widest">Confirm</button>
               </div>
             </form>
           </div>
