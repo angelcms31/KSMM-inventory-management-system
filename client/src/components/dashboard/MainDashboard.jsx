@@ -74,7 +74,7 @@ const AlertDialog = ({ alert, onClose }) => {
           )}
           <button onClick={onClose} className={`w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] ${isSuccess ? 'text-emerald-600 bg-emerald-50' : 'bg-rose-500 text-white shadow-lg shadow-rose-200'}`}>Close</button>
         </div>
-        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-50'}`} />
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
       </div>
     </div>
   );
@@ -474,6 +474,7 @@ const MainDashboard = () => {
   const lowStockProducts = products.filter(p => Number(p.current_stock) <= Number(p.min_stocks));
   const inTransitOrders = [...orders.filter(o => o.status === "Shipped")].sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
   const totalDeliveries = inTransitOrders.length;
+  const currentDeliveryOrder = inTransitOrders[deliveryPage] || null;
 
   const topProducts = [...products]
     .map(p => ({
@@ -521,6 +522,7 @@ const MainDashboard = () => {
       {showTrendModal && <SalesTrendModal orders={orders} onClose={() => setShowTrendModal(false)} />}
 
       <div className="flex-1 overflow-hidden flex flex-col px-5 pt-5 pb-4 gap-4 min-h-0">
+
         <div className="flex items-center justify-between flex-shrink-0">
           <div>
             <h1 className="text-3xl font-black text-gray-900 tracking-tighter leading-none uppercase">Dashboard</h1>
@@ -600,8 +602,7 @@ const MainDashboard = () => {
                     <div className="flex justify-between items-center mb-1">
                       <p className="text-xs font-black text-gray-800 truncate uppercase">{item.name}</p>
                       <span className={`text-[8px] px-1.5 py-0.5 rounded-full text-white font-black uppercase ml-2 flex-shrink-0 ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-400'}`}>
-                        {item.current_stock}
-                      </span>
+                    {Number(item.current_stock) === 0 ? "No Stock" : "Low Stock"}                      </span>
                     </div>
                     <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
                       <div className={`h-full transition-all duration-700 ${Number(item.current_stock) === 0 ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${Math.max((item.current_stock / (item.min_stocks || 1)) * 100, 4)}%` }} />
@@ -621,17 +622,17 @@ const MainDashboard = () => {
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => setDeliveryPage(p => Math.max(p - 1, 0))} disabled={deliveryPage === 0} className="w-6 h-6 rounded-full border border-gray-100 flex items-center justify-center disabled:opacity-20 hover:bg-gray-50 transition-all">
+                <button onClick={() => setDeliveryPage(p => Math.max(p - 1, 0))} disabled={deliveryPage === 0} className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center disabled:opacity-20 hover:bg-gray-50 transition-all">
                   <ChevronLeft size={12} />
                 </button>
-                <button onClick={() => setDeliveryPage(p => Math.min(p + 1, totalDeliveries - 1))} disabled={deliveryPage >= totalDeliveries - 1} className="w-6 h-6 rounded-full border border-gray-100 flex items-center justify-center disabled:opacity-20 hover:bg-gray-50 transition-all">
+                <button onClick={() => setDeliveryPage(p => Math.min(p + 1, totalDeliveries - 1))} disabled={deliveryPage >= totalDeliveries - 1} className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center disabled:opacity-20 hover:bg-gray-50 transition-all">
                   <ChevronRight size={12} />
                 </button>
               </div>
             </div>
 
             {inTransitOrders[deliveryPage] ? (
-              <div className="flex-1 border border-blue-100/50 rounded-2xl p-4 bg-white flex flex-col relative overflow-hidden">
+              <button onClick={() => setSelectedOrder(inTransitOrders[deliveryPage])} className="flex-1 border border-blue-100/50 rounded-2xl p-4 bg-white flex flex-col relative overflow-hidden hover:border-blue-300 transition-all text-left">
                 <div className="flex justify-between items-start mb-1">
                   <div className="min-w-0">
                     <p className="text-lg font-black text-blue-900 truncate uppercase tracking-tight leading-none">{inTransitOrders[deliveryPage].client_name}</p>
@@ -655,7 +656,7 @@ const MainDashboard = () => {
                   </div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{inTransitOrders[deliveryPage].platform || "SHOPEE"}</p>
                 </div>
-              </div>
+              </button>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-50 rounded-2xl gap-3">
                  <Truck size={32} className="opacity-20" />

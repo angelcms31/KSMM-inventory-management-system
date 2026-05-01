@@ -276,60 +276,52 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
                   <input disabled className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 opacity-50 outline-none cursor-not-allowed font-black text-sm" value={matForm.unique_code} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 font-black">
-                <div className="space-y-2 text-left">
-                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Stock</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
-                    value={matForm.stock_quantity}
-                    onChange={e => {
-                      const val = parseInt(e.target.value);
-                      setMatForm({ ...matForm, stock_quantity: isNaN(val) ? '' : Math.max(0, val) });
-                    }}
-                  />
-                </div>
-                <div className="space-y-2 text-left">
-                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Unit</label>
-                  <select className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm font-black" value={matForm.stock_unit} onChange={e => setMatForm({ ...matForm, stock_unit: e.target.value })}>
-                    {UNIT_OPTIONS.map(u => (
-                      <option key={u.value} value={u.value}>{u.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2 text-left">
-                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Min Threshold</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    required
-                    className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
-                    value={matForm.reorder_threshold}
-                    onChange={e => {
-                      const val = parseInt(e.target.value);
-                      setMatForm({ ...matForm, reorder_threshold: isNaN(val) ? '' : Math.max(0, val) });
-                    }}
-                  />
-                </div>
-                <div className="space-y-2 text-left">
-                  <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Unit Price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
-                    value={matForm.cost_per_unit}
-                    onChange={e => {
-                      const val = parseFloat(e.target.value);
-                      setMatForm({ ...matForm, cost_per_unit: isNaN(val) ? '' : Math.max(0, val) });
-                    }}
-                  />
-                </div>
+              {/* Hanapin ang grid-cols-2 lg:grid-cols-4 na div */}
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 font-black">
+  <div className="flex flex-col justify-end space-y-2 text-left">
+    <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Stock</label>
+    <input
+      type="number" min="0" step="1" required
+      className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
+      value={matForm.stock_quantity}
+      onChange={e => {
+        const val = parseInt(e.target.value);
+        setMatForm({ ...matForm, stock_quantity: isNaN(val) ? '' : Math.max(0, val) });
+      }}
+    />
+  </div>
+  <div className="flex flex-col justify-end space-y-2 text-left">
+    <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Unit</label>
+    <select className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm font-black" value={matForm.stock_unit} onChange={e => setMatForm({ ...matForm, stock_unit: e.target.value })}>
+      {UNIT_OPTIONS.map(u => (
+        <option key={u.value} value={u.value}>{u.label}</option>
+      ))}
+    </select>
+  </div>
+  <div className="flex flex-col justify-end space-y-2 text-left">
+    <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1 leading-tight">Min Threshold</label>
+    <input
+      type="number" min="0" step="1" required
+      className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
+      value={matForm.reorder_threshold}
+      onChange={e => {
+        const val = parseInt(e.target.value);
+        setMatForm({ ...matForm, reorder_threshold: isNaN(val) ? '' : Math.max(0, val) });
+      }}
+    />
+  </div>
+  <div className="flex flex-col justify-end space-y-2 text-left">
+    <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Unit Price</label>
+    <input
+      type="number" step="0.01" min="0" required
+      className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
+      value={matForm.cost_per_unit}
+      onChange={e => {
+        const val = parseFloat(e.target.value);
+        setMatForm({ ...matForm, cost_per_unit: isNaN(val) ? '' : Math.max(0, val) });
+      }}
+    />
+  </div>
               </div>
               <div className="flex gap-3 pt-1 justify-end flex-shrink-0">
                 <button type="button" onClick={closeModal} className="px-6 lg:px-10 py-3 lg:py-4 border-2 border-slate-100 rounded-2xl text-slate-400 uppercase text-sm font-black hover:bg-slate-50 transition-all">Cancel</button>
