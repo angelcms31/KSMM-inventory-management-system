@@ -517,8 +517,7 @@ const MainDashboard = () => {
   ];
 
   return (
-    <div className="w-full h-full overflow-hidden bg-[#f4f6f9] font-sans text-left flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} products={products} />}
+<div className="w-full h-full overflow-hidden bg-[#f4f6f9] dashboard-container text-left flex flex-col">      {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} products={products} />}
       {showTrendModal && <SalesTrendModal orders={orders} onClose={() => setShowTrendModal(false)} />}
 
       <div className="flex-1 overflow-hidden flex flex-col px-5 pt-5 pb-4 gap-4 min-h-0">
@@ -550,8 +549,7 @@ const MainDashboard = () => {
           ))}
         </div>
 
-        <div className="flex-1 grid grid-cols-12 grid-rows-2 gap-3 min-h-0">
-          <div className="col-span-9 row-span-1 bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col min-h-0">
+<div className="flex-1 grid grid-cols-12 gap-3 min-h-0" style={{ gridTemplateRows: "1.4fr 1fr" }}>          <div className="col-span-9 row-span-1 bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col min-h-0">
             <div className="flex items-start justify-between mb-4 flex-shrink-0">
               <div>
                 <h3 className="text-base font-black text-gray-900 uppercase tracking-tight">Monthly Revenue</h3>
@@ -667,12 +665,25 @@ const MainDashboard = () => {
         </div>
       </div>
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&display=swap');
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-      `}</style>
+ <style>{`
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;0,900;1,400&display=swap');
+  .dashboard-container {
+    font-family: 'DM Sans', sans-serif !important;
+    letter-spacing: -0.01em;
+  }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  @keyframes popIn { 
+    from { opacity: 0; transform: scale(0.95) translateY(10px); } 
+    to { opacity: 1; transform: scale(1) translateY(0); } 
+  }
+
+  .font-black { font-weight: 900 !important; }
+  .font-bold { font-weight: 700 !important; }
+  .font-medium { font-weight: 500 !important; }
+`}</style>
     </div>
   );
 };

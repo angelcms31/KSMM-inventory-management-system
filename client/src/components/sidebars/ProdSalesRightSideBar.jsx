@@ -194,17 +194,17 @@ const ProdSalesRightSidebar = () => {
     <>
       {isCollapsed ? (
         <button
-          onClick={() => setSidebarWidth(DEFAULT_WIDTH)}
-          className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
-          title="Expand sidebar"
-        >
-          <div className="relative">
-            <HiOutlineBell size={18} className="text-gray-300" />
-            {lowStockLogs.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]"></span>
-            )}
-          </div>
-        </button>
+    onClick={() => setSidebarWidth(DEFAULT_WIDTH)}
+    className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
+    title="Expand sidebar"
+  >
+    <div className="relative">
+      <HiOutlineMenuAlt3 size={20} className="text-gray-300" />
+      {lowStockLogs.length > 0 && (
+        <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]"></span>
+      )}
+    </div>
+  </button>
       ) : (
         <div 
           className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0"
