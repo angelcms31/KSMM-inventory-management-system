@@ -49,6 +49,11 @@ const AlertDialog = ({ alert, onClose }) => {
   );
 };
 
+const COLLAPSE_THRESHOLD = 160;
+const MIN_WIDTH = 0;
+const MAX_WIDTH = 480;
+const DEFAULT_WIDTH = 280;
+
 const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   const [activities, setActivities] = useState([]);
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
@@ -75,8 +80,38 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [isFromPO, setIsFromPO] = useState(false);
   const [sidebarAlert, setSidebarAlert] = useState(null);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
   const bodyRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const startResizing = useCallback((e) => {
+    setIsResizing(true);
+    e.preventDefault();
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((e) => {
+    if (!isResizing) return;
+    const newWidth = window.innerWidth - e.clientX;
+    const clamped = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
+    setSidebarWidth(clamped <= COLLAPSE_THRESHOLD ? MIN_WIDTH : clamped);
+  }, [isResizing]);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", resize);
+    window.addEventListener("mouseup", stopResizing);
+    return () => {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [resize, stopResizing]);
 
   useEffect(() => {
     if (!pendingCompose || !pendingCompose.to) return;
@@ -114,7 +149,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     }, 100);
 
     return () => clearInterval(injectInterval);
-  }, [pendingCompose]);
+  }, [pendingCompose, onComposeHandled]);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return "Just now";
@@ -301,228 +336,229 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     return () => clearInterval(interval);
   }, []);
 
-  return (
-    <>
-      <AlertDialog alert={sidebarAlert} onClose={() => setSidebarAlert(null)} />
-      <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
-        <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 z-40 overflow-hidden">
-          {showNotifications && (
-            <div className="absolute inset-0 bg-[#262221] z-50 flex flex-col">
-              <div className="p-5 flex items-center justify-between border-b border-white/5">
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setShowNotifications(false)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
-                    <HiChevronLeft size={18} className="text-gray-400" />
-                  </button>
-                  <div>
-                    <h4 className="text-[14px] font-bold text-white">Finance Alerts</h4>
-                    <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Stock Activity</p>
+  const SidebarContent = () => (
+    <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 z-40 overflow-hidden">
+      {showNotifications && (
+        <div className="absolute inset-0 bg-[#262221] z-50 flex flex-col">
+          <div className="p-5 flex items-center justify-between border-b border-white/5">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowNotifications(false)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
+                <HiChevronLeft size={18} className="text-gray-400" />
+              </button>
+              <div>
+                <h4 className="text-[14px] font-bold text-white">Finance Alerts</h4>
+                <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Stock Activity</p>
+              </div>
+            </div>
+            {lowStockAlerts.length > 0 && (
+              <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
+                {lowStockAlerts.length} alert{lowStockAlerts.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 overflow-y-auto text-left">
+            {lowStockAlerts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-3">
+                <span className="text-4xl">📦</span>
+                <p className="text-gray-600 text-[12px] font-bold">No critical stock alerts</p>
+              </div>
+            ) : (
+              <div className="p-4 space-y-3">
+                {lowStockAlerts.map(alert => (
+                  <div
+                    key={alert.id}
+                    onClick={() => handleTakeAction(alert.id)}
+                    className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 cursor-pointer hover:bg-rose-500/20 transition-all text-left"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-rose-500 font-black text-[10px] uppercase">Low Stock Alert</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    </div>
+                    <p className="text-white text-xs font-bold uppercase">{alert.name}</p>
+                    <p className="text-gray-400 text-[10px] mt-1 italic">
+                      Current: <span className="text-rose-400 font-black">{alert.current}</span> / Level: {alert.threshold}
+                    </p>
+                    <p className="mt-3 text-[9px] font-black uppercase text-rose-400 flex items-center gap-1">Take Action →</p>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="p-4 border-t border-white/5">
+            <button
+              onClick={() => setShowNotifications(false)}
+              className="w-full text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors py-2"
+            >
+              ← Back to Sidebar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="p-6 flex items-center justify-between">
+        <div className="flex items-center space-x-3 text-left">
+          <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10">
+            <img
+              src={profilePic ? (profilePic.startsWith('data:') || profilePic.startsWith('http') ? profilePic : `http://localhost:5000${profilePic}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`}
+              alt="User"
+              className="w-full h-full object-cover"
+              onError={e => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`; }}
+            />
+          </div>
+          <div>
+            <h4 className="text-[14px] font-bold leading-none">{userName}</h4>
+            <p className="text-[11px] text-gray-500 mt-1.5 uppercase tracking-widest font-black">{userRole}</p>
+          </div>
+        </div>
+        <button onClick={() => setShowNotifications(true)} className="relative cursor-pointer p-1.5 rounded-full hover:bg-white/5 transition-all duration-200 active:scale-90">
+          <HiOutlineBell size={22} className="text-gray-400 hover:text-white transition-colors duration-200" />
+          {lowStockAlerts.length > 0 && (
+            <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 rounded-full border-2 border-[#262221] flex items-center justify-center">
+              <span className="text-[8px] font-black text-white px-0.5">{lowStockAlerts.length > 9 ? '9+' : lowStockAlerts.length}</span>
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="px-6 mb-4 text-left">
+        <div className="bg-[#1e1b1a] rounded-xl p-4 border border-white/5">
+          <h5 className="text-[12px] font-black text-gray-400 uppercase tracking-widest mb-5">Recent Activities</h5>
+          <div className="space-y-6">
+            {activities.length > 0 ? activities.map((log, i) => (
+              <div key={i} className="flex justify-between items-start">
+                <div className="flex-grow pr-2 min-w-0">
+                  <p className="text-[12px] font-bold leading-tight text-gray-200 truncate">{log.action}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 truncate italic">By {log.merged_name}</p>
+                  <p className="text-[10px] text-gray-600 mt-1">{formatTime(log.timestamp)}</p>
                 </div>
-                {lowStockAlerts.length > 0 && (
-                  <span className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
-                    {lowStockAlerts.length} alert{lowStockAlerts.length !== 1 ? 's' : ''}
-                  </span>
-                )}
+                <span className={`${getStatusStyle(log.action)} text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-tighter flex-shrink-0`}>
+                  {log.action?.split(' ')[0] || 'LOG'}
+                </span>
               </div>
-              <div className="flex-1 overflow-y-auto text-left">
-                {lowStockAlerts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-3">
-                    <span className="text-4xl">📦</span>
-                    <p className="text-gray-600 text-[12px] font-bold">No critical stock alerts</p>
-                  </div>
-                ) : (
-                  <div className="p-4 space-y-3">
-                    {lowStockAlerts.map(alert => (
-                      <div
-                        key={alert.id}
-                        onClick={() => handleTakeAction(alert.id)}
-                        className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 cursor-pointer hover:bg-rose-500/20 transition-all text-left"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-rose-500 font-black text-[10px] uppercase">Low Stock Alert</span>
-                          <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                        </div>
-                        <p className="text-white text-xs font-bold uppercase">{alert.name}</p>
-                        <p className="text-gray-400 text-[10px] mt-1 italic">
-                          Current: <span className="text-rose-400 font-black">{alert.current}</span> / Level: {alert.threshold}
-                        </p>
-                        <p className="mt-3 text-[9px] font-black uppercase text-rose-400 flex items-center gap-1">Take Action →</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="p-4 border-t border-white/5">
-                <button
-                  onClick={() => setShowNotifications(false)}
-                  className="w-full text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors py-2"
-                >
-                  ← Back to Sidebar
+            )) : (
+              <p className="text-[11px] text-gray-600 text-center py-4 italic">No activity yet</p>
+            )}
+          </div>
+          <button onClick={navigateToAudit} className="text-[10px] text-gray-500 mt-6 hover:text-white font-bold transition-colors uppercase tracking-widest">
+            VIEW ALL
+          </button>
+        </div>
+      </div>
+
+      <div className="px-6 flex-grow pb-6 overflow-hidden text-left flex flex-col">
+        <div className="bg-[#1e1b1a] flex-1 rounded-xl p-4 border border-white/5 flex flex-col overflow-hidden relative">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex bg-black/20 p-1 rounded-lg">
+              <button onClick={() => setViewMode('inbox')} className={`px-3 py-1 text-[10px] font-black uppercase rounded-md transition-all ${viewMode === 'inbox' ? 'bg-white text-black' : 'text-gray-500'}`}>Inbox</button>
+              <button onClick={() => setViewMode('sent')} className={`px-3 py-1 text-[10px] font-black uppercase rounded-md transition-all ${viewMode === 'sent' ? 'bg-white text-black' : 'text-gray-500'}`}>Sent</button>
+            </div>
+            {gmailConnected && (
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => { setShowCompose(true); setComposeMinimized(false); }} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Compose">
+                  <HiOutlinePaperAirplane size={13} className="text-gray-400" />
                 </button>
+                <button onClick={fetchGmailMessages} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Refresh">
+                  <HiOutlineRefresh size={13} className="text-gray-400" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {gmailLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-gray-600 text-[10px] uppercase font-black tracking-widest">Loading...</p>
+                </div>
+              </div>
+            ) : !gmailConnected ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-3">
+                  <HiOutlinePaperAirplane className="text-gray-600 rotate-90" size={20} />
+                </div>
+                <p className="text-gray-400 text-[11px] font-bold mb-1">Gmail Disconnected</p>
+                <button onClick={handleConnect} className="w-full text-[10px] font-black uppercase tracking-widest bg-white text-black py-2.5 rounded-lg hover:bg-gray-200 transition-colors shadow-lg">
+                  Connect Gmail
+                </button>
+              </div>
+            ) : (viewMode === 'inbox' ? messages : sentMessages).length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <p className="text-gray-600 text-[11px] italic">No {viewMode} messages</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {(viewMode === 'inbox' ? messages : sentMessages).map(msg => (
+                  <div key={msg.id} onClick={() => setSelected(msg)} className={`px-2 py-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 ${msg.isUnread ? 'bg-white/[0.03]' : ''}`}>
+                    <div className="flex items-start gap-2">
+                      <img
+                        src={msg.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'S')}&background=random&color=fff&size=40&bold=true`}
+                        alt={msg.senderName}
+                        className="w-7 h-7 rounded-full shrink-0 object-cover mt-0.5"
+                        onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || '?')}&background=random&color=fff&size=40&bold=true`; }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className={`text-[11px] truncate max-w-[65%] ${msg.isUnread ? 'font-semibold text-white' : 'font-medium text-gray-300'}`}>
+                            {msg.senderName || formatFrom(msg.from)}
+                          </span>
+                          <span className="text-[9px] text-gray-600 shrink-0">{formatDate(msg.date)}</span>
+                        </div>
+                        <p className={`text-[10px] truncate mb-0.5 ${msg.isUnread ? 'text-gray-200' : 'text-gray-500'}`}>{msg.subject}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selected && (
+            <div className="absolute inset-0 bg-[#1e1b1a] z-30 flex flex-col p-4">
+              <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                <button onClick={() => setSelected(null)} className="p-1 hover:bg-white/5 rounded-md">
+                  <HiChevronLeft size={20} />
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setComposeTo(selected.senderEmail || "");
+                      setComposeSubject(`Re: ${selected.subject}`);
+                      if (bodyRef.current) bodyRef.current.innerHTML = "";
+                      setSelected(null);
+                      setShowCompose(true);
+                      setComposeMinimized(false);
+                    }}
+                    className="text-[10px] font-bold text-indigo-400 px-2 py-1 hover:bg-white/5 rounded"
+                  >
+                    REPLY
+                  </button>
+                  <button onClick={() => setSelected(null)} className="text-[10px] font-bold text-gray-500 hover:text-white">CLOSE</button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <h2 className="text-[14px] font-bold mb-2 leading-tight text-white">{selected.subject}</h2>
+                <div className="text-[11px] mb-4">
+                  <span className="text-gray-500 font-medium">From:</span>{' '}
+                  <span className="text-white">{selected.from}</span>
+                </div>
+                <div className="text-[12px] text-gray-300 leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: selected.snippet || "(No content)" }} />
               </div>
             </div>
           )}
-
-          <div className="p-6 flex items-center justify-between">
-            <div className="flex items-center space-x-3 text-left">
-              <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10">
-                <img
-                  src={profilePic ? (profilePic.startsWith('data:') || profilePic.startsWith('http') ? profilePic : `http://localhost:5000${profilePic}`) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`}
-                  alt="User"
-                  className="w-full h-full object-cover"
-                  onError={e => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${userName}`; }}
-                />
-              </div>
-              <div>
-                <h4 className="text-[14px] font-bold leading-none">{userName}</h4>
-                <p className="text-[11px] text-gray-500 mt-1.5 uppercase tracking-widest font-black">{userRole}</p>
-              </div>
-            </div>
-            <button onClick={() => setShowNotifications(true)} className="relative cursor-pointer p-1.5 rounded-full hover:bg-white/5 transition-all duration-200 active:scale-90">
-              <HiOutlineBell size={22} className="text-gray-400 hover:text-white transition-colors duration-200" />
-              {lowStockAlerts.length > 0 && (
-                <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 rounded-full border-2 border-[#262221] flex items-center justify-center">
-                  <span className="text-[8px] font-black text-white px-0.5">{lowStockAlerts.length > 9 ? '9+' : lowStockAlerts.length}</span>
-                </span>
-              )}
-            </button>
-          </div>
-
-          <div className="px-6 mb-4 text-left">
-            <div className="bg-[#1e1b1a] rounded-xl p-4 border border-white/5">
-              <h5 className="text-[12px] font-black text-gray-400 uppercase tracking-widest mb-5">Recent Activities</h5>
-              <div className="space-y-6">
-                {activities.length > 0 ? activities.map((log, i) => (
-                  <div key={i} className="flex justify-between items-start">
-                    <div className="flex-grow pr-2 min-w-0">
-                      <p className="text-[12px] font-bold leading-tight text-gray-200 truncate">{log.action}</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5 truncate italic">By {log.merged_name}</p>
-                      <p className="text-[10px] text-gray-600 mt-1">{formatTime(log.timestamp)}</p>
-                    </div>
-                    <span className={`${getStatusStyle(log.action)} text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-tighter flex-shrink-0`}>
-                      {log.action?.split(' ')[0] || 'LOG'}
-                    </span>
-                  </div>
-                )) : (
-                  <p className="text-[11px] text-gray-600 text-center py-4 italic">No activity yet</p>
-                )}
-              </div>
-              <button onClick={navigateToAudit} className="text-[10px] text-gray-500 mt-6 hover:text-white font-bold transition-colors uppercase tracking-widest">
-                VIEW ALL
-              </button>
-            </div>
-          </div>
-
-          <div className="px-6 flex-grow pb-6 overflow-hidden text-left flex flex-col">
-            <div className="bg-[#1e1b1a] flex-1 rounded-xl p-4 border border-white/5 flex flex-col overflow-hidden relative">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex bg-black/20 p-1 rounded-lg">
-                  <button onClick={() => setViewMode('inbox')} className={`px-3 py-1 text-[10px] font-black uppercase rounded-md transition-all ${viewMode === 'inbox' ? 'bg-white text-black' : 'text-gray-500'}`}>Inbox</button>
-                  <button onClick={() => setViewMode('sent')} className={`px-3 py-1 text-[10px] font-black uppercase rounded-md transition-all ${viewMode === 'sent' ? 'bg-white text-black' : 'text-gray-500'}`}>Sent</button>
-                </div>
-                {gmailConnected && (
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => { setShowCompose(true); setComposeMinimized(false); }} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Compose">
-                      <HiOutlinePaperAirplane size={13} className="text-gray-400" />
-                    </button>
-                    <button onClick={fetchGmailMessages} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Refresh">
-                      <HiOutlineRefresh size={13} className="text-gray-400" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {gmailLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-gray-600 text-[10px] uppercase font-black tracking-widest">Loading...</p>
-                    </div>
-                  </div>
-                ) : !gmailConnected ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-3">
-                      <HiOutlinePaperAirplane className="text-gray-600 rotate-90" size={20} />
-                    </div>
-                    <p className="text-gray-400 text-[11px] font-bold mb-1">Gmail Disconnected</p>
-                    <button onClick={handleConnect} className="w-full text-[10px] font-black uppercase tracking-widest bg-white text-black py-2.5 rounded-lg hover:bg-gray-200 transition-colors shadow-lg">
-                      Connect Gmail
-                    </button>
-                  </div>
-                ) : (viewMode === 'inbox' ? messages : sentMessages).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center">
-                    <p className="text-gray-600 text-[11px] italic">No {viewMode} messages</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {(viewMode === 'inbox' ? messages : sentMessages).map(msg => (
-                      <div key={msg.id} onClick={() => setSelected(msg)} className={`px-2 py-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 ${msg.isUnread ? 'bg-white/[0.03]' : ''}`}>
-                        <div className="flex items-start gap-2">
-                          <img
-                            src={msg.senderAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'S')}&background=random&color=fff&size=40&bold=true`}
-                            alt={msg.senderName}
-                            className="w-7 h-7 rounded-full shrink-0 object-cover mt-0.5"
-                            onError={e => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || '?')}&background=random&color=fff&size=40&bold=true`; }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className={`text-[11px] truncate max-w-[65%] ${msg.isUnread ? 'font-semibold text-white' : 'font-medium text-gray-300'}`}>
-                                {msg.senderName || formatFrom(msg.from)}
-                              </span>
-                              <span className="text-[9px] text-gray-600 shrink-0">{formatDate(msg.date)}</span>
-                            </div>
-                            <p className={`text-[10px] truncate mb-0.5 ${msg.isUnread ? 'text-gray-200' : 'text-gray-500'}`}>{msg.subject}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {selected && (
-                <div className="absolute inset-0 bg-[#1e1b1a] z-30 flex flex-col p-4">
-                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-                    <button onClick={() => setSelected(null)} className="p-1 hover:bg-white/5 rounded-md">
-                      <HiChevronLeft size={20} />
-                    </button>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setComposeTo(selected.senderEmail || "");
-                          setComposeSubject(`Re: ${selected.subject}`);
-                          if (bodyRef.current) bodyRef.current.innerHTML = "";
-                          setSelected(null);
-                          setShowCompose(true);
-                          setComposeMinimized(false);
-                        }}
-                        className="text-[10px] font-bold text-indigo-400 px-2 py-1 hover:bg-white/5 rounded"
-                      >
-                        REPLY
-                      </button>
-                      <button onClick={() => setSelected(null)} className="text-[10px] font-bold text-gray-500 hover:text-white">CLOSE</button>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <h2 className="text-[14px] font-bold mb-2 leading-tight">{selected.subject}</h2>
-                    <div className="text-[11px] mb-4">
-                      <span className="text-gray-500 font-medium">From:</span>{' '}
-                      <span className="text-white">{selected.from}</span>
-                    </div>
-                    <div className="text-[12px] text-gray-300 leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: selected.snippet || "(No content)" }} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <>
+      <AlertDialog alert={sidebarAlert} onClose={() => setSidebarAlert(null)} />
 
       {showCompose && (
         <div
           className={`fixed z-[9999] w-[310px] rounded-t-2xl overflow-hidden shadow-2xl border border-white/10 transition-all duration-300 ${composeMinimized ? 'h-12' : 'h-[450px]'}`}
-          style={{ bottom: 0, right: 288, boxShadow: '0 -8px 40px rgba(0,0,0,0.6)' }}
+          style={{ bottom: 0, right: isCollapsed ? 60 : sidebarWidth + 8, boxShadow: '0 -8px 40px rgba(0,0,0,0.6)' }}
         >
           <div className="bg-[#404040] flex items-center justify-between px-4 py-3 cursor-pointer select-none" onClick={() => setComposeMinimized(m => !m)}>
             <span className="text-[13px] font-semibold text-white tracking-tight">New Message</span>
@@ -572,12 +608,72 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
         </div>
       )}
 
+      {isCollapsed ? (
+        <button
+          onClick={() => { setSidebarWidth(DEFAULT_WIDTH); setShowNotifications(true); }}
+          className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
+          title="Expand sidebar"
+        >
+          <div className="relative">
+            <HiOutlineBell size={18} className="text-gray-300" />
+            {lowStockAlerts.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border border-[#262221] flex items-center justify-center">
+                <span className="text-[7px] font-black text-white">{lowStockAlerts.length > 9 ? '9+' : lowStockAlerts.length}</span>
+              </span>
+            )}
+          </div>
+        </button>
+      ) : (
+        <div
+          className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0"
+          style={{ width: sidebarWidth }}
+        >
+          <div
+            onMouseDown={startResizing}
+            className={`w-1 h-full cursor-col-resize flex-shrink-0 hover:bg-emerald-500/40 transition-colors ${isResizing ? 'bg-emerald-500/40' : ''}`}
+          />
+          <div className="flex-1 h-full overflow-hidden">
+            <SidebarContent />
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={() => { setMobileOpen(true); setShowNotifications(true); }}
+        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center shadow-lg"
+      >
+        <div className="relative">
+          <HiOutlineBell size={18} className="text-gray-300" />
+          {lowStockAlerts.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border border-[#262221] flex items-center justify-center">
+              <span className="text-[7px] font-black text-white">{lowStockAlerts.length > 9 ? '9+' : lowStockAlerts.length}</span>
+            </span>
+          )}
+        </div>
+      </button>
+
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex" onClick={() => setMobileOpen(false)}>
+          <div className="flex-1 bg-black/50" />
+          <div className="w-[280px] h-full overflow-y-auto text-left" onClick={e => e.stopPropagation()} style={{ animation: 'slideInRight 0.25s ease-out' }}>
+            <div className="relative h-full">
+              <button onClick={() => setMobileOpen(false)} className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">
+                <HiOutlineX size={14} />
+              </button>
+              <SidebarContent />
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        ${isResizing ? 'body { cursor: col-resize !important; user-select: none; }' : ''}
         [contenteditable]:empty:before { content: attr(data-placeholder); color: #4b5563; pointer-events: none; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
       `}</style>
     </>
   );

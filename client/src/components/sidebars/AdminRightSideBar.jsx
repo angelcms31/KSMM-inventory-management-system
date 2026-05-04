@@ -44,6 +44,11 @@ const AlertDialog = ({ alert, onClose }) => {
   );
 };
 
+const COLLAPSE_THRESHOLD = 160;
+const MIN_WIDTH = 0;
+const MAX_WIDTH = 480;
+const DEFAULT_WIDTH = 280;
+
 const AdminRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   const [activities, setActivities] = useState([]);
   const navigate = useNavigate();
@@ -74,9 +79,38 @@ const AdminRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [sidebarAlert, setSidebarAlert] = useState(null);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
 
   const bodyRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const startResizing = useCallback((e) => {
+    setIsResizing(true);
+    e.preventDefault();
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((e) => {
+    if (!isResizing) return;
+    const newWidth = window.innerWidth - e.clientX;
+    const clamped = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
+    setSidebarWidth(clamped <= COLLAPSE_THRESHOLD ? MIN_WIDTH : clamped);
+  }, [isResizing]);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", resize);
+    window.addEventListener("mouseup", stopResizing);
+    return () => {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [resize, stopResizing]);
 
   useEffect(() => {
     if (!pendingCompose || !pendingCompose.to) return;
@@ -574,6 +608,8 @@ const AdminRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     </div>
   );
 
+
+
   return (
     <>
       <AlertDialog alert={sidebarAlert} onClose={() => setSidebarAlert(null)} />
@@ -581,7 +617,7 @@ const AdminRightSidebar = ({ pendingCompose, onComposeHandled }) => {
       {showCompose && (
         <div
           className={`fixed z-[9999] w-[310px] rounded-t-2xl overflow-hidden shadow-2xl border border-white/10 transition-all duration-300 ${composeMinimized ? 'h-12' : 'h-[450px]'}`}
-          style={{ bottom: 0, right: 288, boxShadow: '0 -8px 40px rgba(0,0,0,0.6)' }}
+          style={{ bottom: 0, right: isCollapsed ? 60 : sidebarWidth + 8, boxShadow: '0 -8px 40px rgba(0,0,0,0.6)' }}
         >
           <div className="bg-[#404040] flex items-center justify-between px-4 py-3 cursor-pointer select-none" onClick={() => setComposeMinimized(m => !m)}>
             <span className="text-[13px] font-semibold text-white tracking-tight">New Message</span>
@@ -652,9 +688,35 @@ const AdminRightSidebar = ({ pendingCompose, onComposeHandled }) => {
         </div>
       )}
 
-      <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
-        <SidebarContent />
-      </div>
+      {isCollapsed ? (
+        <button
+          onClick={() => { setSidebarWidth(DEFAULT_WIDTH); handleOpenNotifications(); }}
+          className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
+          title="Expand sidebar"
+        >
+          <div className="relative">
+            <HiOutlineBell size={18} className="text-gray-300" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border border-[#262221] flex items-center justify-center">
+                <span className="text-[7px] font-black text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
+              </span>
+            )}
+          </div>
+        </button>
+      ) : (
+        <div
+          className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0"
+          style={{ width: sidebarWidth }}
+        >
+          <div
+            onMouseDown={startResizing}
+            className={`w-1 h-full cursor-col-resize flex-shrink-0 hover:bg-indigo-500/40 transition-colors ${isResizing ? 'bg-indigo-500/40' : ''}`}
+          />
+          <div className="flex-1 h-full overflow-hidden">
+            <SidebarContent />
+          </div>
+        </div>
+      )}
 
       <button
         onClick={() => { setMobileOpen(true); handleOpenNotifications(); }}
@@ -683,6 +745,11 @@ const AdminRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           </div>
         </div>
       )}
+
+      <style>{`
+        ${isResizing ? 'body { cursor: col-resize !important; user-select: none; }' : ''}
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      `}</style>
     </>
   );
 };

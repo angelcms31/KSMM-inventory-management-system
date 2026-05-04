@@ -1,15 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
-import { HiOutlineMenuAlt3, HiOutlineX } from "react-icons/hi";
+import { HiOutlineMenuAlt3, HiOutlineX, HiOutlineBell } from "react-icons/hi";
+
+const COLLAPSE_THRESHOLD = 160;
+const MIN_WIDTH = 0;
+const MAX_WIDTH = 480;
+const DEFAULT_WIDTH = 280;
 
 const ProdSalesRightSidebar = () => {
   const [lowStockLogs, setLowStockLogs] = useState([]);
   const [profilePic, setProfilePic] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
 
   const userName = localStorage.getItem("userName") || "User";
   const userRole = localStorage.getItem("userRole") || "Production";
   const loggedInUserId = localStorage.getItem("user_id");
+
+  const isCollapsed = sidebarWidth <= COLLAPSE_THRESHOLD;
+
+  const startResizing = useCallback((e) => {
+    setIsResizing(true);
+    e.preventDefault();
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((e) => {
+    if (!isResizing) return;
+    const newWidth = window.innerWidth - e.clientX;
+    const clamped = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH);
+    setSidebarWidth(clamped <= COLLAPSE_THRESHOLD ? MIN_WIDTH : clamped);
+  }, [isResizing]);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", resize);
+    window.addEventListener("mouseup", stopResizing);
+    return () => {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [resize, stopResizing]);
 
   const fetchData = async () => {
     try {
@@ -65,7 +99,7 @@ const ProdSalesRightSidebar = () => {
   };
 
   const SidebarContent = () => (
-    <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 overflow-y-auto">
+    <div className="relative w-full h-full bg-[#262221] text-white flex flex-col font-sans border-l border-white/5 overflow-y-auto custom-scrollbar">
       <div className="p-6 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden border border-white/10 flex items-center justify-center flex-shrink-0">
@@ -84,7 +118,7 @@ const ProdSalesRightSidebar = () => {
           </div>
           <div className="min-w-0">
             <h4 className="text-[13px] font-bold leading-none truncate w-32" title={userName}>{userName}</h4>
-            <p className="text-[10px] text-gray-500 mt-1 tracking-tighter">{userRole}</p>
+            <p className="text-[10px] text-gray-500 mt-1 tracking-tighter uppercase font-black">{userRole}</p>
           </div>
         </div>
       </div>
@@ -101,45 +135,53 @@ const ProdSalesRightSidebar = () => {
           </div>
 
           <div className="space-y-3">
-            {lowStockLogs.length > 0 ? lowStockLogs.map((item, i) => (
-              <div key={i} className="bg-[#262221] rounded-xl p-3 border border-white/5">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-black text-gray-200 truncate uppercase leading-tight">
-                      {item.material_name}
-                    </p>
-                    <p className="text-[9px] text-gray-500 mt-0.5 uppercase tracking-wider font-bold">
-                      {item.item_type === 'finished_good' ? 'Finished Good' : 'Raw Material'} · {item.unique_code}
-                    </p>
+            {lowStockLogs.length > 0 ? lowStockLogs.map((item, i) => {
+              const isFinishedGood = item.item_type === 'finished_good';
+              return (
+                <div 
+                  key={i} 
+                  className={`rounded-xl p-3 border transition-colors ${
+                    isFinishedGood 
+                      ? 'bg-emerald-500/5 border-emerald-500/10' 
+                      : 'bg-indigo-500/5 border-indigo-500/10'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-black text-gray-200 truncate uppercase leading-tight">
+                        {item.material_name}
+                      </p>
+                      <p className={`text-[9px] mt-0.5 uppercase tracking-wider font-bold ${
+                        isFinishedGood ? 'text-emerald-500/70' : 'text-indigo-400/70'
+                      }`}>
+                        {isFinishedGood ? 'Finished Good' : 'Raw Material'} · {item.unique_code}
+                      </p>
+                    </div>
+                    <span className={`${getStockBadgeStyle(item)} text-[7px] px-2 py-0.5 rounded font-black uppercase tracking-tighter text-white flex-shrink-0`}>
+                      {getStockLabel(item)}
+                    </span>
                   </div>
-                  <span className={`${getStockBadgeStyle(item)} text-[7px] px-2 py-0.5 rounded font-black uppercase tracking-tighter text-white flex-shrink-0`}>
-                    {getStockLabel(item)}
-                  </span>
+                  <div className="w-full bg-white/5 rounded-full h-1.5 mb-2">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${getStockBarColor(item.stock_quantity, item.reorder_threshold)}`}
+                      style={{ width: getStockBarWidth(item.stock_quantity, item.reorder_threshold) }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] text-gray-500 font-bold">
+                      Stock: <span className="text-amber-400">{item.stock_quantity}</span>
+                    </span>
+                    <span className="text-[9px] text-gray-600 font-bold">Min: {item.reorder_threshold}</span>
+                  </div>
                 </div>
-
-                <div className="w-full bg-white/5 rounded-full h-1.5 mb-2">
-                  <div
-                    className={`h-1.5 rounded-full transition-all ${getStockBarColor(item.stock_quantity, item.reorder_threshold)}`}
-                    style={{ width: getStockBarWidth(item.stock_quantity, item.reorder_threshold) }}
-                  />
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-[9px] text-gray-500 font-bold">
-                    Stock: <span className="text-amber-400">{item.stock_quantity}</span>
-                  </span>
-                  <span className="text-[9px] text-gray-600 font-bold">
-                    Min: {item.reorder_threshold}
-                  </span>
-                </div>
-              </div>
-            )) : (
+              );
+            }) : (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <div className="w-10 h-10 rounded-full bg-emerald-900/30 flex items-center justify-center mb-3">
                   <span className="text-emerald-500 text-lg">✓</span>
                 </div>
                 <p className="text-[11px] text-gray-600 font-black uppercase tracking-wider">All stocks healthy</p>
-                <p className="text-[9px] text-gray-700 mt-1">No alerts at this time</p>
+                <p className="text-[9px] text-gray-700 mt-1 uppercase font-bold">No alerts at this time</p>
               </div>
             )}
           </div>
@@ -150,14 +192,37 @@ const ProdSalesRightSidebar = () => {
 
   return (
     <>
-      <div className="hidden lg:block w-[280px] h-screen sticky top-0 right-0 shrink-0">
-        <SidebarContent />
-      </div>
+      {isCollapsed ? (
+        <button
+          onClick={() => setSidebarWidth(DEFAULT_WIDTH)}
+          className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
+          title="Expand sidebar"
+        >
+          <div className="relative">
+            <HiOutlineBell size={18} className="text-gray-300" />
+            {lowStockLogs.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]"></span>
+            )}
+          </div>
+        </button>
+      ) : (
+        <div 
+          className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0"
+          style={{ width: sidebarWidth }}
+        >
+          <div
+            onMouseDown={startResizing}
+            className={`w-1 h-full cursor-col-resize flex-shrink-0 hover:bg-amber-500/40 transition-colors ${isResizing ? 'bg-amber-500/40' : ''}`}
+          />
+          <div className="flex-1 h-full overflow-hidden">
+            <SidebarContent />
+          </div>
+        </div>
+      )}
 
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center"
-        style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center shadow-lg"
       >
         <div className="relative">
           <HiOutlineMenuAlt3 size={20} className="text-gray-300" />
@@ -178,9 +243,9 @@ const ProdSalesRightSidebar = () => {
             <div className="relative h-full">
               <button
                 onClick={() => setMobileOpen(false)}
-                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"
+                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"
               >
-                <HiOutlineX size={14} className="text-gray-300" />
+                <HiOutlineX size={14} />
               </button>
               <SidebarContent />
             </div>
@@ -189,6 +254,10 @@ const ProdSalesRightSidebar = () => {
       )}
 
       <style>{`
+        ${isResizing ? 'body { cursor: col-resize !important; user-select: none; }' : ''}
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         @keyframes slideInRight {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
