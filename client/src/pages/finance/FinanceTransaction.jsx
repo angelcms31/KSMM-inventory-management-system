@@ -2,9 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Search, Download, ChevronDown, TrendingUp, TrendingDown,
   CheckCircle, XCircle, FileText, FileSpreadsheet,
-  Inbox, ArrowUpRight, ArrowDownRight, Activity,
-  ChevronLeft, ChevronRight, Eye, User, Clock, Filter, RefreshCw
+  Inbox, ArrowUpRight, ArrowDownRight,
+  ChevronLeft, ChevronRight, Eye, Filter
 } from "lucide-react";
+import { HiX, HiOutlineEye, HiOutlineDownload } from "react-icons/hi";
+import { FaRegFilePdf, FaRegFileExcel } from "react-icons/fa";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -24,14 +26,9 @@ const MONTHS = [
 const TYPE_OPTIONS = ["All", "Revenue", "Expense"];
 
 const STATUS_META = {
-  Pending: { color: "bg-amber-50 text-amber-700 border border-amber-200", dot: "bg-amber-400" },
-  Completed: { color: "bg-emerald-50 text-emerald-700 border border-emerald-200", dot: "bg-emerald-400" },
-  Cancelled: { color: "bg-red-50 text-red-600 border border-red-200", dot: "bg-red-400" }
-};
-
-const TYPE_META = {
-  Revenue: { color: "text-emerald-600", bg: "bg-emerald-50", icon: <ArrowUpRight className="w-3 h-3" /> },
-  Expense: { color: "text-red-500", bg: "bg-red-50", icon: <ArrowDownRight className="w-3 h-3" /> },
+  Pending: { color: "bg-amber-50 text-amber-700 border border-amber-200" },
+  Completed: { color: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  Cancelled: { color: "bg-red-50 text-red-600 border border-red-200" }
 };
 
 const fmt = (n) =>
@@ -76,26 +73,44 @@ function Toast({ message, type, onClose }) {
 }
 
 function NotifModal({ title, message, type, onClose, actionLabel, onAction }) {
+  const isSuccess = type === "success";
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 relative animate-in zoom-in duration-200">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 ${type === "success" ? "bg-emerald-50" : "bg-red-50"}`}>
-          {type === "success"
-            ? <CheckCircle className="w-7 h-7 text-emerald-500" />
-            : <XCircle className="w-7 h-7 text-red-500" />}
+    <div
+      className="fixed inset-0 z-[150] flex items-center justify-center p-6"
+      style={{ backdropFilter: "blur(12px)", backgroundColor: "rgba(0,0,0,0.25)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={`w-20 h-20 rounded-[1.75rem] flex items-center justify-center mb-6 ${isSuccess ? "bg-emerald-50" : "bg-rose-50"}`}>
+          {isSuccess
+            ? <CheckCircle className="w-11 h-11 text-emerald-500" />
+            : <XCircle className="w-11 h-11 text-rose-500" />}
         </div>
-        <h3 className="text-lg font-black text-gray-900 text-center mb-2">{title}</h3>
-        <p className="text-sm text-gray-400 text-center mb-7">{message}</p>
-        <div className="flex flex-col gap-2">
-          {onAction && (
-            <button onClick={onAction} className="w-full py-3 bg-black text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+        <p className={`text-xs font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? "text-emerald-500" : "text-rose-500"}`}>
+          {isSuccess ? "Success" : "Error"}
+        </p>
+        <p className="text-slate-800 font-black text-xl leading-snug tracking-tight mb-3">{title}</p>
+        {message && <p className="text-sm text-gray-400 font-bold mb-8">{message}</p>}
+        <div className="flex flex-col gap-2 w-full">
+          {onAction && actionLabel && (
+            <button
+              onClick={() => { onAction(); onClose(); }}
+              className="w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-white transition-all bg-black hover:bg-stone-800 shadow-xl flex items-center justify-center gap-2"
+            >
               <Eye className="w-4 h-4" /> {actionLabel}
             </button>
           )}
-          <button onClick={onClose} className="w-full py-3 text-gray-400 text-sm font-bold hover:text-black transition-colors">
+          <button
+            onClick={onClose}
+            className={`w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] ${isSuccess ? "text-emerald-600 bg-emerald-50" : "bg-rose-500 text-white shadow-lg shadow-rose-200"}`}
+          >
             Close
           </button>
         </div>
+        <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? "bg-emerald-500" : "bg-rose-500"}`} />
       </div>
     </div>
   );
@@ -152,20 +167,23 @@ export default function FinanceTransactions({ socket }) {
   const [monthOpen, setMonthOpen] = useState(false);
   const [typeOpen, setTypeOpen] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewRows, setPreviewRows] = useState([]);
   const [statusModal, setStatusModal] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [toast, setToast] = useState(null);
   const [notifModal, setNotifModal] = useState(null);
 
-  const [currentUser, setCurrentUser] = useState(localStorage.getItem("firstName") || "System User");
+  const [currentUser, setCurrentUser] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
+
   const [exportYear, setExportYear] = useState(currentYear);
   const [exportMonth, setExportMonth] = useState(null);
   const [exportType, setExportType] = useState("All");
   const [exportYearOpen, setExportYearOpen] = useState(false);
   const [exportMonthOpen, setExportMonthOpen] = useState(false);
   const [exportTypeOpen, setExportTypeOpen] = useState(false);
-
-  const [lastDownloadedBlob, setLastDownloadedBlob] = useState(null);
+  const [sortOrder, setSortOrder] = useState("desc");
 
   const yearRef = useRef(null);
   const monthRef = useRef(null);
@@ -175,6 +193,34 @@ export default function FinanceTransactions({ socket }) {
   const exportTypeRef = useRef(null);
 
   const showToast = (message, type = "info") => setToast({ message, type });
+
+  const exportTimestamp = new Date().toLocaleString("en-US", {
+    month: "long", day: "numeric", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true
+  });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const fName = localStorage.getItem("firstName");
+      const lName = localStorage.getItem("lastName");
+      const sId = localStorage.getItem("user_id");
+      if (sId) setCurrentUserId(sId);
+      if (fName && lName && fName !== "null" && lName !== "null") {
+        setCurrentUser(`${fName} ${lName}`);
+      } else if (sId) {
+        try {
+          const res = await axios.get(`${API}/api/user/name/${sId}`);
+          if (res.data?.name) setCurrentUser(res.data.name);
+          else setCurrentUser("System User");
+        } catch {
+          setCurrentUser("System User");
+        }
+      } else {
+        setCurrentUser("System User");
+      }
+    };
+    fetchUser();
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -218,7 +264,7 @@ export default function FinanceTransactions({ socket }) {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const fetchExportData = async () => {
+  const fetchExportData = useCallback(async () => {
     const res = await axios.get(`${API}/api/finance/transactions`, {
       params: {
         page: 1,
@@ -228,8 +274,14 @@ export default function FinanceTransactions({ socket }) {
         type: exportType !== "All" ? exportType : null
       }
     });
-    return res.data.transactions || [];
-  };
+    let data = res.data.transactions || [];
+    data.sort((a, b) =>
+      sortOrder === "asc"
+        ? new Date(a.transaction_date) - new Date(b.transaction_date)
+        : new Date(b.transaction_date) - new Date(a.transaction_date)
+    );
+    return data;
+  }, [exportYear, exportMonth, exportType, sortOrder]);
 
   const buildFileLabel = () => {
     const now = new Date();
@@ -239,10 +291,25 @@ export default function FinanceTransactions({ socket }) {
     return { ts, monthLabel, typeLabel };
   };
 
-  const viewDownloaded = () => {
-    if (!lastDownloadedBlob) return;
-    const url = URL.createObjectURL(lastDownloadedBlob);
-    window.open(url, "_blank");
+  const buildPreviewRows = (data) =>
+    data.map(t => ({
+      "Reference": t.reference_no,
+      "Category": t.category,
+      "Details": t.description || "—",
+      "Date": fmtDate(t.transaction_date),
+      "Type": t.transaction_type,
+      "Amount (PHP)": Number(t.amount).toFixed(2),
+      "Status": t.status
+    }));
+
+  const openPreview = async () => {
+    try {
+      const data = await fetchExportData();
+      setPreviewRows(buildPreviewRows(data));
+      setShowPreview(true);
+    } catch {
+      showToast("Failed to load preview data.", "error");
+    }
   };
 
   const exportPDF = async () => {
@@ -255,10 +322,9 @@ export default function FinanceTransactions({ socket }) {
       doc.setFontSize(14);
       doc.setFont(undefined, "bold");
       doc.text("Finance Transactions Ledger", 14, 14);
-
       doc.setFontSize(8);
       doc.setFont(undefined, "normal");
-      doc.text(`Exported by: ${currentUser}`, 14, 21);
+      doc.text(`Exported by: ${currentUser} (ID: ${currentUserId || "N/A"})`, 14, 21);
       doc.text(`Downloaded: ${fmtDateTime(new Date())}`, 14, 26);
       doc.text(`Filter: Year ${exportYear} | Month: ${monthLabel} | Type: ${typeLabel}`, 14, 31);
 
@@ -285,7 +351,7 @@ export default function FinanceTransactions({ socket }) {
       a.download = filename;
       a.click();
 
-      setLastDownloadedBlob(pdfBlob);
+      setShowPreview(false);
       setShowExport(false);
       setNotifModal({
         title: "Export Successful",
@@ -307,7 +373,7 @@ export default function FinanceTransactions({ socket }) {
 
       const meta = [
         ["Finance Transactions Ledger"],
-        [`Exported by: ${currentUser}`],
+        [`Exported by: ${currentUser} (ID: ${currentUserId || "N/A"})`],
         [`Downloaded: ${fmtDateTime(new Date())}`],
         [`Filter: Year ${exportYear} | Month: ${monthLabel} | Type: ${typeLabel}`],
         []
@@ -336,7 +402,7 @@ export default function FinanceTransactions({ socket }) {
       a.download = filename;
       a.click();
 
-      setLastDownloadedBlob(blob);
+      setShowPreview(false);
       setShowExport(false);
       setNotifModal({
         title: "Export Successful",
@@ -353,9 +419,9 @@ export default function FinanceTransactions({ socket }) {
   const updateStatus = async (id, status) => {
     setUpdating(true);
     try {
-      await axios.patch(`${API}/api/transactions/${id}/status`, { 
+      await axios.patch(`${API}/api/transactions/${id}/status`, {
         status,
-        adminId: localStorage.getItem("user_id") 
+        adminId: localStorage.getItem("user_id")
       });
       setStatusModal(null);
       fetchData();
@@ -425,14 +491,12 @@ export default function FinanceTransactions({ socket }) {
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
-              <button onClick={() => setShowExport(true)} className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-stone-800 active:scale-95 transition-all">
+              <button
+                onClick={() => setShowExport(true)}
+                className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-stone-800 active:scale-95 transition-all"
+              >
                 <Download size={16} /> Export
               </button>
-              {lastDownloadedBlob && (
-                <button onClick={viewDownloaded} className="flex items-center gap-2 border-2 border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all">
-                  <Eye size={16} /> View Last Export
-                </button>
-              )}
             </div>
 
             <div className="flex gap-2">
@@ -475,7 +539,7 @@ export default function FinanceTransactions({ socket }) {
                           </div>
                         </td>
                         <td className="px-6 py-5 text-center">
-                          {t.status === 'Pending' ? (
+                          {t.status === "Pending" ? (
                             <button onClick={() => setStatusModal(t)} className="text-[10px] uppercase font-black text-blue-500 hover:text-blue-700 hover:underline">Verify</button>
                           ) : <span className="text-gray-300 font-black">—</span>}
                         </td>
@@ -512,25 +576,138 @@ export default function FinanceTransactions({ socket }) {
             <button className="absolute top-6 right-8 text-gray-300 hover:text-black transition-all" onClick={() => setShowExport(false)}><XCircle /></button>
             <div className="mb-7 text-center">
               <h3 className="text-xl font-black text-gray-900 mb-1 uppercase tracking-tight">Export Ledger</h3>
-              <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">Generating for: <span className="text-black font-black underline">{currentUser}</span></p>
+              <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">
+                Generating for: <span className="text-black font-black underline">{currentUser || "System User"}</span>
+              </p>
             </div>
+
             <div className="space-y-6 mb-8">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 flex items-center gap-1.5"><Filter className="w-3 h-3" /> Ledger Filters</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 flex items-center gap-1.5">
+                  <Filter className="w-3 h-3" /> Ledger Filters
+                </label>
                 <div className="flex gap-2 flex-wrap">
                   <DropdownFilter label="Type" options={TYPE_OPTIONS} selected={exportType} onSelect={(v) => setExportType(v ?? "All")} dropRef={exportTypeRef} open={exportTypeOpen} setOpen={setExportTypeOpen} />
                   <DropdownFilter label="Year" options={YEARS} selected={exportYear} onSelect={(v) => setExportYear(v ?? currentYear)} dropRef={exportYearRef} open={exportYearOpen} setOpen={setExportYearOpen} />
                   <DropdownFilter label="Month" options={MONTHS} selected={exportMonth} onSelect={setExportMonth} dropRef={exportMonthRef} open={exportMonthOpen} setOpen={setExportMonthOpen} valueKey="value" />
                 </div>
+                <div className="mt-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Sort Order</label>
+                  <div className="flex gap-2">
+                    {["desc", "asc"].map(o => (
+                      <button
+                        key={o}
+                        onClick={() => setSortOrder(o)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${sortOrder === o ? "bg-black text-white border-black" : "bg-white text-gray-500 border-gray-200 hover:border-black"}`}
+                      >
+                        {o === "desc" ? "Newest First" : "Oldest First"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+
               <div className="p-5 bg-gray-50 rounded-2xl space-y-3 border border-gray-100">
-                <div className="flex justify-between text-[10px] font-black uppercase text-gray-400 tracking-wider"><span>Verified Operator</span> <span className="text-black font-black uppercase">{currentUser}</span></div>
-                <div className="flex justify-between text-[10px] font-black uppercase text-gray-400 tracking-wider"><span>System Time</span> <span className="text-black font-mono">{fmtDateTime(new Date())}</span></div>
+                <div className="flex justify-between text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                  <span>Verified Operator</span>
+                  <span className="text-black font-black uppercase">{currentUser || "System User"} {currentUserId ? `(ID: ${currentUserId})` : ""}</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-black uppercase text-gray-400 tracking-wider">
+                  <span>System Time</span>
+                  <span className="text-black font-mono">{exportTimestamp}</span>
+                </div>
               </div>
             </div>
+
+            <button
+              onClick={openPreview}
+              className="w-full mb-4 py-4 border-2 border-gray-100 rounded-2xl flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest text-gray-600 hover:border-black hover:bg-black hover:text-white transition-all active:scale-95"
+            >
+              <HiOutlineEye size={16} /> Preview Data Stream
+            </button>
+
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={exportPDF} className="border-2 border-gray-100 rounded-3xl p-6 flex flex-col items-center gap-4 hover:border-black hover:bg-black hover:text-white transition-all group active:scale-95 shadow-sm"><FileText className="w-8 h-8" /><span className="text-xs font-black uppercase tracking-widest">Export PDF</span></button>
-              <button onClick={exportExcel} className="border-2 border-gray-100 rounded-3xl p-6 flex flex-col items-center gap-4 hover:border-black hover:bg-black hover:text-white transition-all group active:scale-95 shadow-sm"><FileSpreadsheet className="w-8 h-8" /><span className="text-xs font-black uppercase tracking-widest">Export Excel</span></button>
+              <button onClick={exportPDF} className="border-2 border-gray-100 rounded-3xl p-6 flex flex-col items-center gap-4 hover:border-black hover:bg-black hover:text-white transition-all group active:scale-95 shadow-sm">
+                <FaRegFilePdf size={28} className="text-gray-300 group-hover:text-white" />
+                <span className="text-xs font-black uppercase tracking-widest">Export PDF</span>
+              </button>
+              <button onClick={exportExcel} className="border-2 border-gray-100 rounded-3xl p-6 flex flex-col items-center gap-4 hover:border-black hover:bg-black hover:text-white transition-all group active:scale-95 shadow-sm">
+                <FaRegFileExcel size={28} className="text-gray-300 group-hover:text-white" />
+                <span className="text-xs font-black uppercase tracking-widest">Export Excel</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPreview && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-[300] p-4 text-left uppercase">
+          <div className="bg-white rounded-[2.5rem] p-6 sm:p-10 w-full max-w-5xl relative shadow-2xl max-h-[90vh] flex flex-col">
+            <button className="absolute top-8 right-8 text-slate-300 hover:text-black transition-all" onClick={() => setShowPreview(false)}>
+              <HiX size={24} />
+            </button>
+            <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tighter leading-none">Document Preview</h2>
+            <div className="mb-6 grid grid-cols-3 gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100 font-black text-slate-800">
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-400 tracking-widest block mb-1">Operator</span>
+                <span className="text-sm">{currentUser || "System User"} {currentUserId ? `(ID: ${currentUserId})` : ""}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-400 tracking-widest block mb-1">Timestamp</span>
+                <span className="text-sm">{exportTimestamp}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-400 tracking-widest block mb-1">Volume</span>
+                <span className="text-sm text-emerald-600">{previewRows.length} Records</span>
+              </div>
+            </div>
+
+            <div className="overflow-auto flex-1 rounded-2xl border border-gray-100 shadow-inner">
+              <table className="w-full text-left min-w-[800px] uppercase">
+                <thead className="sticky top-0 bg-black text-white text-xs font-black uppercase tracking-[0.2em]">
+                  <tr>
+                    {["Reference", "Category", "Details", "Date", "Type", "Amount (PHP)", "Status"].map(h => (
+                      <th key={h} className="px-5 py-4">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white text-xs font-bold text-gray-700">
+                  {previewRows.length > 0 ? previewRows.map((row, i) => (
+                    <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="px-5 py-4 font-black font-mono">{row["Reference"]}</td>
+                      <td className="px-5 py-4">{row["Category"]}</td>
+                      <td className="px-5 py-4 truncate max-w-[160px]">{row["Details"]}</td>
+                      <td className="px-5 py-4">{row["Date"]}</td>
+                      <td className={`px-5 py-4 font-black ${row["Type"] === "Expense" ? "text-red-500" : "text-emerald-600"}`}>{row["Type"]}</td>
+                      <td className="px-5 py-4 font-black text-gray-900">₱{row["Amount (PHP)"]}</td>
+                      <td className="px-5 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-black ${STATUS_META[row["Status"]]?.color ?? "bg-gray-100 text-gray-500"}`}>
+                          {row["Status"]}
+                        </span>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="7" className="px-5 py-10 text-center text-gray-400">No data available for the selected filters</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex gap-4 mt-6">
+              <button
+                className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-black/10"
+                onClick={exportPDF}
+              >
+                <FaRegFilePdf size={18} /> Download PDF
+              </button>
+              <button
+                className="flex-1 bg-white border-2 border-black text-black py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all"
+                onClick={exportExcel}
+              >
+                <FaRegFileExcel size={18} /> Download Excel
+              </button>
             </div>
           </div>
         </div>
@@ -538,23 +715,39 @@ export default function FinanceTransactions({ socket }) {
 
       {statusModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm text-left">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm p-8 relative animate-in zoom-in duration-200">
-            <h3 className="text-xl font-black text-gray-900 mb-4 uppercase tracking-tighter">Verify Transaction</h3>
-            <div className="p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Reference Number</p>
-              <p className="font-mono text-sm font-black text-gray-900 mb-3">{statusModal.reference_no}</p>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Transaction Value</p>
-              <p className={`font-black text-lg ${statusModal.transaction_type === "Expense" ? "text-red-500" : "text-emerald-600"}`}>{fmt(statusModal.amount)}</p>
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg p-10 relative animate-in zoom-in duration-200">
+            <div className="flex items-center gap-3 mb-6">
+              <button onClick={() => setStatusModal(null)} className="p-2 rounded-xl text-gray-400 hover:text-black hover:bg-gray-100 transition-all">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Verify Transaction</h3>
             </div>
-            <div className="space-y-2">
-              <button disabled={updating} onClick={() => updateStatus(statusModal.transaction_id, "Completed")} className="w-full py-4 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 shadow-lg shadow-emerald-200/50">
+            <div className="p-6 bg-gray-50 rounded-2xl mb-8 border border-gray-100 space-y-4">
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Details</p>
+                <p className="text-sm font-bold text-gray-700 leading-relaxed">{statusModal.description || "—"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Reference Number</p>
+                  <p className="font-mono text-sm font-black text-gray-900">{statusModal.reference_no}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Category</p>
+                  <p className="text-sm font-black text-gray-900 uppercase">{statusModal.category || "—"}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Transaction Value</p>
+                <p className={`font-black text-2xl ${statusModal.transaction_type === "Expense" ? "text-red-500" : "text-emerald-600"}`}>{fmt(statusModal.amount)}</p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button disabled={updating} onClick={() => updateStatus(statusModal.transaction_id, "Completed")} className="flex-1 py-4 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-[0.98] transition-all disabled:opacity-60 shadow-lg shadow-emerald-200/50 whitespace-nowrap">
                 {updating ? "Processing..." : "Verify & Complete"}
               </button>
-              <button disabled={updating} onClick={() => updateStatus(statusModal.transaction_id, "Cancelled")} className="w-full py-4 bg-red-50 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 active:scale-[0.98] transition-all disabled:opacity-60">
+              <button disabled={updating} onClick={() => updateStatus(statusModal.transaction_id, "Cancelled")} className="flex-1 py-4 bg-red-50 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-100 active:scale-[0.98] transition-all disabled:opacity-60 whitespace-nowrap">
                 Cancel Transaction
-              </button>
-              <button onClick={() => setStatusModal(null)} className="w-full py-3 text-gray-400 text-xs font-black uppercase tracking-widest hover:text-black transition-colors">
-                Back to Ledger
               </button>
             </div>
           </div>

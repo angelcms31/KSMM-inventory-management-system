@@ -517,15 +517,16 @@ const MainDashboard = () => {
   ];
 
   return (
-<div className="w-full h-full overflow-hidden bg-[#f4f6f9] dashboard-container text-left flex flex-col">      {selectedOrder && <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} products={products} />}
-      {showTrendModal && <SalesTrendModal orders={orders} onClose={() => setShowTrendModal(false)} />}
+<div className="w-full h-full overflow-hidden bg-[#f4f6f9] dashboard-container flex flex-col text-left">      {showTrendModal && <SalesTrendModal orders={orders} onClose={() => setShowTrendModal(false)} />}
 
       <div className="flex-1 overflow-hidden flex flex-col px-5 pt-5 pb-4 gap-4 min-h-0">
 
         <div className="flex items-center justify-between flex-shrink-0">
           <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tighter leading-none uppercase">Dashboard</h1>
-            <p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">Enterprise Analytics Overview</p>
+<h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none uppercase" style={{ fontWeight: 900 }}>
+  Dashboard
+</h1>            
+<p className="text-xs text-gray-400 font-bold mt-1 uppercase tracking-widest">Enterprise Analytics Overview</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>

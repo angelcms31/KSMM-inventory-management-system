@@ -114,8 +114,7 @@ const ManageArtisan = () => {
   };
 
   const handleNameChange = (field, value, isEdit = false) => {
-    if (!/^[a-zA-Z\s]*$/.test(value)) return;
-    if (isEdit) setSelectedArtisan({ ...selectedArtisan, [field]: value });
+if (!/^[a-zA-Z\s]*$/.test(value) || value.length > 30) return;    if (isEdit) setSelectedArtisan({ ...selectedArtisan, [field]: value });
     else setFormData({ ...formData, [field]: value });
   };
 
@@ -300,15 +299,31 @@ const ManageArtisan = () => {
                 <div className="space-y-5">
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">First Name</label>
-                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.firstName : selectedArtisan?.firstName} onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} />
-                  </div>
+                  <input 
+                    required 
+                    maxLength={30} 
+                    className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" 
+                    value={showAddModal ? formData.firstName : selectedArtisan?.firstName} 
+                    onChange={e => handleNameChange('firstName', e.target.value, showEditModal)} 
+                  />                  </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Middle Name</label>
-                    <input className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.middleName : selectedArtisan?.middleName} onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} />
+                    <input 
+                      maxLength={30} 
+                      className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" 
+                      value={showAddModal ? formData.middleName : selectedArtisan?.middleName} 
+                      onChange={e => handleNameChange('middleName', e.target.value, showEditModal)} 
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Last Name</label>
-                    <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.lastName : selectedArtisan?.lastName} onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} />
+                    <input 
+                      required 
+                      maxLength={30} 
+                      className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" 
+                      value={showAddModal ? formData.lastName : selectedArtisan?.lastName} 
+                      onChange={e => handleNameChange('lastName', e.target.value, showEditModal)} 
+                    />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Department</label>
@@ -345,8 +360,20 @@ const ManageArtisan = () => {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Email Address</label>
-                    <input required type="email" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" value={showAddModal ? formData.email : selectedArtisan?.email} onChange={e => showAddModal ? setFormData({...formData, email: e.target.value}) : setSelectedArtisan({...selectedArtisan, email: e.target.value})} />
-                  </div>
+                <input 
+                  required 
+                  type="email" 
+                  maxLength={30} 
+                  className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none font-bold text-sm border border-transparent focus:border-slate-200" 
+                  value={showAddModal ? formData.email : selectedArtisan?.email} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val.length <= 30) {
+                      showAddModal ? setFormData({...formData, email: val}) : setSelectedArtisan({...selectedArtisan, email: val})
+                    }
+                  }} 
+                />                  
+                </div>
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase text-slate-400 font-black ml-1">Contact No.</label>
                     <div className="flex items-center bg-[#F3F4F6] rounded-2xl overflow-hidden">

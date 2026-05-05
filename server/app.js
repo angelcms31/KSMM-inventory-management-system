@@ -1284,7 +1284,7 @@ app.get("/api/finance/transactions", async (req, res) => {
         const offset = (page - 1) * limit;
         const { search, type, month, year } = req.query;
 
-        let conditions = ["1=1"];
+        let conditions = ["t.category != 'Labor Pay'"];
         let params = [];
         let i = 1;
 
@@ -1320,13 +1320,14 @@ app.get("/api/finance/transactions", async (req, res) => {
         `;
 
         const result = await getPool().query(query, dataParams);
-        
+
         const stats = await getPool().query(`
             SELECT 
                 COALESCE(SUM(CASE WHEN transaction_type = 'Revenue' THEN amount ELSE 0 END), 0) as total_revenue,
                 COALESCE(SUM(CASE WHEN transaction_type = 'Expense' THEN amount ELSE 0 END), 0) as total_expense
             FROM transactions 
             WHERE status = 'Completed'
+            AND category != 'Labor Pay'
         `);
 
         res.json({

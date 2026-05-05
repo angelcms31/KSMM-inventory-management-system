@@ -176,7 +176,7 @@ export default function Inventory() {
   };
 
   const handleOpenEdit = async (order) => {
-    if (order.status === 'Complete' || order.status === 'Quality Control') return;
+    if (order.status === 'Complete') return;
     setSelectedOrder(order);
     try {
       const res = await axios.get(`http://localhost:5000/api/work_order_materials/${order.work_order_id}`);
@@ -418,7 +418,7 @@ export default function Inventory() {
                           )}
                           <button
                             onClick={() => handleOpenEdit(order)}
-                            disabled={isComplete || isQC}
+                            disabled={isComplete}
                             className={`p-2 lg:p-3 bg-white text-slate-300 hover:text-black hover:shadow-md rounded-xl transition-all border border-slate-100 ${isComplete || isQC ? 'opacity-30 cursor-not-allowed' : ''}`}
                           >
                             <HiPencil size={16} />

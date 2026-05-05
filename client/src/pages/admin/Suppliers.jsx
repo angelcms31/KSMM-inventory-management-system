@@ -139,11 +139,25 @@ const Suppliers = () => {
     else setAddFormData({ ...addFormData, contact_no: cleanVal });
   };
 
-  const handleNameInput = (val, isUpdate = false) => {
+ const handleNameInput = (val, isUpdate = false) => {
     const emojiRegex = /[\uD800-\uDBFF][\uDC00-\uDFFF]|\u200d|\u200b|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]/g;
     const cleanVal = val.replace(emojiRegex, '');
-    if (isUpdate) setUpdateFormData({ ...updateFormData, name: cleanVal });
-    else setAddFormData({ ...addFormData, name: cleanVal });
+    
+    if (cleanVal.length > 30) {
+      return;
+    }
+
+    if (isUpdate) {
+      setUpdateFormData({ 
+        ...updateFormData, 
+        name: cleanVal 
+      });
+    } else {
+      setAddFormData({ 
+        ...addFormData, 
+        name: cleanVal 
+      });
+    }
   };
 
   const toggleStatus = async (sup) => {
@@ -367,11 +381,31 @@ const Suppliers = () => {
             <form onSubmit={showAddModal ? handleAddSupplier : handleUpdateSupplier} className="space-y-6">
               <div className="space-y-1">
                 <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Name</label>
-                <input required className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? addFormData.name : updateFormData.name} onChange={e => handleNameInput(e.target.value, !showAddModal)} />
+              <input 
+                required 
+                maxLength={30} 
+                className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" 
+                value={showAddModal ? addFormData.name : updateFormData.name} 
+                onChange={e => handleNameInput(e.target.value, !showAddModal)} 
+              />              
               </div>
               <div className="space-y-1">
                 <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Email Address</label>
-                <input required type="email" className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" value={showAddModal ? addFormData.email : updateFormData.email} onChange={e => showAddModal ? setAddFormData({ ...addFormData, email: e.target.value }) : setUpdateFormData({ ...updateFormData, email: e.target.value })} />
+              <input 
+                required 
+                type="email" 
+                maxLength={30} 
+                className="w-full bg-[#F3F4F6] rounded-2xl p-4 outline-none border border-transparent font-black text-sm" 
+                value={showAddModal ? addFormData.email : updateFormData.email} 
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val.length <= 30) { 
+                    showAddModal 
+                      ? setAddFormData({ ...addFormData, email: val }) 
+                      : setUpdateFormData({ ...updateFormData, email: val });
+                  }
+                }} 
+              />              
               </div>
               <div className="space-y-1">
                 <label className="text-[9px] uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">Contact</label>
