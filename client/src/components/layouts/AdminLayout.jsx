@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import AdminSidebar from "../sidebars/AdminSidebar";
-import AdminRightSidebar from "../sidebars/AdminRightSidebar";
+import AdminRightSidebar from "../sidebars/AdminRightSideBar";
 import { getHashedPath } from "../../utils/hash";
 
 import MainDashboard from "../dashboard/MainDashboard";
