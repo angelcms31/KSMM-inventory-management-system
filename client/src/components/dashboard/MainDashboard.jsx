@@ -518,7 +518,13 @@ const MainDashboard = () => {
 
   return (
 <div className="w-full h-full overflow-hidden bg-[#f4f6f9] dashboard-container flex flex-col text-left">      {showTrendModal && <SalesTrendModal orders={orders} onClose={() => setShowTrendModal(false)} />}
-
+    {selectedOrder && (
+      <OrderDetailModal 
+        order={selectedOrder} 
+        products={products} 
+        onClose={() => setSelectedOrder(null)} 
+      />
+    )}
       <div className="flex-1 overflow-hidden flex flex-col px-5 pt-5 pb-4 gap-4 min-h-0">
 
         <div className="flex items-center justify-between flex-shrink-0">

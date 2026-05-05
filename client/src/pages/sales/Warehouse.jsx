@@ -129,6 +129,7 @@ export default function Warehouse() {
           <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
+            maxLength ={30}
             placeholder="Search by name, location or manager..."
             className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-10 pr-4 outline-none font-bold text-slate-700 text-xs"
             value={searchTerm}
@@ -314,6 +315,7 @@ export default function Warehouse() {
               <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
               <input
                 type="text"
+                maxLength ={30}
                 placeholder="Search by name, SKU or category..."
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2.5 pl-9 pr-4 outline-none font-bold text-slate-700 text-xs"
                 value={inventorySearch}

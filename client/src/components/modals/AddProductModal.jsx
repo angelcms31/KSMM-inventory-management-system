@@ -147,6 +147,14 @@ export default function AddProductModal({ product, products = [], fetchProducts,
     }
   };
 
+  const handlePositiveNumberChange = (field) => (e) => {
+    const value = e.target.value;
+    if (value === "" || parseFloat(value) >= 0) {
+      setForm(prev => ({ ...prev, [field]: value }));
+      setErrors(prev => ({ ...prev, [field]: "" }));
+    }
+  };
+
   const validate = () => {
     const e = {};
     if (!form.name.trim()) e.name = "Product Name is required.";
@@ -283,6 +291,11 @@ export default function AddProductModal({ product, products = [], fetchProducts,
 
   const inputBase = "w-full bg-slate-50 border rounded-xl p-3 outline-none font-bold text-xs focus:ring-2 focus:ring-black/5 transition-all truncate";
   const inputClass = (field) => `${inputBase} ${errors[field] ? "border-red-300 bg-red-50/30" : "border-slate-100"}`;
+  const limitDigits = (max) => (e) => {
+  if (e.target.value.length > max) {
+    e.target.value = e.target.value.slice(0, max);
+  }
+};
 
   return (
     <>
@@ -330,6 +343,7 @@ export default function AddProductModal({ product, products = [], fetchProducts,
                     </label>
                     <input
                       required
+                      maxLength={30}
                       className={inputClass("name")}
                       value={form.name}
                       onChange={handleNameChange}
@@ -380,12 +394,15 @@ export default function AddProductModal({ product, products = [], fetchProducts,
                     <label className="text-[9px] uppercase font-black text-slate-400 ml-1 tracking-widest truncate block">Qty</label>
                     <input
                       type="number"
+                      onInput={limitDigits(6)}
                       min="0"
                       className={inputClass("quantity")}
                       value={form.quantity}
-                      onChange={e => setForm({ ...form, quantity: e.target.value })}
+                      onChange={handlePositiveNumberChange("quantity")}
+                      onKeyDown={e => e.key === "-" && e.preventDefault()}
                     />
                   </div>
+
                   <div className="space-y-1">
                     <label className="text-[9px] uppercase font-black text-slate-400 ml-1 tracking-widest truncate block">Unit</label>
                     <select
@@ -404,11 +421,13 @@ export default function AddProductModal({ product, products = [], fetchProducts,
                     </label>
                     <input
                       type="number"
+                      onInput={limitDigits(6)}
                       min="0"
                       required
                       className={inputClass("min_stocks")}
                       value={form.min_stocks}
-                      onChange={e => { setForm({ ...form, min_stocks: e.target.value }); setErrors({ ...errors, min_stocks: "" }); }}
+                      onChange={handlePositiveNumberChange("min_stocks")}
+                      onKeyDown={e => e.key === "-" && e.preventDefault()}
                     />
                     {errors.min_stocks && <p className="text-red-500 text-[8px] font-bold ml-1 mt-0.5">{errors.min_stocks}</p>}
                   </div>
@@ -416,11 +435,13 @@ export default function AddProductModal({ product, products = [], fetchProducts,
                     <label className="text-[9px] uppercase font-black text-slate-400 ml-1 tracking-widest truncate block">Price</label>
                     <input
                       type="number"
+                      onInput={limitDigits(6)}
                       min="0"
                       step="0.01"
                       className={inputBase + " border-slate-100"}
                       value={form.selling_price}
-                      onChange={e => setForm({ ...form, selling_price: e.target.value })}
+                      onChange={handlePositiveNumberChange("selling_price")}
+                      onKeyDown={e => e.key === "-" && e.preventDefault()}
                     />
                   </div>
                 </div>

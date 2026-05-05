@@ -102,6 +102,22 @@ export default function AddWarehouseModal({ warehouse, onClose, fetchWarehouses 
     }
   };
 
+const handleCapacityChange = (e) => {
+  const value = e.target.value;
+  
+  if (value === "") {
+    setFormData({ ...formData, capacity_total: "" });
+    return;
+  }
+
+  const positiveValue = Math.max(0, parseInt(value, 10) || 0);
+  
+  setFormData({ ...formData, capacity_total: positiveValue.toString() });
+  setErrors({ ...errors, capacity_total: "" });
+};
+
+
+
   const inputBase = "w-full bg-gray-50 border rounded-xl p-3 font-bold outline-none text-sm transition-all focus:ring-2 focus:ring-black/5";
   const inputClass = (field) => `${inputBase} ${errors[field] ? "border-red-300 bg-red-50/30" : "border-gray-100"}`;
 
@@ -130,6 +146,7 @@ export default function AddWarehouseModal({ warehouse, onClose, fetchWarehouses 
               </label>
               <input
                 required
+                maxLength={30}
                 className={inputClass("name")}
                 placeholder="e.g. South Warehouse"
                 value={formData.name}
@@ -144,6 +161,7 @@ export default function AddWarehouseModal({ warehouse, onClose, fetchWarehouses 
               </label>
               <input
                 required
+                maxLength={30}
                 className={inputClass("manager_name")}
                 placeholder="Full Name"
                 value={formData.manager_name}
@@ -159,6 +177,7 @@ export default function AddWarehouseModal({ warehouse, onClose, fetchWarehouses 
                 </label>
                 <input
                   required
+                  maxLength={30}
                   className={inputClass("location")}
                   placeholder="e.g. Cebu City"
                   value={formData.location}
@@ -167,20 +186,29 @@ export default function AddWarehouseModal({ warehouse, onClose, fetchWarehouses 
                 {errors.location && <p className="text-red-500 text-[9px] font-bold ml-1 mt-0.5">{errors.location}</p>}
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
-                  Capacity <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="number"
-                  min="1"
-                  className={inputClass("capacity_total")}
-                  placeholder="e.g. 50000"
-                  value={formData.capacity_total}
-                  onChange={e => { setFormData({ ...formData, capacity_total: e.target.value }); setErrors({ ...errors, capacity_total: "" }); }}
-                />
-                {errors.capacity_total && <p className="text-red-500 text-[9px] font-bold ml-1 mt-0.5">{errors.capacity_total}</p>}
-              </div>
+  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">
+    Capacity <span className="text-red-500">*</span>
+  </label>
+  <input
+    required
+    type="number"
+    min="1" 
+    onKeyDown={(e) => {
+      if (["-", "+", "e", "E"].includes(e.key)) {
+        e.preventDefault();
+      }
+    }}
+    className={inputClass("capacity_total")}
+    placeholder="e.g. 50000"
+    value={formData.capacity_total}
+    onChange={handleCapacityChange} 
+  />
+  {errors.capacity_total && (
+    <p className="text-red-500 text-[9px] font-bold ml-1 mt-0.5">
+      {errors.capacity_total}
+    </p>
+  )}
+</div>
             </div>
           </div>
 

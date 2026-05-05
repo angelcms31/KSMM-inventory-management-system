@@ -215,6 +215,7 @@ if (!/^[a-zA-Z\s]*$/.test(value) || value.length > 30) return;    if (isEdit) se
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
+            maxLength={30}
             placeholder="Search by name, email, contact, ID, or department..."
             className="w-full bg-[#F8F9FA] border-none rounded-xl py-2.5 pl-11 pr-4 outline-none font-bold text-slate-700 text-xs"
             value={searchTerm}

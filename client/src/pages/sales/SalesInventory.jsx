@@ -508,7 +508,7 @@ export default function SalesInventory() {
     const stock = Number(current) || 0;
     const threshold = Number(min) || 0;
     if (stock <= 0) return { label: "NO STOCK", color: "bg-[#F43F5E] text-white" };
-    if (stock <= threshold) return { label: "LOW STOCK", color: "bg-[#F43F5E] text-white" };
+    if (stock <= threshold) return { label: "LOW STOCK", color: "bg-[#f59e0b] text-white" };
     return { label: "IN STOCK", color: "bg-[#10B981] text-white" };
   };
 
@@ -559,6 +559,7 @@ export default function SalesInventory() {
               <HiMagnifyingGlass className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 flex-shrink-0" size={18} />
               <input
                 type="text"
+                maxLength = {30}
                 placeholder="Search SKU, Name..."
                 className="w-full bg-slate-50 border-none rounded-2xl py-3 sm:py-3.5 pl-10 sm:pl-12 pr-3 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-black/5 transition-all text-xs sm:text-sm"
                 value={searchTerm}

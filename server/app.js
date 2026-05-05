@@ -1063,6 +1063,40 @@ app.patch("/api/sales_orders/:id/status", async (req, res) => {
   }
 });
 
+app.post("/api/sales_returns", async (req, res) => {
+  const { order_ref, reason, user_id } = req.body;
+  const client = await getPool().connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const orderId = order_ref.split('-')[1];
+
+    await client.query(
+      "INSERT INTO sales_returns (order_ref, reason, user_id, created_at) VALUES ($1, $2, $3, NOW())",
+      [order_ref, reason, user_id]
+    );
+
+    await client.query(
+      "UPDATE sales_orders SET status = 'Returned' WHERE order_id = $1",
+      [orderId]
+    );
+
+    await client.query("UPDATE finishedgoods SET current_stock = current_stock + (SELECT quantity FROM sales_orders WHERE order_id = $1) WHERE sku = (SELECT sku FROM sales_orders WHERE order_id = $1)", [orderId]);
+
+    await client.query("COMMIT");
+
+    io.emit("sales_orders:updated");
+
+    res.status(201).json({ success: true, message: "Order status updated to Returned" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Return Error:", err.message);
+    res.status(500).json({ error: "Failed to process return: " + err.message });
+  } finally {
+    client.release();
+  }
+});
 // ─────────────────────────────────────────────
 // FINANCE
 // ─────────────────────────────────────────────

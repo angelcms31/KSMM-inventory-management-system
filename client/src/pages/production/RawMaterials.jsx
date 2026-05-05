@@ -124,6 +124,11 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
       console.error(err);
     }
   };
+    const limitDigits = (max) => (e) => {
+  if (e.target.value.length > max) {
+    e.target.value = e.target.value.slice(0, max);
+      }
+    };
 
   return (
     <div className={isStandalone ? "w-full h-full flex flex-col font-sans antialiased text-slate-900 overflow-hidden" : ""}>
@@ -133,6 +138,7 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
             <HiMagnifyingGlass className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
+              maxLength={30}
               placeholder="Search materials..."
               className="w-full bg-[#F8F9FA] border-none rounded-2xl py-3 pl-10 lg:pl-12 pr-4 outline-none font-bold text-slate-700 text-base"
               value={searchTerm}
@@ -260,7 +266,6 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
                   <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-2 font-black">
                     Material Name
                     <span className="ml-2 text-slate-300 normal-case tracking-normal font-bold">
-                      ({(matForm.material_name || '').length}/30)
                     </span>
                   </label>
                   <input
@@ -276,12 +281,12 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
                   <input disabled className="w-full bg-[#F3F4F6] rounded-2xl p-3 lg:p-4 opacity-50 outline-none cursor-not-allowed font-black text-sm" value={matForm.unique_code} />
                 </div>
               </div>
-              {/* Hanapin ang grid-cols-2 lg:grid-cols-4 na div */}
 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 font-black">
   <div className="flex flex-col justify-end space-y-2 text-left">
     <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Stock</label>
     <input
       type="number" min="0" step="1" required
+      onInput={limitDigits(6)}
       className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
       value={matForm.stock_quantity}
       onChange={e => {
@@ -302,6 +307,7 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
     <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1 leading-tight">Min Threshold</label>
     <input
       type="number" min="0" step="1" required
+      onInput={limitDigits(6)}
       className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
       value={matForm.reorder_threshold}
       onChange={e => {
@@ -314,6 +320,7 @@ export default function RawMaterials({ materials: propMaterials, onRefresh, sear
     <label className="text-xs uppercase tracking-[0.2em] text-slate-400 ml-1">Unit Price</label>
     <input
       type="number" step="0.01" min="0" required
+      onInput={limitDigits(6)}
       className="w-full bg-[#F3F4F6] rounded-xl p-3 lg:p-4 outline-none text-sm"
       value={matForm.cost_per_unit}
       onChange={e => {
