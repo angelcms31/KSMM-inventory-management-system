@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Line } from "react-chartjs-2";
-import axios from "axios";
+import api from "../../api";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -191,7 +191,7 @@ const SalesTrendModal = ({ orders, onClose }) => {
       setExportedByName(`${fName} ${lName}`);
     } else if (sId) {
       try {
-        const res = await axios.get(`http://localhost:5000/api/user/name/${sId}`);
+        const res = await api.get(`/api/user/name/${sId}`);
         if (res.data?.name) setExportedByName(res.data.name);
       } catch { setExportedByName("Unknown User"); }
     }
@@ -457,9 +457,9 @@ const MainDashboard = () => {
     const fetchAll = async () => {
       try {
         const [ordersRes, productsRes] = await Promise.all([
-          axios.get("http://localhost:5000/api/sales_orders"),
-          axios.get("http://localhost:5000/api/finished_goods"),
-        ]);
+  api.get("/api/sales_orders"),
+  api.get("/api/finished_goods"),
+]);
         setOrders(ordersRes.data || []);
         setProducts(productsRes.data || []);
       } catch (err) {

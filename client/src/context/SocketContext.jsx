@@ -3,11 +3,13 @@ import { io } from "socket.io-client";
 
 const SocketContext = createContext(null);
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    const s = io("http://localhost:5000", { withCredentials: true });
+    const s = io(API_URL, { withCredentials: true });
     setSocket(s);
     return () => s.disconnect();
   }, []);

@@ -80,7 +80,7 @@ function App() {
     const role = localStorage.getItem("userRole");
     if (userId) {
       try {
-        await axios.post("http://localhost:5000/api/logout", { userId, role });
+      await api.post("/api/logout", { userId, role });
       } catch (err) {
         console.error("Logout failed", err);
       }

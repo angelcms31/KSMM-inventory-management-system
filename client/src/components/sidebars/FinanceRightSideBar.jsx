@@ -338,7 +338,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                       <span className="text-rose-500 font-black text-[10px] uppercase">Low Stock Alert</span>
                       <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                     </div>
-                    <p className="text-white text-xs font-bold uppercase">{alert.name}</p>
+                      <p className="text-white text-xs font-bold uppercase truncate w-full">{alert.name}</p>
                     <p className="text-gray-400 text-[10px] mt-1 italic">
                       Current: <span className="text-rose-400 font-black">{alert.current}</span> / Level: {alert.threshold}
                     </p>
@@ -347,14 +347,6 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                 ))}
               </div>
             )}
-          </div>
-          <div className="p-4 border-t border-white/5">
-            <button
-              onClick={() => setShowNotifications(false)}
-              className="w-full text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors py-2 cursor-pointer outline-none"
-            >
-              ← Back to Sidebar
-            </button>
           </div>
         </div>
       )}

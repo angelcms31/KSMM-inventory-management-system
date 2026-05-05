@@ -11,7 +11,22 @@ require("dotenv").config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", credentials: true }
+  cors: {
+    origin: (origin, callback) => {
+      const allowed = [
+        "http://localhost:5173",
+        /\.vercel\.app$/  
+      ];
+      if (!origin || allowed.some(o => 
+        typeof o === 'string' ? o === origin : o.test(origin)
+      )) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true
+  }
 });
 
 io.on("connection", (socket) => {
@@ -24,10 +39,19 @@ module.exports = { app, server, io };
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(cors({
-  origin: [
-    "http://localhost:5173", 
-    "http://192.168.1.179:5173" // Bagong IP address mo
-  ],
+  origin: (origin, callback) => {
+    const allowed = [
+      "http://localhost:5173",
+      /\.vercel\.app$/
+    ];
+    if (!origin || allowed.some(o => 
+      typeof o === 'string' ? o === origin : o.test(origin)
+    )) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
@@ -1741,9 +1765,7 @@ app.put('/api/work_orders/:id', async (req, res) => {
       }
     }
 
-    app.get("/", (req, res) => {
-  res.send("KSMM IMS Backend is running on Render!");
-});
+
 
     await client.query('COMMIT');
 
@@ -1776,9 +1798,12 @@ app.get('/api/clear-gmail-tokens', async (req, res) => {
 
 const { registerGmailRoutes } = require('./gmailroutes');
 registerGmailRoutes(app, dbQuery);
+app.get("/", (req, res) => {
+  res.send("KSMM IMS Backend is running on Render!");
+});
 
-const PORT = 5000;
-initDB();
+
+const PORT = process.env.PORT || 5000;initDB();
 const networkInterfaces = os.networkInterfaces();
 const localIP = Object.values(networkInterfaces).flat().find(i => i.family === 'IPv4' && !i.internal)?.address || 'localhost';
 
