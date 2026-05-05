@@ -1741,6 +1741,10 @@ app.put('/api/work_orders/:id', async (req, res) => {
       }
     }
 
+    app.get("/", (req, res) => {
+  res.send("KSMM IMS Backend is running on Render!");
+});
+
     await client.query('COMMIT');
 
     io.emit('work_orders:updated');
