@@ -300,7 +300,7 @@ const FinanceVariance = ({ userId }) => {
       <AlertDialog alert={alert} onClose={closeAlert} />
       <div className="flex-1 overflow-y-auto px-4 sm:px-10 pt-6 pb-10 custom-scrollbar">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="font-black text-2xl sm:text-3xl text-gray-900 select-none">Variance Logs</h1>
+          <h1 className="font-black text-2xl sm:text-3xl text-gray-900 select-none">VARIANCE LOGS</h1>
           <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-3">
             <HiOutlineClock className="text-stone-400" size={20} />
             <div>
