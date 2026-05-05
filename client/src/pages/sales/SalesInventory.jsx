@@ -19,15 +19,13 @@ import {
   HiXCircle, 
   HiArrowDownTray, 
   HiPlus, 
-  HiArrowUpTray,
-  HiLockClosed,
-  HiShieldCheck,
-  HiClock
+  HiArrowUpTray
 } from "react-icons/hi2";
 import AddProductModal from "../../components/modals/AddProductModal";
 
+const BASE_URL = "http://192.168.31.98:5173";
 const QR_SESSION_KEY = "qr_session_expires";
-const QR_SESSION_DURATION = 5 * 60 * 1000;
+const QR_SESSION_DURATION = 5 * 60 * 1000; 
 
 const AlertDialog = ({ alert, onClose }) => {
   if (!alert) return null;
@@ -84,182 +82,11 @@ const useAlert = () => {
   return { alert, showAlert, closeAlert };
 };
 
-const QRCredentialGate = ({ onSuccess, onClose }) => {
-  const [step, setStep] = useState("login");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (!username.trim() || !password.trim()) {
-      setError("Please enter your credentials.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await axios.post("http://localhost:5000/login", {
-        email: username.trim(),
-        password: password.trim()
-      });
-      if (res.data?.success) {
-        const expires = Date.now() + QR_SESSION_DURATION;
-        sessionStorage.setItem(QR_SESSION_KEY, expires.toString());
-        setStep("success");
-        setTimeout(() => onSuccess(), 900);
-      } else {
-        setError("Invalid credentials. Please try again.");
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.message || "Authentication failed.";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[250] flex items-center justify-center p-6"
-      style={{ backdropFilter: "blur(14px)", backgroundColor: "rgba(0,0,0,0.4)" }}
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
-        style={{ animation: "popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards" }}
-        onClick={e => e.stopPropagation()}
-      >
-        {step === "success" ? (
-          <>
-            <div className="w-20 h-20 rounded-[1.75rem] bg-emerald-50 flex items-center justify-center mb-6">
-              <HiShieldCheck size={44} className="text-emerald-500" />
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-2 text-emerald-500">Verified</p>
-            <p className="text-slate-800 font-black text-xl leading-snug tracking-tight">
-              Access granted. Opening scanner...
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="w-20 h-20 rounded-[1.75rem] bg-slate-50 flex items-center justify-center mb-6">
-              <HiLockClosed size={36} className="text-slate-700" />
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-2 text-slate-400">QR Scanner Access</p>
-            <p className="text-slate-800 font-black text-xl leading-snug tracking-tight mb-2">
-              Sign in to continue
-            </p>
-            <div className="flex items-center gap-1.5 mb-8">
-              <HiClock size={12} className="text-amber-400" />
-              <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Session valid for 5 minutes</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="w-full space-y-3 text-left">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Username / Email</label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={e => setUsername(e.target.value.slice(0, 30))}
-                  maxLength={30}
-                  placeholder="Enter your email"
-                  className="w-full bg-slate-50 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-black/10 border border-slate-100 transition-all"
-                  disabled={loading}
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value.slice(0, 30))}
-                  maxLength={30}
-                  placeholder="Enter your password"
-                  className="w-full bg-slate-50 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-black/10 border border-slate-100 transition-all"
-                  disabled={loading}
-                />
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 rounded-2xl px-4 py-3">
-                  <HiXCircle size={14} className="text-rose-500 flex-shrink-0" />
-                  <p className="text-[11px] font-bold text-rose-600">{error}</p>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 bg-black text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-black/10 disabled:opacity-60 mt-2"
-              >
-                {loading ? "Verifying..." : "Sign In & Open Scanner"}
-              </button>
-            </form>
-
-            <button onClick={onClose} className="mt-4 text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-slate-500 transition-colors">
-              Cancel
-            </button>
-          </>
-        )}
-
-        <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.04] bg-slate-900" />
-      </div>
-      <style>{`
-        @keyframes popIn {
-          from { opacity: 0; transform: scale(0.88) translateY(16px); }
-          to   { opacity: 1; transform: scale(1)    translateY(0);    }
-        }
-      `}</style>
-    </div>
-  );
-};
-
-const QRSessionExpiredModal = ({ onReauth, onClose }) => (
-  <div
-    className="fixed inset-0 z-[250] flex items-center justify-center p-6"
-    style={{ backdropFilter: "blur(14px)", backgroundColor: "rgba(0,0,0,0.4)" }}
-    onClick={onClose}
-  >
-    <div
-      className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-10 flex flex-col items-center text-center relative overflow-hidden"
-      style={{ animation: "popIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards" }}
-      onClick={e => e.stopPropagation()}
-    >
-      <div className="w-20 h-20 rounded-[1.75rem] bg-amber-50 flex items-center justify-center mb-6">
-        <HiClock size={40} className="text-amber-500" />
-      </div>
-      <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-2 text-amber-500">Session Expired</p>
-      <p className="text-slate-800 font-black text-xl leading-snug tracking-tight mb-2">
-        Your 5-minute session has ended
-      </p>
-      <p className="text-sm font-bold text-slate-400 mb-8">Please sign in again to continue scanning QR codes.</p>
-      <button
-        onClick={onReauth}
-        className="w-full py-4 bg-black text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-black/10 mb-3"
-      >
-        Sign In Again
-      </button>
-      <button onClick={onClose} className="text-[10px] font-black text-slate-300 uppercase tracking-widest hover:text-slate-500 transition-colors">
-        Close
-      </button>
-      <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.04] bg-amber-500" />
-    </div>
-    <style>{`
-      @keyframes popIn {
-        from { opacity: 0; transform: scale(0.88) translateY(16px); }
-        to   { opacity: 1; transform: scale(1)    translateY(0);    }
-      }
-    `}</style>
-  </div>
-);
-
 const downloadQRCode = async (product) => {
-  const text = product.sku || product.name || "NO-SKU";
+  const qrContent = `${BASE_URL}/verify-qr?sku=${product.sku}`;
   const truncateText = (str, n) => str.length > n ? str.substr(0, n - 1) + "..." : str;
 
-  const qrDataUrl = await QRCode.toDataURL(text, {
+  const qrDataUrl = await QRCode.toDataURL(qrContent, {
     width: 256,
     margin: 2,
     color: { dark: "#0f172a", light: "#ffffff" },
@@ -288,12 +115,12 @@ const downloadQRCode = async (product) => {
   ctx.fillText(truncateText(product.name || "", 32), finalCanvas.width / 2, qrImg.height + padding + 38);
 
   const link = document.createElement("a");
-  link.download = `QR-${text.substring(0, 20)}.png`;
+  link.download = `QR-${(product.sku || "").substring(0, 20)}.png`;
   link.href = finalCanvas.toDataURL("image/png");
   link.click();
 };
 
-const QRScannerModal = ({ products, onClose, showAlert, onSessionExpired }) => {
+const QRScannerModal = ({ products, onClose, showAlert }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -301,37 +128,13 @@ const QRScannerModal = ({ products, onClose, showAlert, onSessionExpired }) => {
   const fileInputRef = useRef(null);
   const activeRef = useRef(false);
   const productsRef = useRef(products);
-  const timerRef = useRef(null);
 
   const [scannedProduct, setScannedProduct] = useState(null);
   const [cameraError, setCameraError] = useState(null);
   const [mode, setMode] = useState("camera");
   const [uploading, setUploading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => { productsRef.current = products; }, [products]);
-
-  useEffect(() => {
-    const updateTimer = () => {
-      const expires = parseInt(sessionStorage.getItem(QR_SESSION_KEY) || "0");
-      const remaining = Math.max(0, expires - Date.now());
-      setTimeLeft(remaining);
-      if (remaining <= 0) {
-        stopCamera();
-        onSessionExpired();
-      }
-    };
-    updateTimer();
-    timerRef.current = setInterval(updateTimer, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [onSessionExpired]);
-
-  const formatTime = (ms) => {
-    const secs = Math.ceil(ms / 1000);
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
 
   const getStockStatus = (current, min) => {
     const stock = Number(current) || 0;
@@ -352,8 +155,13 @@ const QRScannerModal = ({ products, onClose, showAlert, onSessionExpired }) => {
 
   const resolveProduct = (value) => {
     const v = value.trim().toLowerCase();
+    let sku = v;
+    try {
+      const url = new URL(value.trim());
+      sku = url.searchParams.get("sku") || v;
+    } catch {}
     return productsRef.current.find(
-      p => (p.sku || "").toLowerCase() === v || (p.name || "").toLowerCase() === v
+      p => (p.sku || "").toLowerCase() === sku.toLowerCase() || (p.name || "").toLowerCase() === sku
     );
   };
 
@@ -459,9 +267,6 @@ const QRScannerModal = ({ products, onClose, showAlert, onSessionExpired }) => {
     setMode(newMode);
   };
 
-  const timerColor = timeLeft < 60000 ? "text-rose-500" : timeLeft < 120000 ? "text-amber-500" : "text-emerald-500";
-  const timerBg = timeLeft < 60000 ? "bg-rose-50 border-rose-100" : timeLeft < 120000 ? "bg-amber-50 border-amber-100" : "bg-emerald-50 border-emerald-100";
-
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center p-4"
@@ -478,18 +283,12 @@ const QRScannerModal = ({ products, onClose, showAlert, onSessionExpired }) => {
             <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900 leading-none">QR Scanner</h2>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mt-1">Scan QR Code</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest ${timerBg} ${timerColor}`}>
-              <HiClock size={12} />
-              {formatTime(timeLeft)}
-            </div>
-            <button
-              onClick={onClose}
-              className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-all"
-            >
-              <HiXMark size={20} />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-all"
+          >
+            <HiXMark size={20} />
+          </button>
         </div>
 
         <div className="px-8 pb-4 pt-4">
@@ -656,42 +455,10 @@ export default function SalesInventory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [currentPage, setCurrentPage] = useState(1);
-
-  const [qrGateOpen, setQrGateOpen] = useState(false);
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
-  const [qrExpiredOpen, setQrExpiredOpen] = useState(false);
 
   const PAGE_SIZE = 10;
   const { alert, showAlert, closeAlert } = useAlert();
-
-  const isQrSessionValid = () => {
-    const expires = parseInt(sessionStorage.getItem(QR_SESSION_KEY) || "0");
-    return Date.now() < expires;
-  };
-
-  const handleScanQRClick = () => {
-    if (isQrSessionValid()) {
-      setQrScannerOpen(true);
-    } else {
-      setQrGateOpen(true);
-    }
-  };
-
-  const handleGateSuccess = () => {
-    setQrGateOpen(false);
-    setQrScannerOpen(true);
-  };
-
-  const handleSessionExpired = () => {
-    setQrScannerOpen(false);
-    sessionStorage.removeItem(QR_SESSION_KEY);
-    setQrExpiredOpen(true);
-  };
-
-  const handleReauth = () => {
-    setQrExpiredOpen(false);
-    setQrGateOpen(true);
-  };
 
   const fetchData = async () => {
     try {
@@ -808,7 +575,7 @@ export default function SalesInventory() {
             </button>
 
             <button
-              onClick={handleScanQRClick}
+              onClick={() => setQrScannerOpen(true)}
               className="sm:hidden flex-shrink-0 w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
             >
               <HiQrCode size={20} />
@@ -816,7 +583,7 @@ export default function SalesInventory() {
           </div>
 
           <button
-            onClick={handleScanQRClick}
+            onClick={() => setQrScannerOpen(true)}
             className="hidden sm:flex flex-shrink-0 items-center justify-center gap-2 bg-slate-900 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg whitespace-nowrap"
           >
             <HiQrCode size={16} />
@@ -1019,26 +786,11 @@ export default function SalesInventory() {
         </div>
       </div>
 
-      {qrGateOpen && (
-        <QRCredentialGate
-          onSuccess={handleGateSuccess}
-          onClose={() => setQrGateOpen(false)}
-        />
-      )}
-
       {qrScannerOpen && (
         <QRScannerModal
           products={products}
           onClose={() => setQrScannerOpen(false)}
           showAlert={showAlert}
-          onSessionExpired={handleSessionExpired}
-        />
-      )}
-
-      {qrExpiredOpen && (
-        <QRSessionExpiredModal
-          onReauth={handleReauth}
-          onClose={() => setQrExpiredOpen(false)}
         />
       )}
 

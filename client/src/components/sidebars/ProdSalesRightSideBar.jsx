@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { HiOutlineMenuAlt3, HiOutlineX, HiOutlineBell } from "react-icons/hi";
+import { HiOutlineMenuAlt3, HiOutlineX } from "react-icons/hi";
 
 const COLLAPSE_THRESHOLD = 160;
 const MIN_WIDTH = 0;
@@ -25,9 +25,7 @@ const ProdSalesRightSidebar = () => {
     e.preventDefault();
   }, []);
 
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-  }, []);
+  const stopResizing = useCallback(() => setIsResizing(false), []);
 
   const resize = useCallback((e) => {
     if (!isResizing) return;
@@ -50,8 +48,7 @@ const ProdSalesRightSidebar = () => {
       const res = await axios.get("http://localhost:5000/api/low_stock_logs");
       const logs = Array.isArray(res.data) ? res.data : [];
       setLowStockLogs(logs.slice(0, 7));
-    } catch (err) {
-      console.error("Error fetching low stock logs:", err);
+    } catch {
       setLowStockLogs([]);
     }
   };
@@ -61,8 +58,7 @@ const ProdSalesRightSidebar = () => {
     try {
       const res = await axios.get(`http://localhost:5000/api/user/${loggedInUserId}`);
       setProfilePic(res.data.profile_image);
-    } catch (err) {
-      console.error("Error Fetching Profile:", err);
+    } catch {
     }
   };
 
@@ -86,8 +82,7 @@ const ProdSalesRightSidebar = () => {
   const getStockBarWidth = (current, threshold) => {
     const c = Number(current) || 0;
     const t = Number(threshold) || 1;
-    const pct = Math.min((c / (t * 2)) * 100, 100);
-    return `${pct}%`;
+    return `${Math.min((c / (t * 2)) * 100, 100)}%`;
   };
 
   const getStockBarColor = (current, threshold) => {
@@ -138,22 +133,16 @@ const ProdSalesRightSidebar = () => {
             {lowStockLogs.length > 0 ? lowStockLogs.map((item, i) => {
               const isFinishedGood = item.item_type === 'finished_good';
               return (
-                <div 
-                  key={i} 
-                  className={`rounded-xl p-3 border transition-colors ${
-                    isFinishedGood 
-                      ? 'bg-emerald-500/5 border-emerald-500/10' 
-                      : 'bg-indigo-500/5 border-indigo-500/10'
-                  }`}
+                <div
+                  key={i}
+                  className={`rounded-xl p-3 border transition-colors ${isFinishedGood ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-indigo-500/5 border-indigo-500/10'}`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] font-black text-gray-200 truncate uppercase leading-tight">
                         {item.material_name}
                       </p>
-                      <p className={`text-[9px] mt-0.5 uppercase tracking-wider font-bold ${
-                        isFinishedGood ? 'text-emerald-500/70' : 'text-indigo-400/70'
-                      }`}>
+                      <p className={`text-[9px] mt-0.5 uppercase tracking-wider font-bold ${isFinishedGood ? 'text-emerald-500/70' : 'text-indigo-400/70'}`}>
                         {isFinishedGood ? 'Finished Good' : 'Raw Material'} · {item.unique_code}
                       </p>
                     </div>
@@ -194,26 +183,40 @@ const ProdSalesRightSidebar = () => {
     <>
       {isCollapsed ? (
         <button
-    onClick={() => setSidebarWidth(DEFAULT_WIDTH)}
-    className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
-    title="Expand sidebar"
-  >
-    <div className="relative">
-      <HiOutlineMenuAlt3 size={20} className="text-gray-300" />
-      {lowStockLogs.length > 0 && (
-        <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]"></span>
-      )}
-    </div>
-  </button>
+          onClick={() => setSidebarWidth(DEFAULT_WIDTH)}
+          className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 cursor-pointer outline-none group"
+          title="Expand sidebar"
+        >
+          <div className="relative">
+            <HiOutlineMenuAlt3 size={20} className="text-gray-500 group-hover:text-gray-200 transition-colors duration-200" />
+            {lowStockLogs.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]" />
+            )}
+          </div>
+        </button>
       ) : (
-        <div 
-          className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0"
+        <div
+          className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0 transition-all duration-300 ease-in-out"
           style={{ width: sidebarWidth }}
         >
           <div
             onMouseDown={startResizing}
-            className={`w-1 h-full cursor-col-resize flex-shrink-0 hover:bg-amber-500/40 transition-colors ${isResizing ? 'bg-amber-500/40' : ''}`}
-          />
+            className={`w-3 h-full cursor-col-resize flex-shrink-0 group/handle flex items-center justify-center ${isResizing ? '[&>div]:opacity-100 [&>div]:bg-indigo-500/40' : ''}`}
+          >
+            <div className={`w-1 h-full transition-all duration-150 group-hover/handle:bg-indigo-500/40 ${isResizing ? 'bg-indigo-500/40' : 'bg-transparent'}`} />
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 -translate-x-1/2 opacity-0 group-hover/handle:opacity-100 transition-all duration-300 pointer-events-none z-50">
+              <div className="bg-[#1a1715] border border-white/20 rounded-lg px-1.5 py-2 shadow-xl flex flex-col gap-0.5 items-center scale-90 group-hover/handle:scale-100">
+                <svg width="10" height="14" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="3" cy="2" r="1.2" fill="#6366f1"/>
+                  <circle cx="7" cy="2" r="1.2" fill="#6366f1"/>
+                  <circle cx="3" cy="7" r="1.2" fill="#6366f1"/>
+                  <circle cx="7" cy="7" r="1.2" fill="#6366f1"/>
+                  <circle cx="3" cy="12" r="1.2" fill="#6366f1"/>
+                  <circle cx="7" cy="12" r="1.2" fill="#6366f1"/>
+                </svg>
+              </div>
+            </div>
+          </div>
           <div className="flex-1 h-full overflow-hidden">
             <SidebarContent />
           </div>
@@ -222,12 +225,12 @@ const ProdSalesRightSidebar = () => {
 
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center shadow-lg"
+        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center shadow-lg cursor-pointer outline-none group"
       >
         <div className="relative">
-          <HiOutlineMenuAlt3 size={20} className="text-gray-300" />
+          <HiOutlineMenuAlt3 size={20} className="text-gray-500 group-hover:text-gray-200 transition-colors duration-200" />
           {lowStockLogs.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]"></span>
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full border border-[#262221]" />
           )}
         </div>
       </button>
@@ -243,7 +246,7 @@ const ProdSalesRightSidebar = () => {
             <div className="relative h-full">
               <button
                 onClick={() => setMobileOpen(false)}
-                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"
+                className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white cursor-pointer outline-none hover:bg-white/20 transition-colors duration-200"
               >
                 <HiOutlineX size={14} />
               </button>
@@ -253,16 +256,16 @@ const ProdSalesRightSidebar = () => {
         </div>
       )}
 
-      <style>{`
-        ${isResizing ? 'body { cursor: col-resize !important; user-select: none; }' : ''}
+      <style>{`${isResizing ? 'body { cursor: col-resize !important; user-select: none; }' : ''}
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        @keyframes slideInRight {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-      `}</style>
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+        .animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+        .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }`}
+      </style>
     </>
   );
 };

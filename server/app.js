@@ -23,8 +23,15 @@ module.exports = { app, server, io };
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
-
+app.use(cors({
+  origin: [
+    "http://localhost:5173", 
+    "http://192.168.1.179:5173" // Bagong IP address mo
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: { user: process.env.MY_EMAIL, pass: process.env.MY_PASSWORD }
@@ -1733,6 +1740,10 @@ app.put('/api/work_orders/:id', async (req, res) => {
         }
       }
     }
+
+    app.get("/", (req, res) => {
+  res.send("KSMM IMS Backend is running on Render!");
+});
 
     await client.query('COMMIT');
 
