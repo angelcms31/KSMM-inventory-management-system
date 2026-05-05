@@ -13,6 +13,7 @@ import AdminLayout from "./components/layouts/AdminLayout";
 import SalesLayout from "./components/layouts/SalesLayout";
 import ProductionLayout from "./components/layouts/ProductionLayout";
 import FinanceLayout from "./components/layouts/FinanceLayout";
+import VerifyQRModal from "./components/modals/VerifyQRModal";
 
 const RequireAuth = ({ children }) => {
   const userId = localStorage.getItem("user_id");
@@ -113,6 +114,11 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to={`/auth/${getAuthHash("login")}`} replace />} />
         <Route path="/auth/:authHash" element={<AuthSwitcher />} />
+
+        <Route 
+    path={`/${getHashedPath("public", "verify-qr")}`} 
+    element={<VerifyQRModal />} 
+  />
 
         <Route 
           path="/dashboard/*" 

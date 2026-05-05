@@ -27,9 +27,7 @@ const AlertDialog = ({ alert, onClose }) => {
         <p className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${isSuccess ? 'text-emerald-500' : 'text-rose-500'}`}>
           {isSuccess ? 'Success' : 'Error'}
         </p>
-        <p className="text-slate-800 font-bold text-lg leading-tight tracking-tight mb-8">
-          {alert.message}
-        </p>
+        <p className="text-slate-800 font-bold text-lg leading-tight tracking-tight mb-8">{alert.message}</p>
         <button
           onClick={onClose}
           className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] ${isSuccess ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-100'}`}
@@ -39,12 +37,7 @@ const AlertDialog = ({ alert, onClose }) => {
         <div className={`absolute -bottom-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
         <div className={`absolute -top-6 -left-6 w-24 h-24 rounded-full opacity-[0.04] ${isSuccess ? 'bg-emerald-500' : 'bg-rose-500'}`} />
       </div>
-      <style>{`
-        @keyframes popIn {
-          from { opacity: 0; transform: scale(0.88) translateY(16px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-      `}</style>
+      <style>{`@keyframes popIn { from { opacity: 0; transform: scale(0.88) translateY(16px); } to { opacity: 1; transform: scale(1) translateY(0); } }`}</style>
     </div>
   );
 };
@@ -93,9 +86,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     e.preventDefault();
   }, []);
 
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-  }, []);
+  const stopResizing = useCallback(() => setIsResizing(false), []);
 
   const resize = useCallback((e) => {
     if (!isResizing) return;
@@ -115,17 +106,14 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
 
   useEffect(() => {
     if (!pendingCompose || !pendingCompose.to) return;
-
     const targetTo = pendingCompose.to;
     const targetSubject = pendingCompose.subject || "";
     const targetBody = pendingCompose.body || "";
-
     setIsFromPO(true);
     setShowCompose(true);
     setComposeMinimized(false);
     setComposeTo(targetTo);
     setComposeSubject(targetSubject);
-
     let attempts = 0;
     const injectInterval = setInterval(() => {
       attempts++;
@@ -135,19 +123,12 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;")
           .replace(/\n/g, "<br>");
-
         bodyRef.current.innerHTML = escaped;
-
-        if (onComposeHandled) {
-          onComposeHandled();
-        }
-
+        if (onComposeHandled) onComposeHandled();
         clearInterval(injectInterval);
       }
-
       if (attempts > 20) clearInterval(injectInterval);
     }, 100);
-
     return () => clearInterval(injectInterval);
   }, [pendingCompose, onComposeHandled]);
 
@@ -186,8 +167,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
   };
 
   const navigateToAudit = () => {
-    const logPath = getHashedPath(userRole, 'audit');
-    navigate(`/dashboard/${logPath}`);
+    navigate(`/dashboard/${getHashedPath(userRole, 'audit')}`);
   };
 
   const fetchActivities = async () => {
@@ -197,13 +177,10 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
         axios.get("http://localhost:5000/api/materials"),
         axios.get("http://localhost:5000/api/all_orders"),
       ]);
-
       setActivities((Array.isArray(resLogs.data) ? resLogs.data : []).slice(0, 4));
-
       const activeOrderMatIds = (resOrders.data || [])
         .filter(o => o.status === 'Ongoing' || o.status === 'Pending')
         .map(o => parseInt(o.material_id));
-
       const lowStock = (Array.isArray(resMaterials.data) ? resMaterials.data : [])
         .filter(m => {
           const isLow = parseInt(m.stock_quantity) <= parseInt(m.reorder_threshold);
@@ -211,7 +188,6 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           return isLow && !hasActivePO;
         })
         .map(m => ({ id: m.material_id, name: m.material_name, current: m.stock_quantity, threshold: m.reorder_threshold }));
-
       setLowStockAlerts(lowStock);
     } catch { setActivities([]); }
   };
@@ -288,7 +264,6 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
     const bodyText = bodyRef.current?.innerText?.trim() || "";
     const bodyHTML = bodyRef.current?.innerHTML || "";
     if (!composeTo || !composeSubject || !bodyText) return;
-
     setSending(true);
     try {
       const formData = new FormData();
@@ -296,27 +271,16 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
       formData.append("subject", composeSubject);
       formData.append("body", bodyHTML);
       attachments.forEach(file => formData.append("attachments", file));
-
-      await axios.post("http://localhost:5000/api/gmail/send", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-
+      await axios.post("http://localhost:5000/api/gmail/send", formData, { headers: { "Content-Type": "multipart/form-data" } });
       setSendSuccess(true);
       fetchGmailMessages();
-
       if (isFromPO) {
         setSidebarAlert({ type: 'success', message: 'Purchase order created and email sent successfully!' });
       }
-
-      setTimeout(() => {
-        handleDiscard();
-      }, 2000);
-    } catch (err) {
-      console.error(err);
+      setTimeout(() => { handleDiscard(); }, 2000);
+    } catch {
       setSidebarAlert({ type: 'error', message: 'Failed to send email.' });
-    } finally {
-      setSending(false);
-    }
+    } finally { setSending(false); }
   };
 
   useEffect(() => {
@@ -342,7 +306,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
         <div className="absolute inset-0 bg-[#262221] z-50 flex flex-col">
           <div className="p-5 flex items-center justify-between border-b border-white/5">
             <div className="flex items-center gap-3">
-              <button onClick={() => setShowNotifications(false)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
+              <button onClick={() => setShowNotifications(false)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer outline-none">
                 <HiChevronLeft size={18} className="text-gray-400" />
               </button>
               <div>
@@ -387,7 +351,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           <div className="p-4 border-t border-white/5">
             <button
               onClick={() => setShowNotifications(false)}
-              className="w-full text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors py-2"
+              className="w-full text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors py-2 cursor-pointer outline-none"
             >
               ← Back to Sidebar
             </button>
@@ -410,7 +374,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
             <p className="text-[11px] text-gray-500 mt-1.5 uppercase tracking-widest font-black">{userRole}</p>
           </div>
         </div>
-        <button onClick={() => setShowNotifications(true)} className="relative cursor-pointer p-1.5 rounded-full hover:bg-white/5 transition-all duration-200 active:scale-90">
+        <button onClick={() => setShowNotifications(true)} className="relative cursor-pointer p-1.5 rounded-full hover:bg-white/5 transition-all duration-200 active:scale-90 outline-none">
           <HiOutlineBell size={22} className="text-gray-400 hover:text-white transition-colors duration-200" />
           {lowStockAlerts.length > 0 && (
             <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 rounded-full border-2 border-[#262221] flex items-center justify-center">
@@ -439,7 +403,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
               <p className="text-[11px] text-gray-600 text-center py-4 italic">No activity yet</p>
             )}
           </div>
-          <button onClick={navigateToAudit} className="text-[10px] text-gray-500 mt-6 hover:text-white font-bold transition-colors uppercase tracking-widest">
+          <button onClick={navigateToAudit} className="text-[10px] text-gray-500 mt-6 hover:text-white font-bold transition-colors uppercase tracking-widest cursor-pointer outline-none">
             VIEW ALL
           </button>
         </div>
@@ -454,10 +418,10 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
             </div>
             {gmailConnected && (
               <div className="flex items-center gap-1.5">
-                <button onClick={() => { setShowCompose(true); setComposeMinimized(false); }} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Compose">
+                <button onClick={() => { setShowCompose(true); setComposeMinimized(false); }} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors cursor-pointer outline-none" title="Compose">
                   <HiOutlinePaperAirplane size={13} className="text-gray-400" />
                 </button>
-                <button onClick={fetchGmailMessages} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors" title="Refresh">
+                <button onClick={fetchGmailMessages} className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-colors cursor-pointer outline-none" title="Refresh">
                   <HiOutlineRefresh size={13} className="text-gray-400" />
                 </button>
               </div>
@@ -478,7 +442,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                   <HiOutlinePaperAirplane className="text-gray-600 rotate-90" size={20} />
                 </div>
                 <p className="text-gray-400 text-[11px] font-bold mb-1">Gmail Disconnected</p>
-                <button onClick={handleConnect} className="w-full text-[10px] font-black uppercase tracking-widest bg-white text-black py-2.5 rounded-lg hover:bg-gray-200 transition-colors shadow-lg">
+                <button onClick={handleConnect} className="w-full text-[10px] font-black uppercase tracking-widest bg-white text-black py-2.5 rounded-lg hover:bg-gray-200 transition-colors shadow-lg cursor-pointer outline-none">
                   Connect Gmail
                 </button>
               </div>
@@ -516,7 +480,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           {selected && (
             <div className="absolute inset-0 bg-[#1e1b1a] z-30 flex flex-col p-4">
               <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-                <button onClick={() => setSelected(null)} className="p-1 hover:bg-white/5 rounded-md">
+                <button onClick={() => setSelected(null)} className="p-1 hover:bg-white/5 rounded-md cursor-pointer outline-none">
                   <HiChevronLeft size={20} />
                 </button>
                 <div className="flex gap-2">
@@ -529,11 +493,11 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                       setShowCompose(true);
                       setComposeMinimized(false);
                     }}
-                    className="text-[10px] font-bold text-indigo-400 px-2 py-1 hover:bg-white/5 rounded"
+                    className="text-[10px] font-bold text-indigo-400 px-2 py-1 hover:bg-white/5 rounded cursor-pointer outline-none"
                   >
                     REPLY
                   </button>
-                  <button onClick={() => setSelected(null)} className="text-[10px] font-bold text-gray-500 hover:text-white">CLOSE</button>
+                  <button onClick={() => setSelected(null)} className="text-[10px] font-bold text-gray-500 hover:text-white cursor-pointer outline-none">CLOSE</button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -563,11 +527,10 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           <div className="bg-[#404040] flex items-center justify-between px-4 py-3 cursor-pointer select-none" onClick={() => setComposeMinimized(m => !m)}>
             <span className="text-[13px] font-semibold text-white tracking-tight">New Message</span>
             <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setComposeMinimized(m => !m)} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiMinus size={15} /></button>
-              <button onClick={handleDiscard} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10"><HiOutlineX size={15} /></button>
+              <button onClick={() => setComposeMinimized(m => !m)} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10 cursor-pointer outline-none"><HiMinus size={15} /></button>
+              <button onClick={handleDiscard} className="text-gray-300 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10 cursor-pointer outline-none"><HiOutlineX size={15} /></button>
             </div>
           </div>
-
           {!composeMinimized && (
             <div className="bg-[#1e1b1a] flex flex-col h-[calc(100%-48px)]">
               <div className="border-b border-white/10 px-4 py-2.5 flex items-center gap-2">
@@ -583,24 +546,24 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
                   {attachments.map((file, i) => (
                     <div key={i} className="flex items-center gap-1 bg-white/10 rounded-full px-2.5 py-1 text-[10px] text-gray-300 max-w-[140px]">
                       <span className="truncate">{file.name}</span>
-                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5"><HiOutlineX size={10} /></button>
+                      <button onClick={() => removeAttachment(i)} className="text-gray-500 hover:text-white shrink-0 ml-0.5 cursor-pointer outline-none"><HiOutlineX size={10} /></button>
                     </div>
                   ))}
                 </div>
               )}
               {sendSuccess && <div className="px-4 pb-1"><p className="text-[11px] text-green-400 font-medium">✓ Message sent!</p></div>}
               <div className="px-4 py-3 border-t border-white/10 flex items-center justify-between">
-                <button onClick={handleSend} disabled={sending} className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] text-white text-[12px] font-semibold px-5 py-2 rounded-full transition-colors active:scale-95 disabled:opacity-50">
+                <button onClick={handleSend} disabled={sending} className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1765cc] text-white text-[12px] font-semibold px-5 py-2 rounded-full transition-colors active:scale-95 disabled:opacity-50 cursor-pointer outline-none">
                   {sending ? "Sending..." : "Send"}
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
                 </button>
                 <div className="flex items-center gap-0.5">
-                  <button onMouseDown={e => { e.preventDefault(); applyFormat('bold'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" /></svg></button>
-                  <button onMouseDown={e => { e.preventDefault(); applyFormat('italic'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></svg></button>
-                  <button onMouseDown={e => { e.preventDefault(); applyFormat('underline'); }} className={`p-1.5 rounded-full hover:bg-white/5 ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></svg></button>
-                  <button onClick={handleAttachClick} className="p-1.5 rounded-full text-gray-500 hover:bg-white/5 transition-colors"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg></button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('bold'); }} className={`p-1.5 rounded-full hover:bg-white/5 cursor-pointer outline-none ${formatting.bold ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4h8a4 4 0 010 8H6z" /><path d="M6 12h9a4 4 0 010 8H6z" /></svg></button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('italic'); }} className={`p-1.5 rounded-full hover:bg-white/5 cursor-pointer outline-none ${formatting.italic ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></svg></button>
+                  <button onMouseDown={e => { e.preventDefault(); applyFormat('underline'); }} className={`p-1.5 rounded-full hover:bg-white/5 cursor-pointer outline-none ${formatting.underline ? 'text-white bg-white/15' : 'text-gray-500'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></svg></button>
+                  <button onClick={handleAttachClick} className="p-1.5 rounded-full text-gray-500 hover:bg-white/5 transition-colors cursor-pointer outline-none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" /></svg></button>
                   <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
-                  <button onClick={handleDiscard} className="p-1.5 rounded-full text-gray-500 hover:text-red-400 transition-colors"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg></button>
+                  <button onClick={handleDiscard} className="p-1.5 rounded-full text-gray-500 hover:text-red-400 transition-colors cursor-pointer outline-none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" /></svg></button>
                 </div>
               </div>
             </div>
@@ -611,11 +574,11 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
       {isCollapsed ? (
         <button
           onClick={() => { setSidebarWidth(DEFAULT_WIDTH); setShowNotifications(true); }}
-          className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95"
+          className="hidden lg:flex fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 cursor-pointer outline-none group"
           title="Expand sidebar"
         >
           <div className="relative">
-            <HiOutlineBell size={18} className="text-gray-300" />
+            <HiOutlineBell size={18} className="text-gray-500 group-hover:text-gray-200 transition-colors duration-200" />
             {lowStockAlerts.length > 0 && (
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border border-[#262221] flex items-center justify-center">
                 <span className="text-[7px] font-black text-white">{lowStockAlerts.length > 9 ? '9+' : lowStockAlerts.length}</span>
@@ -625,13 +588,27 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
         </button>
       ) : (
         <div
-          className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0"
+          className="hidden lg:flex h-screen sticky top-0 right-0 shrink-0 transition-all duration-300 ease-in-out"
           style={{ width: sidebarWidth }}
         >
           <div
             onMouseDown={startResizing}
-            className={`w-1 h-full cursor-col-resize flex-shrink-0 hover:bg-emerald-500/40 transition-colors ${isResizing ? 'bg-emerald-500/40' : ''}`}
-          />
+            className={`w-3 h-full cursor-col-resize flex-shrink-0 group/handle flex items-center justify-center ${isResizing ? '[&>div]:opacity-100 [&>div]:bg-indigo-500/40' : ''}`}
+          >
+            <div className={`w-1 h-full transition-all duration-150 group-hover/handle:bg-indigo-500/40 ${isResizing ? 'bg-indigo-500/40' : 'bg-transparent'}`} />
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 -translate-x-1/2 opacity-0 group-hover/handle:opacity-100 transition-all duration-300 pointer-events-none z-50">
+              <div className="bg-[#1a1715] border border-white/20 rounded-lg px-1.5 py-2 shadow-xl flex flex-col gap-0.5 items-center scale-90 group-hover/handle:scale-100">
+                <svg width="10" height="14" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="3" cy="2" r="1.2" fill="#6366f1"/>
+                  <circle cx="7" cy="2" r="1.2" fill="#6366f1"/>
+                  <circle cx="3" cy="7" r="1.2" fill="#6366f1"/>
+                  <circle cx="7" cy="7" r="1.2" fill="#6366f1"/>
+                  <circle cx="3" cy="12" r="1.2" fill="#6366f1"/>
+                  <circle cx="7" cy="12" r="1.2" fill="#6366f1"/>
+                </svg>
+              </div>
+            </div>
+          </div>
           <div className="flex-1 h-full overflow-hidden">
             <SidebarContent />
           </div>
@@ -640,10 +617,10 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
 
       <button
         onClick={() => { setMobileOpen(true); setShowNotifications(true); }}
-        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center shadow-lg"
+        className="lg:hidden fixed top-4 right-4 z-40 w-11 h-11 rounded-2xl bg-[#262221] border border-white/10 flex items-center justify-center shadow-lg cursor-pointer outline-none group"
       >
         <div className="relative">
-          <HiOutlineBell size={18} className="text-gray-300" />
+          <HiOutlineBell size={18} className="text-gray-500 group-hover:text-gray-200 transition-colors duration-200" />
           {lowStockAlerts.length > 0 && (
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border border-[#262221] flex items-center justify-center">
               <span className="text-[7px] font-black text-white">{lowStockAlerts.length > 9 ? '9+' : lowStockAlerts.length}</span>
@@ -657,7 +634,7 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
           <div className="flex-1 bg-black/50" />
           <div className="w-[280px] h-full overflow-y-auto text-left" onClick={e => e.stopPropagation()} style={{ animation: 'slideInRight 0.25s ease-out' }}>
             <div className="relative h-full">
-              <button onClick={() => setMobileOpen(false)} className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white">
+              <button onClick={() => setMobileOpen(false)} className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white cursor-pointer outline-none hover:bg-white/20 transition-colors duration-200">
                 <HiOutlineX size={14} />
               </button>
               <SidebarContent />
@@ -666,15 +643,18 @@ const FinanceRightSidebar = ({ pendingCompose, onComposeHandled }) => {
         </div>
       )}
 
-      <style>{`
-        ${isResizing ? 'body { cursor: col-resize !important; user-select: none; }' : ''}
+      <style>{`${isResizing ? 'body { cursor: col-resize !important; user-select: none; }' : ''}
         [contenteditable]:empty:before { content: attr(data-placeholder); color: #4b5563; pointer-events: none; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
-        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
-      `}</style>
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+        .animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+        .animate-scaleIn { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }`}
+      </style>
     </>
   );
 };
