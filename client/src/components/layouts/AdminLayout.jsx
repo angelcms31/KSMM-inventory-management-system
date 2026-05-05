@@ -4,7 +4,7 @@ import AdminSidebar from "../sidebars/AdminSidebar";
 import AdminRightSidebar from "../sidebars/AdminRightSidebar";
 import { getHashedPath } from "../../utils/hash";
 
-import MainDashboard from "../../components/dashboard/MainDashboard";
+import MainDashboard from "../dashboard/MainDashboard";
 import Artisan from "../../pages/admin/ManageArtisan";
 import Suppliers from "../../pages/admin/Suppliers";
 import ManageUsers from "../../pages/admin/ManageUsers";
